@@ -8,10 +8,13 @@ begining of a port and optimization of the WLAN Pi profiler from py2 to py3 and 
 
 pre-reqs:
 
-- minimum Python 3.6 installed
+- minimum `Python 3.6` installed ([instructions for building from source](https://gist.github.com/joshschmelzle/e84d3060cc987d3ccb3a141cab9ffbb1))
 - `airmon-ng` installed
 
+install: 
+
 ```
+# get code
 git clone <repo>
 cd <repo>
 
@@ -20,16 +23,13 @@ sudo python3 -m pip install .
 
 # or just to run w/o installing
 sudo python3 -m profiler2 <params>
-```
 
-usage examples:
-
-```
+# run w/o installing examples
 sudo python3.7 -m profiler2 
 sudo python3.7 -m profiler2 -c 40 -s "WLAN Pi Dev" -logging debug
 ```
 
-## how to set the channel manually:
+## how to prep your interface and set the channel manually:
 
 ```
 sudo ip link set wlan0 down
