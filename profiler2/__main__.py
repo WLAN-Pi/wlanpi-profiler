@@ -59,7 +59,7 @@ def main() -> None:
     log = logging.getLogger(inspect.stack()[0][3])
 
     log.debug("prepping interface...")
-    if not prep_interface(interface, "monitor", channel):
+    if not helpers.prep_interface(interface, "monitor", channel):
         log.error("failed to prep interface")
         sys.exit(-1)
 
