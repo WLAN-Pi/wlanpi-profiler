@@ -128,8 +128,8 @@ class TxBeacons(object):
                 / beacon_frame_ies
             )
 
-        #self.log.debug("origin beacon hexdump")
-        #self.log.debug(hexdump(self.beacon_frame))
+        # self.log.debug("origin beacon hexdump")
+        # self.log.debug(hexdump(self.beacon_frame))
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
@@ -235,7 +235,9 @@ class Sniffer(object):
         if frame.addr2 not in self.associated:
             self.associated.append(frame.addr2)
 
-            print(f"{time()}: added {frame.addr2} to associated list: {self.associated}")
+            print(
+                f"{time()}: added {frame.addr2} to associated list: {self.associated}"
+            )
 
         # TODO: trigger analysis of association request
 
@@ -244,7 +246,7 @@ class Sniffer(object):
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
         with self.sequence_number.get_lock():
-           frame.sequence_number = next_sequence_number(self.sequence_number) - 1
+            frame.sequence_number = next_sequence_number(self.sequence_number) - 1
 
         # self.log.debug(f"sending authentication (0x0B) to {receiver}")
         self.l2socket.send(frame)
