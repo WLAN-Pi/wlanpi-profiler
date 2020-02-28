@@ -50,7 +50,7 @@ def main() -> None:
     boot_time = time()
     import multiprocessing as mp
 
-    mp.set_start_method("spawn")
+    #mp.set_start_method("spawn")
 
     lock = mp.Lock()
     sequence_number = mp.Value("i", 0)
