@@ -232,7 +232,7 @@ class Sniffer(object):
             self.associated.append(frame.addr2)
 
             self.log.info(
-                f"{time()}: added {frame.addr2} to associated list: {self.associated}"
+                f"{frame.addr2} added to associated list {self.associated}"
             )
 
         # TODO: trigger analysis of association request
