@@ -17,7 +17,7 @@ try:
 except FileNotFoundError:
     long_description = about["__description__"]
 
-requires = ["scapy"]
+requires = ["scapy", "manuf-ng"]
 
 setup(
     name=about["__title__"],

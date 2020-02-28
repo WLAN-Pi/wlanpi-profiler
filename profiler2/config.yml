@@ -1,8 +1,0 @@
-fakeap:
-  interface: wlan0          
-  ssid: WLAN Pi
-  channel: 36
-reporting:
-  root: '/var/www/html/profiler'
-  clients: '/var/www/html/profiler/clients'
-  reports: '/var/www/html/profiler/reports'

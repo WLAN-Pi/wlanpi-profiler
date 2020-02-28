@@ -1,3 +1,7 @@
+# THIS IS A WORK IN PROGRESS AND NOT READY FOR USE OUTSIDE OF DEVELOPMENT
+
+# I AM DOING DEVELOPMENT ON THE MASTER BRANCH UNTIL A VERSION IS READY FOR TESTING 
+
 # profiler2
 
 begining of a port and optimization of the WLAN Pi profiler from py2 to py3 and removing an external FakeAP dependency.
@@ -6,10 +10,14 @@ begining of a port and optimization of the WLAN Pi profiler from py2 to py3 and 
 
 pre-reqs:
 
-- minimum Python 3.6 installed
-- `airmon-ng` installed
+- minimum `Python 3.6` 
+- `scapy` and `manuf-ng` Py3 modules
+- `tcpdump` and `airmon-ng`
+
+install: 
 
 ```
+# get code
 git clone <repo>
 cd <repo>
 
@@ -18,16 +26,13 @@ sudo python3 -m pip install .
 
 # or just to run w/o installing
 sudo python3 -m profiler2 <params>
+
+# run w/o installing examples
+sudo python3 -m profiler2 
+sudo python3 -m profiler2 -c 40 -s "WLAN Pi Dev" -logging debug
 ```
 
-usage examples:
-
-```
-sudo python3.7 -m profiler2 
-sudo python3.7 -m profiler2 -c 40 -s "WLAN Pi Dev" -logging debug
-```
-
-## how to set the channel manually:
+## how to prep your interface and set the channel manually:
 
 ```
 sudo ip link set wlan0 down
