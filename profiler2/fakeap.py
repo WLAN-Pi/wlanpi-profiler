@@ -365,7 +365,7 @@ class FakeAP(object):
             log.info("starting beacon tx'r")
             self.txbeacons.start()
         log.info("starting sniffer")
-        
+
         sniffer = threading.Thread(
             target=sniff(
                 iface=self.interface,

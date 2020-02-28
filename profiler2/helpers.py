@@ -12,11 +12,15 @@ import argparse
 import inspect
 import logging
 import logging.config
+
+logging.getLogger("scapy.runtime").setLevel(logging.DEBUG)
 import os
 import subprocess
 import sys
 import textwrap
 from typing import Union
+from time import time
+from multiprocessing import Value
 
 # third party imports
 try:
@@ -28,8 +32,13 @@ except ModuleNotFoundError as error:
         )
     sys.exit(-1)
 
-import scapy
-from scapy.all import Dot11Elt
+from scapy.all import (
+    RadioTap,
+    Dot11Elt,
+    get_if_hwaddr,
+    get_if_raw_hwaddr,
+    Scapy_Exception,
+)
 
 # app imports
 from .__version__ import __author__, __version__
@@ -224,9 +233,10 @@ def is_root() -> bool:
 
 def prep_interface(interface: str, mode: str, channel: int) -> bool:
     """ prepares the interface for monitor mode and injection """
+    log = logging.getLogger(inspect.stack()[0][3])
     if mode in ("managed", "monitor"):
         commands = [
-            # "airmon-ng check kill", # this is killing dhclient and i am losing connectivity
+            "airmon-ng check kill",
             f"ip link set {interface} down",
             f"iw dev {interface} set type {mode}",
             f"ip link set {interface} up",
@@ -339,9 +349,7 @@ def get_frequency_bytes(channel: int) -> bytes:
     return freq.to_bytes(2, byteorder="little")
 
 
-def build_fake_frame_ies(
-    ssid: str, channel: int, ft_enabled: bool
-) -> scapy.layers.dot11.Dot11Elt:
+def build_fake_frame_ies(ssid: str, channel: int, ft_enabled: bool) -> Dot11Elt:
     ssid = bytes(ssid, "utf-8")
     essid = Dot11Elt(ID="SSID", info=ssid)
 
@@ -431,3 +439,33 @@ def build_fake_frame_ies(
     # frame.show()
     # hexdump(frame)
     return frame
+
+
+def current_timestamp(boot_time: time):
+    return int(time() - boot_time)
+
+
+def next_sequence_number(sequence_number: Value):
+    """ updates a sequence number of type multiprocessing Value """
+    sequence_number.value = (sequence_number.value + 1) % 4096
+    return sequence_number.value
+
+
+def get_radiotap_header(channel: int):
+    """ builds a pseudo radio tap header """
+    radiotap_packet = RadioTap(
+        present="Flags+Rate+Channel+dBm_AntSignal+Antenna",
+        notdecoded=b"\x8c\00"
+        + get_frequency_bytes(channel)
+        + b"\xc0\x00\xc0\x01\x00\x00",
+    )
+    return radiotap_packet
+
+
+def get_mac(interface: str) -> str:
+    """ gets the mac address for a specified interface """
+    try:
+        mac = get_if_hwaddr(interface)
+    except Scapy_Exception:
+        mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
+    return mac
