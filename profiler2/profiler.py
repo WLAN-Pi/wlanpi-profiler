@@ -235,7 +235,7 @@ class Sniffer(object):
         if frame.addr2 not in self.associated:
             self.associated.append(frame.addr2)
 
-            print(
+            self.log.info(
                 f"{time()}: added {frame.addr2} to associated list: {self.associated}"
             )
 
