@@ -56,6 +56,7 @@ def main() -> None:
     sequence_number = mp.Value("i", 0)
     from .profiler import TxBeacons, Sniffer, AnalyzeFrame
 
+    log = logging.getLogger(inspect.stack()[0][3])
     log.info("starting beacon process")
     p = mp.Process(
         name="txbeacons",
