@@ -1,3 +1,5 @@
+# THIS IS A WORK IN PROGRESS AND NOT READY FOR USE OUTSIDE OF DEVELOPMENT
+
 # profiler2
 
 begining of a port and optimization of the WLAN Pi profiler from py2 to py3 and removing an external FakeAP dependency.
