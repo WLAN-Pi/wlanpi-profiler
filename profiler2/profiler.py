@@ -92,7 +92,7 @@ class TxBeacons(object):
         self, args, boot_time, lock, sequence_number, ssid, interface, channel
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug(f"beacons pid: {os.getpid()}")
+        self.log.info(f"beacons pid: {os.getpid()}")
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
@@ -130,7 +130,7 @@ class TxBeacons(object):
 
         #self.log.debug("origin beacon hexdump")
         #self.log.debug(hexdump(self.beacon_frame))
-        self.log.debug("starting beacon transmissions")
+        self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
     def every(self, interval, task):
@@ -154,7 +154,7 @@ class Sniffer(object):
         self, args, boot_time, lock, sequence_number, ssid, interface, channel
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug(f"sniffer pid: {os.getpid()}")
+        self.log.info(f"sniffer pid: {os.getpid()}")
         # self.log.info(f"PyX presence? {_pyx_presence}")
 
         self.boot_time = boot_time
@@ -192,8 +192,12 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-        sleep(1)
-        self.run()
+        sniff(
+            iface=self.interface,
+            prn=self.received_frame_cb,
+            store=0,
+            filter=self.bpf_filter,
+        )
 
     def received_frame(self, packet):
         """ handles incoming packets for profiling """
@@ -225,16 +229,13 @@ class Sniffer(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-        try:
-            self.l2socket.send(frame)
-        except OSError as error:
-            self.log.exception(error)
+        self.l2socket.send(frame)
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.associated:
             self.associated.append(frame.addr2)
 
-            print(f"{time}: added {frame.addr2} to associated list: {self.associated}")
+            print(f"{time()}: added {frame.addr2} to associated list: {self.associated}")
 
         # TODO: trigger analysis of association request
 
@@ -247,11 +248,3 @@ class Sniffer(object):
 
         # self.log.debug(f"sending authentication (0x0B) to {receiver}")
         self.l2socket.send(frame)
-
-    def run(self):
-        sniff(
-            iface=self.interface,
-            prn=self.received_frame_cb,
-            store=0,
-            filter=self.bpf_filter,
-        )
