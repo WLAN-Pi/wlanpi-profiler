@@ -65,6 +65,8 @@ def main() -> None:
     )
     p.start()
 
+    sleep(2)
+
     log.info("starting sniffer process")
     p2 = mp.Process(
         name="sniffer",
