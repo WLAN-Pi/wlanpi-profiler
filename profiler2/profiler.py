@@ -26,8 +26,7 @@ except ModuleNotFoundError as error:
     if error.name == "pyx":
         _pyx_presence = False
 
-logging.getLogger("scapy.runtime").setLevel(logging.DEBUG)
-# logging.getLogger("scapy").setLevel(2)
+# logging.getLogger("scapy").setLevel(logging.DEBUG)
 
 from scapy.all import (
     Dot11,
@@ -129,8 +128,8 @@ class TxBeacons(object):
                 / beacon_frame_ies
             )
 
-        self.log.debug("origin beacon hexdump")
-        self.log.debug(hexdump(self.beacon_frame))
+        #self.log.debug("origin beacon hexdump")
+        #self.log.debug(hexdump(self.beacon_frame))
         self.log.debug("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
