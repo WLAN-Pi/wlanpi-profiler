@@ -57,6 +57,12 @@ def main() -> None:
     from .profiler import TxBeacons, Sniffer, AnalyzeFrame
 
     log = logging.getLogger(inspect.stack()[0][3])
+
+    self.log.debug("prepping interface...")
+    if not prep_interface(self.interface, "monitor", self.channel):
+        self.log.error("failed to prep interface")
+        sys.exit(-1)
+
     log.info("starting beacon process")
     p = mp.Process(
         name="txbeacons",
@@ -64,8 +70,6 @@ def main() -> None:
         args=(args, boot_time, lock, sequence_number, ssid, interface, channel),
     )
     p.start()
-
-    sleep(2)
 
     log.info("starting sniffer process")
     p2 = mp.Process(

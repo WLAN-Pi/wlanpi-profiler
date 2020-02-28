@@ -99,10 +99,6 @@ class TxBeacons(object):
         self.ssid = ssid
         self.interface = interface
         self.channel = channel
-        self.log.debug("prepping interface...")
-        if not prep_interface(self.interface, "monitor", self.channel):
-            self.log.error("failed to prep interface")
-            sys.exit(-1)
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.info(self.l2socket.outs)
