@@ -225,14 +225,16 @@ class Sniffer(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-        self.l2socket.send(frame)
+        try:
+            self.l2socket.send(frame)
+        except OSError as error:
+            self.log.exception(error)
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.associated:
             self.associated.append(frame.addr2)
 
-            for index, frame in enumerate(self.associated):
-                print(f"{index}, {frame}")
+            print(f"{time}: added {frame.addr2} to associated list: {self.associated}")
 
         # TODO: trigger analysis of association request
 
@@ -240,8 +242,8 @@ class Sniffer(object):
         """ required to get the station to send an assoc request """
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
-        # with self.sequence_number.get_lock():
-        #    frame.sequence_number = next_sequence_number(self.sequence_number) - 1
+        with self.sequence_number.get_lock():
+           frame.sequence_number = next_sequence_number(self.sequence_number) - 1
 
         # self.log.debug(f"sending authentication (0x0B) to {receiver}")
         self.l2socket.send(frame)
