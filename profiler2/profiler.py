@@ -30,5 +30,5 @@ class Profiler(object):
         self.log.debug(
             f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
         )
-        print("hexdump of frame:\n")
+        self.log.debug("hexdump of frame:\n")
         hexdump(frame)
