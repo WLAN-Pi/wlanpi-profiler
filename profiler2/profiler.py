@@ -94,8 +94,8 @@ class TxBeacons(object):
         self, args, boot_time, lock, sequence_number, ssid, interface, channel
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.info(f"beacons pid: {os.getpid()}")
         self.log.info(f"scapy version: {scapy.__version__}")
+        self.log.info(f"beacons pid: {os.getpid()}")
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
