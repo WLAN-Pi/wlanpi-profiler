@@ -217,8 +217,7 @@ class Sniffer(object):
                     if packet.addr1 == self.mac:  # if we are the receiver
                         self.dot11_auth_cb(packet.addr2)
                 elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                    print(packet)
-                    print(type(packet))
+                    print(packet.fields)
                     print(dir(packet))
                     if Dot11Elt in packet:
                         ssid = packet[Dot11Elt].info
