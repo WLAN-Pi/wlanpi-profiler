@@ -148,7 +148,6 @@ class TxBeacons(object):
 
 from datetime import timedelta
 
-@staticmethod
 def convert_timestamp_to_uptime(timestamp) -> str:
     """
     converts timestamp field from the 802.11 beacon or probe response frame to a
