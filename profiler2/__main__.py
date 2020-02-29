@@ -64,6 +64,7 @@ def main() -> None:
     if not helpers.prep_interface(interface, "monitor", channel):
         log.error("failed to prep interface")
         sys.exit(-1)
+    log.debug("done prepping interface...")
 
     log.info("starting beacon process")
     p = mp.Process(
