@@ -35,8 +35,9 @@ from . import helpers
 def main() -> None:
     parser = helpers.setup_parser()
     args = parser.parse_args()
+    helpers.setup_logger(args)
 
-    log = helpers.setup_logger(args)
+    log = logging.getLogger(inspect.stack()[0][3])
     log.info("args {0}".format(args))
     log.info("{0}".format(sys.version))
 
@@ -58,8 +59,6 @@ def main() -> None:
     lock = mp.Lock()
     sequence_number = mp.Value("i", 0)
     from .profiler import TxBeacons, Sniffer, AnalyzeFrame
-
-    log = logging.getLogger(inspect.stack()[0][3])
 
     log.debug("prepping interface...")
     if not helpers.prep_interface(interface, "monitor", channel):

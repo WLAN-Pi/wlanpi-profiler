@@ -72,7 +72,7 @@ def setup_logger(args) -> logging.Logger:
         "loggers": {"": {"handlers": ["default"], "level": logging_level}},
     }
     logging.config.dictConfig(default_logging)
-    return logging.getLogger(__name__)
+    # return logging.getLogger(__name__)
 
 
 def setup_parser() -> argparse:

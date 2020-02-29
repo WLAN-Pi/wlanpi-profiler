@@ -95,6 +95,7 @@ class TxBeacons(object):
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info(f"beacons pid: {os.getpid()}")
+        self.log.info(f"scapy version: {scapy.__version__}")
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
@@ -145,8 +146,8 @@ class TxBeacons(object):
         # frame.sequence_number value is updating here, but not updating in frame capture.
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
         now = datetime.now().timestamp()
-        frame[Dot11Beacon].timestamp = int((now-self.boot_time) * 1000000)
-        #frame[Dot11Beacon].timestamp = int((now - self.boot_time) * 1000000)
+        frame[Dot11Beacon].timestamp = int((now - self.boot_time) * 1000000)
+        # frame[Dot11Beacon].timestamp = int((now - self.boot_time) * 1000000)
         # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
         self.l2socket.send(frame)
 
