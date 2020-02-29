@@ -142,6 +142,7 @@ class Sniffer(object):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info(f"sniffer pid: {os.getpid()}")
 
+        self.queue = queue
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
@@ -187,12 +188,6 @@ class Sniffer(object):
             filter=self.bpf_filter,
         )
 
-        seen = []
-        while True:
-            for key, frame in self.associated.items():
-                if key not in seen:
-                    queue.put(frame)
-            sleep(1)
 
     def received_frame(self, packet):
         """ handles incoming packets for profiling """
@@ -229,7 +224,9 @@ class Sniffer(object):
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.associated.keys():
+            self.log.debug(f"assoc req just seen from {frame.addr2}")
             self.associated[frame.addr2] = frame
+            self.queue.put(frame)
 
     def auth(self, receiver):
         """ required to get the station to send an assoc request """

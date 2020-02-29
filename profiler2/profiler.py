@@ -17,11 +17,11 @@ class Profiler(object):
 
     def __init__(self, args, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        seen = []
+        
         self.analyzed = {}
         while True:
+            sleep(1)
             self.log.debug(queue.get())
-            sleep(5)
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.client_assoc_hash.keys():
