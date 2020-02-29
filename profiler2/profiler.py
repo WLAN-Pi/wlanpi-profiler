@@ -10,7 +10,8 @@ profiler code goes here, separate from fake ap code.
 # standard library imports
 import inspect, logging
 from time import sleep
-from scapy import hexdump
+
+from scapy.all import hexdump
 
 
 class Profiler(object):
