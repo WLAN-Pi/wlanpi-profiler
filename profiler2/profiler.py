@@ -11,6 +11,7 @@ profiler code goes here, separate from fake ap code.
 import inspect, logging
 from time import sleep
 
+
 class Profiler(object):
     client_assoc_hash = {}
 

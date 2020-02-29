@@ -186,7 +186,7 @@ class Sniffer(object):
             store=0,
             filter=self.bpf_filter,
         )
-        
+
         seen = []
         while True:
             for key, frame in self.associated.items():
