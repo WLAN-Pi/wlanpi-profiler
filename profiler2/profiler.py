@@ -24,7 +24,7 @@ class Profiler(object):
             if frame.addr2 not in self.analyzed.keys():
                 self.analyzed[frame.addr2] = frame
                 self.log.info(f"PROFILER READY TO ANALYZE {frame.addr2}")
-                self.analyzed(frame)
+                self.analyze_assoc(frame)
 
     def analyze_assoc(self, frame):
         self.log.debug(
