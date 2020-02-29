@@ -19,7 +19,7 @@ import subprocess
 import sys
 import textwrap
 from typing import Union
-from time import time
+from time import time, timedelta
 from multiprocessing import Value
 
 # third party imports
@@ -441,10 +441,6 @@ def build_fake_frame_ies(ssid: str, channel: int, ft_enabled: bool) -> Dot11Elt:
     return frame
 
 
-def current_timestamp(boot_time: time):
-    return int(time() - boot_time)
-
-
 def next_sequence_number(sequence_number: Value):
     """ updates a sequence number of type multiprocessing Value """
     sequence_number.value = (sequence_number.value + 1) % 4096
@@ -469,3 +465,18 @@ def get_mac(interface: str) -> str:
     except Scapy_Exception:
         mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
     return mac
+
+
+def convert_timestamp_to_uptime(timestamp) -> str:
+    """
+    converts timestamp field from the 802.11 beacon or probe response frame to a
+    human readable format. This frame is received by the WLAN interface.
+    :param timestamp: unix integer representing an uptime timestamp
+    :return: human readable uptime string
+    """
+    timestamp = timedelta(microseconds=timestamp)
+    timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
+    return (
+        f"{str(timestamp.days).strip().zfill(2)}d "
+        f"{str(timestamp).rpartition(',')[2].strip()}"
+    )

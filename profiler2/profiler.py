@@ -57,7 +57,7 @@ from .constants import (
 )
 
 from .helpers import (
-    current_timestamp,
+    convert_timestamp_to_uptime,
     next_sequence_number,
     get_radiotap_header,
     build_fake_frame_ies,
@@ -142,29 +142,13 @@ class TxBeacons(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         # print(f"frame.sequence_number: {frame.sequence_number}")
-        # frame.sequence_number value is updating here, but not updating in frame capture. 
+        # frame.sequence_number value is updating here, but not updating in frame capture.
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
         now = datetime.now().timestamp()
-        ts = int((now-self.boot_time) * 1000000)
-        # 802.11 timestamp is 8 octets 
-        frame[Dot11Beacon].timestamp = ts
-        self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
+        frame[Dot11Beacon].timestamp = int((now - self.boot_time) * 1000000)
+        # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
         self.l2socket.send(frame)
 
-
-def convert_timestamp_to_uptime(timestamp) -> str:
-    """
-    converts timestamp field from the 802.11 beacon or probe response frame to a
-    human readable format. This frame is received by the WLAN interface.
-    :param timestamp: unix integer representing an uptime timestamp
-    :return: human readable uptime string
-    """
-    timestamp = timedelta(microseconds=timestamp)
-    timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
-    return (
-        f"{str(timestamp.days).strip().zfill(2)}d "
-        f"{str(timestamp).rpartition(',')[2].strip()}"
-    )
 
 class Sniffer(object):
     def __init__(
@@ -194,7 +178,9 @@ class Sniffer(object):
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
         with lock:
-            probe_resp_ies = build_fake_frame_ies(self.ssid, self.channel, self.args.dot11r)
+            probe_resp_ies = build_fake_frame_ies(
+                self.ssid, self.channel, self.args.dot11r
+            )
             self.mac = get_mac(interface)
             self.probe_response_frame = (
                 get_radiotap_header(self.channel)
@@ -252,9 +238,7 @@ class Sniffer(object):
         if frame.addr2 not in self.associated:
             self.associated.append(frame.addr2)
 
-            self.log.info(
-                f"{frame.addr2} added to associated list {self.associated}"
-            )
+            self.log.info(f"{frame.addr2} added to associated list {self.associated}")
 
         # TODO: trigger analysis of association request
 
