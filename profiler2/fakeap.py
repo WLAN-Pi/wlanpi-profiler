@@ -180,15 +180,14 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-        self.log.info("starting sniffer")
+        self.log.info("starting sniffer thread")
         sniffer = threading.Thread(
             target=sniff(
                 iface=self.interface,
-                prn=self.sniffer.received_frame_cb,
+                prn=self.received_frame_cb,
                 store=0,
                 filter=self.bpf_filter,
             ),
-            name="Sniffer",
             args=("Sniffer",),
         )
         sniffer.start()
