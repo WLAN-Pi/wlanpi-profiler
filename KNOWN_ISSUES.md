@@ -2,6 +2,10 @@
 
 MediaTek adapters seem to perform better.
 
+# Beacon timestamp values are wrong
+
+Something between our code and the on air beacon is messing with the timestamp value. 
+
 # Profiler Probe Response Retries
 
 - what's happening? the profiler does not respond before the client moves onto another channel.
