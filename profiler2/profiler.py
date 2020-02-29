@@ -17,21 +17,14 @@ class Profiler(object):
 
     def __init__(self, args, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-
+        self.log.info(f"profiler pid: {os.getpid()}")
         self.analyzed = {}
         while True:
             frame = queue.get()
             if frame.addr2 not in self.analyzed.keys():
                 self.analyzed[frame.addr2] = frame
-                print(f"I AM READY TO ANALYZE {frame.addr2}")
-
-    def assoc_req(self, frame):
-        if frame.addr2 not in self.client_assoc_hash.keys():
-            self.client_assoc_hash[frame.addr2] = frame
-            self.log.debug(f"assoc: {self.client_assoc_hash.keys()}")
-            self.analyze_assoc(frame)
-        else:
-            self.log.debug(f"{frame.addr2} was already seen")
+                self.log.info(f"PROFILER READY TO ANALYZE {frame.addr2}")
+                self.analyzed(frame)
 
     def analyze_assoc(self, frame):
         self.log.debug(

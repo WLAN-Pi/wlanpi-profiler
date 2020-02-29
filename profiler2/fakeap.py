@@ -180,22 +180,11 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-        self.log.info("starting sniffer thread")
-        #sniffer = threading.Thread(
-        #    target=sniff(
-        #        iface=self.interface,
-        #        prn=self.received_frame_cb,
-        #        store=0,
-        #        filter=self.bpf_filter,
-        #    ),
-        #    args=("Sniffer",),
-        #)
-        #sniffer.start()
         sniff(
-                iface=self.interface,
-                prn=self.received_frame_cb,
-                store=0,
-                filter=self.bpf_filter,
+            iface=self.interface,
+            prn=self.received_frame_cb,
+            store=0,
+            filter=self.bpf_filter,
         )
 
     def received_frame(self, packet):
