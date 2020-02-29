@@ -85,11 +85,7 @@ def main() -> None:
     p2.start()
 
     log.info("starting profiler process")
-    p3 = mp.Process(
-        name="profiler",
-        target=Profiler,
-        args=(args, lock, queue)
-    )
+    p3 = mp.Process(name="profiler", target=Profiler, args=(args, lock, queue))
     p3.start()
 
     while True:
