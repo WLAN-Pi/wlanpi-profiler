@@ -163,7 +163,6 @@ class Sniffer(object):
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info(f"sniffer pid: {os.getpid()}")
-        # self.log.info(f"PyX presence? {_pyx_presence}")
 
         self.boot_time = boot_time
         self.args = args
@@ -174,8 +173,8 @@ class Sniffer(object):
         self.associated = []
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
-        # mgt: assoc-req, assoc-resp, reassoc-req, reassoc-resp,probe-req, probe-resp, beacon, atim, disassoc, auth, deauth.
-        # ctl: ps-poll, rts, cts, ack, cf-end, cf-end-ack
+        # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
+        # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.info(self.l2socket.outs)
@@ -218,9 +217,12 @@ class Sniffer(object):
                     if packet.addr1 == self.mac:  # if we are the receiver
                         self.dot11_auth_cb(packet.addr2)
                 elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+                    print(packet)
+                    print(type(packet))
+                    print(dir(packet))
                     if Dot11Elt in packet:
                         ssid = packet[Dot11Elt].info
-                        #:self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
+                        # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
                         if ssid == self.ssid or packet[Dot11Elt].len == 0:
                             self.dot11_probe_request_cb(packet)
                 elif (
