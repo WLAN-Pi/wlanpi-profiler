@@ -11,7 +11,6 @@ fake ap profiler code
 import binascii, inspect, logging, os, sys, multiprocessing, threading
 from time import gmtime, sleep, time
 from datetime import datetime as dt, timezone
-from ctypes import c_ulong
 
 # third party imports
 _pyx_presence = True
@@ -144,10 +143,10 @@ class TxBeacons(object):
         # print(f"frame.sequence_number: {frame.sequence_number}")
         # frame.sequence_number value is updating here, but not updating in frame capture. 
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
-        now = dt.utcnow().timestamp()
+        now = time()
         # 802.11 timestamp is 8 octets
-        frame[Dot11Beacon].timestamp = c_ulong(now - self.boot_time)
-        self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(c_ulong(now - self.boot_time))}, now: {now}, boot: {self.boot_time}, now - boot: {now - self.boot_time}")
+        frame[Dot11Beacon].timestamp = int((now - self.boot_time)*1000)
+        self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime((now - self.boot_time)*1000)}, now: {now}, boot: {self.boot_time}, now - boot: {now - self.boot_time}")
         self.l2socket.send(frame)
 
 from datetime import timedelta

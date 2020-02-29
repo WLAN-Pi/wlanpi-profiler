@@ -49,7 +49,7 @@ def main() -> None:
 
     from datetime import datetime as dt, timezone
 
-    boot_time = dt.utcnow().timestamp()
+    boot_time = time()
     log.info(f"boot_time: {boot_time}")
 
     import multiprocessing as mp
