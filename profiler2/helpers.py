@@ -19,7 +19,8 @@ import subprocess
 import sys
 import textwrap
 from typing import Union
-from time import time, timedelta
+from time import time
+from datetime import timedelta
 from multiprocessing import Value
 
 # third party imports
