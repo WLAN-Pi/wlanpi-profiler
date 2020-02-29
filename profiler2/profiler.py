@@ -212,21 +212,22 @@ class Sniffer(object):
     def received_frame(self, packet):
         """ handles incoming packets for profiling """
         try:
-            if packet.type == DOT11_TYPE_MANAGEMENT:
-                if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-                    if packet.addr1 == self.mac:  # if we are the receiver
-                        self.dot11_auth_cb(packet.addr2)
-                elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                    ssid = packet[Dot11Elt].info
-                    # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
-                    if ssid == self.ssid or packet[Dot11Elt].len == 0:
-                        self.dot11_probe_request_cb(packet)
-                elif (
-                    packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
-                    or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
-                ):
-                    if packet.addr1 == self.mac:  # if we are the receiver
-                        self.dot11_assoc_request_cb(packet)
+            if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
+                if packet.addr1 == self.mac:  # if we are the receiver
+                    self.dot11_auth_cb(packet.addr2)
+            elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+                ssid = packet[Dot11Elt].info
+                # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
+                if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                    self.dot11_probe_request_cb(packet)
+            elif (
+                packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
+                or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
+            ):
+                if packet.addr1 == self.mac:  # if we are the receiver
+                    self.dot11_assoc_request_cb(packet)
+            else:
+                pass
         except AttributeError as error:
             self.log.exception(error)
         except Exception as error:
