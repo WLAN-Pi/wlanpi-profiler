@@ -138,7 +138,7 @@ class TxBeacons(object):
 class Sniffer(object):
     def __init__(
         self, args, boot_time, lock, sequence_number, ssid, interface, channel, queue
-        ):
+    ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info(f"sniffer pid: {os.getpid()}")
 
@@ -148,7 +148,7 @@ class Sniffer(object):
         self.ssid = ssid
         self.interface = interface
         self.channel = channel
-        self.associated = []
+        self.associated = {}
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
         # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
@@ -186,6 +186,13 @@ class Sniffer(object):
             store=0,
             filter=self.bpf_filter,
         )
+        
+        seen = []
+        while True:
+            for key, frame in self.associated.items():
+                if key not in seen:
+                    queue.put(frame)
+            sleep(1)
 
     def received_frame(self, packet):
         """ handles incoming packets for profiling """
@@ -221,12 +228,8 @@ class Sniffer(object):
         self.l2socket.send(frame)
 
     def assoc_req(self, frame):
-        if frame.addr2 not in self.associated:
-            self.associated.append(frame.addr2)
-
-            self.log.info(f"{frame.addr2} added to associated list {self.associated}")
-
-        # TODO: trigger analysis of association request
+        if frame.addr2 not in self.associated.keys():
+            self.associated[frame.addr2] = frame
 
     def auth(self, receiver):
         """ required to get the station to send an assoc request """

@@ -58,7 +58,7 @@ def main() -> None:
 
     lock = mp.Lock()
     sequence_number = mp.Value("i", 0)
-    from .profiler import TxBeacons, Sniffer, AnalyzeFrame
+    from .fakeap import TxBeacons, Sniffer
 
     log.debug("prepping interface...")
     if not helpers.prep_interface(interface, "monitor", channel):
@@ -84,8 +84,10 @@ def main() -> None:
     )
     p2.start()
 
+    from .profiler import Profiler
+
     log.info("starting profiler process")
-    p3 = mp.Process(name="profiler", target=Profiler, args=(args, lock, queue))
+    p3 = mp.Process(name="profiler", target=Profiler, args=(args, queue))
     p3.start()
 
     while True:

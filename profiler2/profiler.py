@@ -9,13 +9,18 @@ profiler code goes here, separate from fake ap code.
 
 # standard library imports
 import inspect, logging
+from time import sleep
 
-
-class AnalyzeFrame(object):
+class Profiler(object):
     client_assoc_hash = {}
 
-    def __init__(self):
+    def __init__(self, args, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
+        seen = []
+        self.analyzed = {}
+        while True:
+            self.log.debug(queue.get())
+            sleep(5)
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.client_assoc_hash.keys():
