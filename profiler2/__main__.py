@@ -47,11 +47,9 @@ def main() -> None:
     ssid = config["fakeap"]["ssid"]
     channel = config["fakeap"]["channel"]
 
-    from datetime import datetime as dt, timezone
-
-    boot_time = time()
-    log.info(f"boot_time: {boot_time}")
-
+    from datetime import datetime
+    boot_time = datetime.now().timestamp()
+    
     import multiprocessing as mp
 
     #mp.set_start_method("spawn")
