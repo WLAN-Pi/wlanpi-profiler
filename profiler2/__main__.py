@@ -49,9 +49,9 @@ def main() -> None:
 
     from datetime import datetime as dt, timezone
 
-    boot_time = int(dt.replace(tzinfo=timezone.utc).timestamp())
+    boot_time = int(dt.utcnow().replace(tzinfo=timezone.utc).timestamp())
     log.info(f"boot_time: {boot_time}")
-    
+
     import multiprocessing as mp
 
     #mp.set_start_method("spawn")
