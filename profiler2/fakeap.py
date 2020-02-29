@@ -181,16 +181,22 @@ class Sniffer(object):
                 / Dot11Auth(seqnum=0x02)
             )
         self.log.info("starting sniffer thread")
-        sniffer = threading.Thread(
-            target=sniff(
+        #sniffer = threading.Thread(
+        #    target=sniff(
+        #        iface=self.interface,
+        #        prn=self.received_frame_cb,
+        #        store=0,
+        #        filter=self.bpf_filter,
+        #    ),
+        #    args=("Sniffer",),
+        #)
+        #sniffer.start()
+        sniff(
                 iface=self.interface,
                 prn=self.received_frame_cb,
                 store=0,
                 filter=self.bpf_filter,
-            ),
-            args=("Sniffer",),
         )
-        sniffer.start()
 
     def received_frame(self, packet):
         """ handles incoming packets for profiling """
