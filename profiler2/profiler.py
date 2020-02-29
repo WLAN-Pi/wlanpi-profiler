@@ -143,10 +143,8 @@ class TxBeacons(object):
         # print(f"frame.sequence_number: {frame.sequence_number}")
         # frame.sequence_number value is updating here, but not updating in frame capture. 
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
-        frame[Dot11Beacon].timestamp = int(dt.replace(tzinfo=timezone.utc).timestamp()) - self.boot_time #current_timestamp(self.boot_time)
-        print(
-            f"frame timestamp: {convert_timestamp_to_uptime(frame[Dot11Beacon].timestamp)}, time(): {time()}, boot_time: {self.boot_time}"
-            )
+        frame[Dot11Beacon].timestamp = int(dt.utcnow().replace(tzinfo=timezone.utc).timestamp()) - self.boot_time #current_timestamp(self.boot_time)
+        print(f"frame timestamp: {convert_timestamp_to_uptime(frame[Dot11Beacon].timestamp)}")
         self.l2socket.send(frame)
 
 from datetime import timedelta
