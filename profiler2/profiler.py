@@ -217,14 +217,10 @@ class Sniffer(object):
                     if packet.addr1 == self.mac:  # if we are the receiver
                         self.dot11_auth_cb(packet.addr2)
                 elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                    print(packet.layers)
-                    print(packet.name)
-                    print(dir(packet))
-                    if Dot11Elt in packet:
-                        ssid = packet[Dot11Elt].info
-                        # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
-                        if ssid == self.ssid or packet[Dot11Elt].len == 0:
-                            self.dot11_probe_request_cb(packet)
+                    ssid = packet[Dot11Elt].info
+                    # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
+                    if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                        self.dot11_probe_request_cb(packet)
                 elif (
                     packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
                     or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
