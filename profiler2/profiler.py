@@ -172,8 +172,8 @@ class Sniffer(object):
         self.dot11_probe_request_cb = self.probe_response
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
-        probe_resp_ies = build_fake_frame_ies(self.ssid, self.channel, self.args.dot11r)
         with lock:
+            probe_resp_ies = build_fake_frame_ies(self.ssid, self.channel, self.args.dot11r)
             self.mac = get_mac(interface)
             self.probe_response_frame = (
                 get_radiotap_header(self.channel)
