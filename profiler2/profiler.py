@@ -140,10 +140,27 @@ class TxBeacons(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         # print(f"frame.sequence_number: {frame.sequence_number}")
-        # frame.sequence_number value is updating, but not updating in frame capture. TODO: investigate
+        # frame.sequence_number value is updating here, but not updating in frame capture. 
+        # TODO: investigate. appears to impact MediaTek adapters vs RealTek
         frame[Dot11Beacon].timestamp = current_timestamp(self.boot_time)
+        print(convert_timestamp_to_uptime(frame[Dot11Beacon].timestamp))
         self.l2socket.send(frame)
 
+    @staticmethod
+    def convert_timestamp_to_uptime(timestamp) -> str:
+        """
+        converts timestamp field from the 802.11 beacon or probe response frame to a
+        human readable format. This frame is received by the WLAN interface.
+
+        :param timestamp: unix integer representing an uptime timestamp
+        :return: human readable uptime string
+        """
+        timestamp = timedelta(microseconds=timestamp)
+        timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
+        return (
+            f"{str(timestamp.days).strip().zfill(2)}d "
+            f"{str(timestamp).rpartition(',')[2].strip()}"
+        )
 
 class Sniffer(object):
     def __init__(
