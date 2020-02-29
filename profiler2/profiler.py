@@ -146,7 +146,7 @@ class TxBeacons(object):
         now = time()
         # 802.11 timestamp is 8 octets
         frame[Dot11Beacon].timestamp = int((now - self.boot_time)*1000)
-        self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime((now - self.boot_time)*1000)}, now: {now}, boot: {self.boot_time}, now - boot: {now - self.boot_time}")
+        self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(int((now - self.boot_time)*1000))}, now: {now}, boot: {self.boot_time}, now - boot: {now - self.boot_time}")
         self.l2socket.send(frame)
 
 from datetime import timedelta
