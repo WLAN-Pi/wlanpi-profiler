@@ -121,9 +121,9 @@ class TxBeacons(object):
                 self.ssid, self.channel, self.args.dot11r
             )
             self.beacon_frame = (
-                get_radiotap_header(self.channel)
-                / dot11
-                / dot11beacon
+                # get_radiotap_header(self.channel)
+                #/ dot11
+                dot11beacon
                 / beacon_frame_ies
             )
 
@@ -147,8 +147,9 @@ class TxBeacons(object):
         # frame.sequence_number value is updating here, but not updating in pcap for some adapters
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
 
-        ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
-        #frame[Dot11Beacon].timestamp = ts
+        # ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
+        # frame[Dot11Beacon].timestamp = ts
+
         # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
@@ -239,7 +240,7 @@ class Sniffer(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-        
+
         self.l2socket.send(frame)
 
     def assoc_req(self, frame):
