@@ -20,8 +20,10 @@ class Profiler(object):
 
         self.analyzed = {}
         while True:
-            sleep(1)
-            self.log.debug(queue.get())
+            frame = queue.get()
+            if frame.addr2 not in self.analyzed.keys():
+                self.analyzed[frame.addr2] = frame
+                print(f"I AM READY TO ANALYZE {frame.addr2}")
 
     def assoc_req(self, frame):
         if frame.addr2 not in self.client_assoc_hash.keys():
