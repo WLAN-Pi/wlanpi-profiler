@@ -161,7 +161,7 @@ class Sniffer(object):
         self.channel = channel
         self.associated = []
 
-        self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req or type ctl subtype ack"
+        self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req" # or type ctl subtype ack"
         # mgt: assoc-req, assoc-resp, reassoc-req, reassoc-resp,probe-req, probe-resp, beacon, atim, disassoc, auth, deauth.
         # ctl: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
