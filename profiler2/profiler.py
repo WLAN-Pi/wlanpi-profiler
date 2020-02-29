@@ -121,9 +121,9 @@ class TxBeacons(object):
                 self.ssid, self.channel, self.args.dot11r
             )
             self.beacon_frame = (
-                # get_radiotap_header(self.channel)
-                #/ dot11
-                dot11beacon
+                get_radiotap_header(self.channel)
+                / dot11
+                / dot11beacon
                 / beacon_frame_ies
             )
 
