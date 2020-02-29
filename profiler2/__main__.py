@@ -90,9 +90,6 @@ def main() -> None:
     p3 = mp.Process(name="profiler", target=Profiler, args=(args, queue))
     p3.start()
 
-    while True:
-        sleep(1)
-
 
 if __name__ == "__main__":
     main()
