@@ -17,7 +17,7 @@ class Profiler(object):
 
     def __init__(self, args, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        
+
         self.analyzed = {}
         while True:
             sleep(1)
