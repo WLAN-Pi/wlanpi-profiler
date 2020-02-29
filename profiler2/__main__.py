@@ -74,13 +74,23 @@ def main() -> None:
     )
     p.start()
 
+    queue = mp.Queue()
+
     log.info("starting sniffer process")
     p2 = mp.Process(
         name="sniffer",
         target=Sniffer,
-        args=(args, boot_time, lock, sequence_number, ssid, interface, channel),
+        args=(args, boot_time, lock, sequence_number, ssid, interface, channel, queue),
     )
     p2.start()
+
+    log.info("starting profiler process")
+    p3 = mp.Process(
+        name="profiler",
+        target=Profiler,
+        args=(args, lock, queue)
+    )
+    p3.start()
 
     while True:
         sleep(1)
