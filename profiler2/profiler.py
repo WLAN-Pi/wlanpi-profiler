@@ -146,21 +146,22 @@ class TxBeacons(object):
         print(convert_timestamp_to_uptime(frame[Dot11Beacon].timestamp))
         self.l2socket.send(frame)
 
-    @staticmethod
-    def convert_timestamp_to_uptime(timestamp) -> str:
-        """
-        converts timestamp field from the 802.11 beacon or probe response frame to a
-        human readable format. This frame is received by the WLAN interface.
+from datetime import timedelta
 
-        :param timestamp: unix integer representing an uptime timestamp
-        :return: human readable uptime string
-        """
-        timestamp = timedelta(microseconds=timestamp)
-        timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
-        return (
-            f"{str(timestamp.days).strip().zfill(2)}d "
-            f"{str(timestamp).rpartition(',')[2].strip()}"
-        )
+@staticmethod
+def convert_timestamp_to_uptime(timestamp) -> str:
+    """
+    converts timestamp field from the 802.11 beacon or probe response frame to a
+    human readable format. This frame is received by the WLAN interface.
+    :param timestamp: unix integer representing an uptime timestamp
+    :return: human readable uptime string
+    """
+    timestamp = timedelta(microseconds=timestamp)
+    timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
+    return (
+        f"{str(timestamp.days).strip().zfill(2)}d "
+        f"{str(timestamp).rpartition(',')[2].strip()}"
+    )
 
 class Sniffer(object):
     def __init__(
