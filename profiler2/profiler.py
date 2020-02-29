@@ -148,7 +148,7 @@ class TxBeacons(object):
         # TODO: investigate. appears to impact MediaTek adapters vs RealTek
 
         ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
-        frame[Dot11Beacon].timestamp = ts
+        #frame[Dot11Beacon].timestamp = ts
         # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
@@ -239,6 +239,7 @@ class Sniffer(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
+        
         self.l2socket.send(frame)
 
     def assoc_req(self, frame):
