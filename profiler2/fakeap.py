@@ -82,7 +82,7 @@ class TxBeacons(object):
         self.channel = channel
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
-        self.log.info(self.l2socket.outs)
+        self.log.debug(self.l2socket.outs)
         self.beacon_interval = 0.102400
 
         with lock:
@@ -156,7 +156,7 @@ class Sniffer(object):
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
-        self.log.info(self.l2socket.outs)
+        self.log.debug(self.l2socket.outs)
 
         self.received_frame_cb = self.received_frame
         self.dot11_probe_request_cb = self.probe_response

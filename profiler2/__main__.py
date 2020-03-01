@@ -60,11 +60,11 @@ def main() -> None:
     sequence_number = mp.Value("i", 0)
     from .fakeap import TxBeacons, Sniffer
 
-    log.debug("prepping interface...")
+    log.info("start interface prep...")
     if not helpers.prep_interface(interface, "monitor", channel):
         log.error("failed to prep interface")
         sys.exit(-1)
-    log.debug("done prepping interface...")
+    log.info("done prep interface...")
 
     log.info("starting beacon process")
     p = mp.Process(
