@@ -251,14 +251,15 @@ def check_config(config: dict) -> bool:
     """ Check that config has expected items. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        print(config.keys())
-        if "GENERAL" not in config:
+        section = "GENERAL"
+        options = [option for option in config['GENERAL']]
+        if section not in config:
             raise KeyError("missing general configuration")
-        if config["GENERAL"].get("interface", None) is None:
+        if "interface" not in options:
             raise KeyError("missing interface from config")
-        if config["GENERAL"].get("channel", None) is None:
+        if "channel" not in options:
             raise KeyError("missing channel from config")
-        if config["GENERAL"].get("ssid", None) is None:
+        if "ssid" not in options:
             raise KeyError("missing ssid from config")
     except KeyError:
         log.error(sys.exc_info()[1])
