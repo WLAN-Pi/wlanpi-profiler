@@ -193,8 +193,8 @@ def load(config_file: str) -> Union[configparser.ConfigParser, bool]:
         return False
 
 
-def validate(config: dict) -> bool:
-    """ Basic checks on config. """
+def validate(config: configparser.ConfigParser) -> bool:
+    """ Basic config checks """
     log = logging.getLogger(inspect.stack()[0][3])
     log.info("checking config")
 
@@ -247,7 +247,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
         return False
 
 
-def check_config(config: dict) -> bool:
+def check_config(config: configparser.ConfigParser) -> bool:
     """ Check that config has expected items. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
@@ -267,11 +267,11 @@ def check_config(config: dict) -> bool:
     return True
 
 
-def is_fakeap_interface_valid(config: dict) -> bool:
+def is_fakeap_interface_valid(config: configparser.ConfigParser) -> bool:
     """ Check that the config interface exists on the system. """
     log = logging.getLogger(inspect.stack()[0][3])
     discovered_interfaces = []
-    interface = config["general"]["interface"]
+    interface = config.get("GENERAL", "interface")
     if interface is None:
         log.critical(f"interface config cannot be empty")
         return False
