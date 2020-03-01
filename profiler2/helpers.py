@@ -303,22 +303,16 @@ def is_ssid_valid(config: configparser.ConfigParser) -> bool:
     
     ssid = config.get("GENERAL", "ssid")
     log.info(f"ssid is {ssid}")
-    if len(ssid) < 1:
-        log.critical(f"ssid length cannot be 0")
-        return False
     if len(ssid) > 32:
         log.critical(f"ssid length cannot be greater than 32")
         return False
     return True
 
 
-def is_channel_valid(config: dict) -> bool:
+def is_channel_valid(config: configparser.ConfigParser) -> bool:
     """ Checks to ensure the fake AP channel is valid. """
     log = logging.getLogger(inspect.stack()[0][3])
-    channel = config["general"]["channel"]
-    if channel is None:
-        log.critical(f"channel config cannot be empty")
-        return False
+    channel = config.get("GENERAL", "channel")
     if channel in CHANNELS:
         log.info(f"{channel} is a valid 802.11 channel")
         return True
