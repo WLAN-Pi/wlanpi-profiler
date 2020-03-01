@@ -251,7 +251,8 @@ def check_config(config: dict) -> bool:
     """ Check that config has expected items. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        if "general" not in config:
+        print(config.keys())
+        if "GENERAL" not in config:
             raise KeyError("missing general configuration")
         if config["GENERAL"].get("interface", None) is None:
             raise KeyError("missing interface from config")
