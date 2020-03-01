@@ -38,8 +38,8 @@ def main() -> None:
     helpers.setup_logger(args)
 
     log = logging.getLogger(inspect.stack()[0][3])
-    log.info("args {0}".format(args))
-    log.info("{0}".format(sys.version))
+    log.info(f"args {args}")
+    log.info(f"python version: {sys.version}")
 
     config = helpers.setup_config(args)
 
