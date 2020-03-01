@@ -82,54 +82,54 @@ def setup_parser() -> argparse:
     )
     config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
     parser.add_argument(
-        "-config",
+        "--config",
         type=str,
         metavar=".ini",
         default=config,
-        help="specify path for INI configuration file",
+        help="specify path for .INI configuration file",
     )
     parser.add_argument("-test", action="store_true", help="perform diagnostic tests")
     parser.add_argument(
-        "-logging",
+        "--logging",
         help="increase output for debugging",
         nargs="?",
         choices=("debug", "info"),
     )
     parser.add_argument(
-        "-i", dest="interface", help="Set the interface used for the profiler's fake AP"
+        "-i", dest="interface", help="name of network interface to bind profiler to"
     )
     parser.add_argument(
-        "-c", dest="channel", help="Set channel for the profiler's fake AP"
+        "-c", dest="channel", help="802.11 channel for the profiler to broadcast on"
     )
     parser.add_argument(
-        "-s", dest="ssid", help="Set channel for the profiler's fake AP"
+        "-s", dest="ssid", help="network identifier for profiler SSID"
     )
     parser.add_argument(
         "--no11r",
         dest="dot11r",
         action="store_true",
         default=True,
-        help="Turn off FT reporting",
+        help="turn off Fast Transition (FT) reporting",
     )
     parser.add_argument(
         "--menu_mode",
         dest="menu_mode",
         action="store_true",
         default=False,
-        help="BakeBit Menu Reporting",
+        help="BakeBit menu reporting",
     )
     parser.add_argument(
         "--noAP",
         dest="listen_only",
         action="store_true",
         default=False,
-        help="Listen only mode",
+        help="listen only mode",
     )
     parser.add_argument(
         "--clean",
         action="store_true",
         default=False,
-        help="Purges client report directory",
+        help="purges client report directory",
     )
     parser.add_argument(
         "-version", "-V", action="version", version=f"%(prog)s {__version__}"
