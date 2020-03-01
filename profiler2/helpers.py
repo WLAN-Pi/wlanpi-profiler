@@ -82,27 +82,18 @@ def setup_parser() -> argparse:
     )
     config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
     parser.add_argument(
-        "--config",
-        type=str,
-        metavar=".ini",
-        default=config,
-        help="specify path for .INI configuration file",
-    )
-    parser.add_argument("-test", action="store_true", help="perform diagnostic tests")
-    parser.add_argument(
-        "--logging",
-        help="increase output for debugging",
-        nargs="?",
-        choices=("debug", "info"),
-    )
-    parser.add_argument(
         "-i", dest="interface", help="name of network interface to bind profiler to"
     )
     parser.add_argument(
         "-c", dest="channel", help="802.11 channel for the profiler to broadcast on"
     )
+    parser.add_argument("-s", dest="ssid", help="network identifier for profiler SSID")
     parser.add_argument(
-        "-s", dest="ssid", help="network identifier for profiler SSID"
+        "--config",
+        type=str,
+        metavar=".ini",
+        default=config,
+        help="specify path for .INI configuration file",
     )
     parser.add_argument(
         "--no11r",
@@ -126,13 +117,20 @@ def setup_parser() -> argparse:
         help="listen only mode",
     )
     parser.add_argument(
+        "--logging",
+        help="increase output for debugging",
+        nargs="?",
+        choices=("debug", "info"),
+    )
+    parser.add_argument("--test", action="store_true", help="perform diagnostic tests")
+    parser.add_argument(
         "--clean",
         action="store_true",
         default=False,
         help="purges client report directory",
     )
     parser.add_argument(
-        "-version", "-V", action="version", version=f"%(prog)s {__version__}"
+        "--version", "-V", action="version", version=f"%(prog)s {__version__}"
     )
     return parser
 
