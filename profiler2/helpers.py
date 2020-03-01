@@ -162,14 +162,14 @@ def setup_config(args) -> dict:
         config = load(args.config)
 
     if not config:
-        config["fakeap"] = {}
+        config["general"] = {}
 
     if args.channel:
-        config["fakeap"]["channel"] = int(args.channel)
+        config["general"]["channel"] = int(args.channel)
     if args.interface:
-        config["fakeap"]["interface"] = args.interface
+        config["general"]["interface"] = args.interface
     if args.ssid:
-        config["fakeap"]["ssid"] = args.ssid
+        config["general"]["ssid"] = args.ssid
 
     # validate config.
     if validate(config):
@@ -252,13 +252,13 @@ def check_config(config: dict) -> bool:
     """ Check that config has expected items. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        if config.get("fakeap", None) is None:
-            raise KeyError("missing fakeap configuration")
-        if config["fakeap"].get("interface", None) is None:
+        if config.get("general", None) is None:
+            raise KeyError("missing general configuration")
+        if config["general"].get("interface", None) is None:
             raise KeyError("missing interface from config")
-        if config["fakeap"].get("channel", None) is None:
+        if config["general"].get("channel", None) is None:
             raise KeyError("missing channel from config")
-        if config["fakeap"].get("ssid", None) is None:
+        if config["general"].get("ssid", None) is None:
             raise KeyError("missing ssid from config")
     except KeyError:
         log.error(sys.exc_info()[1])
@@ -270,9 +270,9 @@ def is_fakeap_interface_valid(config: dict) -> bool:
     """ Check that the config interface exists on the system. """
     log = logging.getLogger(inspect.stack()[0][3])
     discovered_interfaces = []
-    fakeap_interface = config["fakeap"]["interface"]
-    if fakeap_interface is None:
-        log.critical(f"fakeap interface config cannot be empty")
+    interface = config["general"]["interface"]
+    if interface is None:
+        log.critical(f"interface config cannot be empty")
         return False
     interface_command = (
         "find /sys/class/net -follow -maxdepth 2 -name phy80211 | cut -d / -f 5"
@@ -287,14 +287,14 @@ def is_fakeap_interface_valid(config: dict) -> bool:
     discovered_interfaces = list(
         filter(None, process.stdout.decode("utf-8").split("\n"))
     )
-    if fakeap_interface in discovered_interfaces:
+    if interface in discovered_interfaces:
         log.info(
-            f"{fakeap_interface} is in discovered interfaces: {', '.join(discovered_interfaces)}"
+            f"{interface} is in discovered interfaces: {', '.join(discovered_interfaces)}"
         )
         return True
     else:
         log.critical(
-            f"interface {fakeap_interface} is not in discovered interfaces: {discovered_interfaces}"
+            f"interface {interface} is not in discovered interfaces: {discovered_interfaces}"
         )
         return False
 
@@ -302,12 +302,12 @@ def is_fakeap_interface_valid(config: dict) -> bool:
 def is_ssid_valid(config: dict) -> bool:
     """ Checks for the configured fake AP SSID. """
     log = logging.getLogger(inspect.stack()[0][3])
-    fakeap_ssid = config["fakeap"]["ssid"]
-    if fakeap_ssid is None:
-        log.critical(f"fakeap ssid config cannot be empty")
+    ssid = config["general"]["ssid"]
+    if ssid is None:
+        log.critical(f"ssid config cannot be empty")
         return False
-    if len(fakeap_ssid) > 32:
-        log.critical(f"fakeap ssid config length cannot be greater than 32")
+    if len(ssid) > 32:
+        log.critical(f"ssid config length cannot be greater than 32")
         return False
     return True
 
@@ -315,15 +315,15 @@ def is_ssid_valid(config: dict) -> bool:
 def is_channel_valid(config: dict) -> bool:
     """ Checks to ensure the fake AP channel is valid. """
     log = logging.getLogger(inspect.stack()[0][3])
-    fakeap_channel = config["fakeap"]["channel"]
-    if fakeap_channel is None:
-        log.critical(f"fakeap channel config cannot be empty")
+    channel = config["general"]["channel"]
+    if channel is None:
+        log.critical(f"channel config cannot be empty")
         return False
-    if fakeap_channel in CHANNELS:
-        log.info(f"{fakeap_channel} is a valid 802.11 channel")
+    if channel in CHANNELS:
+        log.info(f"{channel} is a valid 802.11 channel")
         return True
     else:
-        log.critical(f"channel {fakeap_channel} is not a valid fakeap channel")
+        log.critical(f"channel {channel} is not a valid channel")
         return False
 
 
