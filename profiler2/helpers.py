@@ -302,7 +302,8 @@ def is_ssid_valid(config: configparser.ConfigParser) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     
     ssid = config.get("GENERAL", "ssid")
-    if len(ssid.strip()) < 1:
+    log.info(f"ssid is {ssid}")
+    if len(ssid) < 1:
         log.critical(f"ssid length cannot be 0")
         return False
     if len(ssid) > 32:
