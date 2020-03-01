@@ -23,15 +23,6 @@ from datetime import timedelta
 from multiprocessing import Value
 
 # third party imports
-try:
-    import yaml
-except ModuleNotFoundError as error:
-    if error.name == "yaml":
-        print(
-            "required module yaml not found. try installing pyyaml with `pip install pyyaml` and running again."
-        )
-    sys.exit(-1)
-
 from scapy.all import (
     RadioTap,
     Dot11Elt,

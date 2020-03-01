@@ -5,8 +5,8 @@
 # |_|
 
 __title__ = "profiler2"
-__description__ = "WLAN Pi profiler version 2"
-__url__ = ""
+__description__ = "WLAN Pi client profiler version 2"
+__url__ = "https://github.com/WLAN-Pi"
 __author__ = "Jerry Olla, Josh Schmelzle, Kobe Watkins, Nigel Bowden"
 __author_email__ = "profiler@wlanpi.com"
 __version__ = "0.0.1"
