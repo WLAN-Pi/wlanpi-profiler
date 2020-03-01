@@ -185,8 +185,6 @@ def load(config_file: str) -> Union[configparser.ConfigParser, bool]:
     try:
         config = configparser.ConfigParser()
         config.read(config_file)
-        print(config)
-        print('GENERAL' in config)
     except FileNotFoundError:
         log.exception("could not find config file")
     if config:
@@ -253,13 +251,13 @@ def check_config(config: dict) -> bool:
     """ Check that config has expected items. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        if config.get("general", None) is None:
+        if "general" not in config:
             raise KeyError("missing general configuration")
-        if config["general"].get("interface", None) is None:
+        if config["GENERAL"].get("interface", None) is None:
             raise KeyError("missing interface from config")
-        if config["general"].get("channel", None) is None:
+        if config["GENERAL"].get("channel", None) is None:
             raise KeyError("missing channel from config")
-        if config["general"].get("ssid", None) is None:
+        if config["GENERAL"].get("ssid", None) is None:
             raise KeyError("missing ssid from config")
     except KeyError:
         log.error(sys.exc_info()[1])
