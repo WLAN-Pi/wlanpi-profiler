@@ -187,7 +187,8 @@ def load(config_file: str) -> Union[dict, bool]:
         import configparser
         parser = configparser.ConfigParser()
         config = parser.read(config_file)
-        print(config)
+        print(type(config))
+        print(config['GENERAL'])
     except FileNotFoundError:
         log.exception("could not find config file")
     if config:
