@@ -165,7 +165,7 @@ def setup_config(args) -> dict:
         config["GENERAL"] = {}
 
     if args.channel:
-        config["GENERAL"]["channel"] = int(args.channel)
+        config["GENERAL"]["channel"] = args.channel
     if args.interface:
         config["GENERAL"]["interface"] = args.interface
     if args.ssid:
