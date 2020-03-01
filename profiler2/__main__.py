@@ -44,9 +44,9 @@ def main() -> None:
     config = helpers.setup_config(args)
     log.info("config: {0}".format(config))
 
-    interface = config["fakeap"]["interface"]
-    ssid = config["fakeap"]["ssid"]
-    channel = config["fakeap"]["channel"]
+    interface = config.get("GENERAL", "interface")
+    ssid = config.get("GENERAL", "ssid")
+    channel = config.get("GENERAL", "channel")
 
     from datetime import datetime
 
