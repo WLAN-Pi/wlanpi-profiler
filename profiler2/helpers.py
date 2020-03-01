@@ -184,9 +184,9 @@ def load(config_file: str) -> Union[dict, bool]:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         import configparser
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        log.debug(config)
+        parser = configparser.ConfigParser()
+        config = parser.read(config_file)
+        print(config)
     except FileNotFoundError:
         log.exception("could not find config file")
     if config:
