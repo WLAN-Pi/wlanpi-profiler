@@ -90,7 +90,7 @@ def setup_parser() -> argparse:
         epilog=f"Made with Python by {__author__}",
         fromfile_prefix_chars="2",
     )
-    config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yml")
+    config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
     parser.add_argument(
         "-config",
         type=str,
@@ -157,10 +157,11 @@ def setup_config(args) -> dict:
 
     config = {}
 
-    # load in config (a: from default location, b: from provided)
+    # load in config (a: from default location "/config.ini" or b: from provided)
     if os.path.isfile(args.config):
         config = load(args.config)
 
+    # if couldn't find default config or user provided config
     if not config:
         config["GENERAL"] = {}
 
