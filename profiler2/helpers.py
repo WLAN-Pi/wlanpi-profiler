@@ -313,7 +313,7 @@ def is_channel_valid(config: configparser.ConfigParser) -> bool:
     """ Checks to ensure the fake AP channel is valid. """
     log = logging.getLogger(inspect.stack()[0][3])
     channel = config.get("GENERAL", "channel")
-    if channel in CHANNELS:
+    if int(channel) in CHANNELS:
         log.info(f"{channel} is a valid 802.11 channel")
         return True
     else:
