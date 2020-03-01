@@ -132,7 +132,7 @@ class TxBeacons(object):
         # class LELongField(LongField):
         #     def __init__(self, name, default):
         #         Field.__init__(self, name, default, "<Q")
-        # 
+        #
         # < is little-endian
         # unsigned long long
         # size is 8

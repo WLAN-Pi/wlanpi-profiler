@@ -252,7 +252,7 @@ def check_config(config: configparser.ConfigParser) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         section = "GENERAL"
-        options = [option for option in config['GENERAL']]
+        options = [option for option in config["GENERAL"]]
         if section not in config:
             raise KeyError("missing general configuration")
         if "interface" not in options:
@@ -300,7 +300,7 @@ def is_fakeap_interface_valid(config: configparser.ConfigParser) -> bool:
 def is_ssid_valid(config: configparser.ConfigParser) -> bool:
     """ Checks for the configured fake AP SSID. """
     log = logging.getLogger(inspect.stack()[0][3])
-    
+
     ssid = config.get("GENERAL", "ssid")
     log.info(f"ssid is {ssid}")
     if len(ssid) > 32:
