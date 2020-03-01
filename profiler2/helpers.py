@@ -9,11 +9,10 @@ provides init functions that are used to help setup the app.
 
 # standard library imports
 import argparse
+import configparser
 import inspect
 import logging
 import logging.config
-
-logging.getLogger("scapy.runtime").setLevel(logging.DEBUG)
 import os
 import subprocess
 import sys
@@ -94,9 +93,9 @@ def setup_parser() -> argparse:
     parser.add_argument(
         "-config",
         type=str,
-        metavar=".yml",
+        metavar=".ini",
         default=config,
-        help="specify path for YAML config",
+        help="specify path for INI configuration file",
     )
     parser.add_argument("-test", action="store_true", help="perform diagnostic tests")
     parser.add_argument(
@@ -180,11 +179,10 @@ def setup_config(args) -> dict:
         sys.exit(-1)
 
 
-def load(config_file: str) -> Union[dict, bool]:
+def load(config_file: str) -> Union[configparser.ConfigParser, bool]:
     """ Load config file. """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        import configparser
         config = configparser.ConfigParser()
         config.read(config_file)
         print(config)

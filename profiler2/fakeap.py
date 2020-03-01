@@ -29,7 +29,7 @@ except ModuleNotFoundError as error:
         _pyx_presence = False
 
 # logging.getLogger("scapy").setLevel(logging.DEBUG)
-
+# logging.getLogger("scapy.runtime").setLevel(logging.DEBUG)
 from scapy.all import (
     Dot11,
     Dot11AssoReq,
