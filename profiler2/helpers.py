@@ -325,9 +325,9 @@ def check_reporting_dirs(config: dict):
     """ Checks to ensure reporting directories exist. """
     log = logging.getLogger(inspect.stack()[0][3])
 
-    for _dir in config["reporting"].keys():
-        if not os.path.isdir(config["reporting"][_dir]):
-            log.info(os.makedirs(config["reporting"][_dir]))
+    for _dir in config["REPORTING"].keys():
+        if not os.path.isdir(config["REPORTING"][_dir]):
+            log.info(os.makedirs(config["REPORTING"][_dir]))
 
 
 def get_frequency_bytes(channel: int) -> bytes:
