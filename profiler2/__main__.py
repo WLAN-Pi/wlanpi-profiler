@@ -42,7 +42,7 @@ def main() -> None:
     log.info("{0}".format(sys.version))
 
     config = helpers.setup_config(args)
-    log.info("config: {0}".format(config))
+    log.info(f"config: {{section: dict(config[section]) for section in config.sections()}}")
 
     interface = config.get("GENERAL", "interface")
     ssid = config.get("GENERAL", "ssid")
