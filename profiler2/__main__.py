@@ -46,7 +46,7 @@ def main() -> None:
 
     interface = config.get("GENERAL", "interface")
     ssid = config.get("GENERAL", "ssid")
-    channel = config.get("GENERAL", "channel")
+    channel = int(config.get("GENERAL", "channel"))
 
     from datetime import datetime
 
