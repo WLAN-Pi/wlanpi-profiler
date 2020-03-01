@@ -128,6 +128,15 @@ class TxBeacons(object):
         # ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
         # frame[Dot11Beacon].timestamp = ts
 
+        # INFO: SCAPY TIMESTAMP FIELD INFORMATION
+        # class LELongField(LongField):
+        #     def __init__(self, name, default):
+        #         Field.__init__(self, name, default, "<Q")
+        # 
+        # < is little-endian
+        # unsigned long long
+        # size is 8
+
         # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
