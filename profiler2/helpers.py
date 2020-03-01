@@ -179,17 +179,15 @@ def setup_config(args) -> dict:
         sys.exit(-1)
 
 
-def load(ymlfile: str) -> Union[dict, bool]:
-    """ Safe load config from YAML file. """
+def load(config_file: str) -> Union[dict, bool]:
+    """ Load config file. """
     log = logging.getLogger(inspect.stack()[0][3])
-    config = None
     try:
-        with open(ymlfile) as c:
-            config = yaml.safe_load(c)
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(config_file)
     except FileNotFoundError:
         log.exception("could not find config file")
-    except yaml.YAMLError as error:
-        log.exception(f"error in {ymlfile}\n{error}\nexiting...")
     if config:
         return config
     else:
