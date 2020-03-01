@@ -44,9 +44,9 @@ def main() -> None:
     config = helpers.setup_config(args)
 
     log.info(
-        f"config: {section: dict(config[section]) for section in config.sections()}"
+        f"config: {section: dict(config.items[section]) for section in config.sections()}"
     )
-
+    
     interface = config.get("GENERAL", "interface")
     ssid = config.get("GENERAL", "ssid")
     channel = int(config.get("GENERAL", "channel"))
