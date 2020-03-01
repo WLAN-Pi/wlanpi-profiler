@@ -297,15 +297,16 @@ def is_fakeap_interface_valid(config: configparser.ConfigParser) -> bool:
         return False
 
 
-def is_ssid_valid(config: dict) -> bool:
+def is_ssid_valid(config: configparser.ConfigParser) -> bool:
     """ Checks for the configured fake AP SSID. """
     log = logging.getLogger(inspect.stack()[0][3])
-    ssid = config["general"]["ssid"]
-    if ssid is None:
-        log.critical(f"ssid config cannot be empty")
+    
+    ssid = config.get("GENERAL", "ssid")
+    if len(ssid) < 1:
+        log.critical(f"ssid length cannot be 0")
         return False
     if len(ssid) > 32:
-        log.critical(f"ssid config length cannot be greater than 32")
+        log.critical(f"ssid length cannot be greater than 32")
         return False
     return True
 
