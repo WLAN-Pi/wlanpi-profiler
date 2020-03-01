@@ -162,14 +162,14 @@ def setup_config(args) -> dict:
         config = load(args.config)
 
     if not config:
-        config["general"] = {}
+        config["GENERAL"] = {}
 
     if args.channel:
-        config["general"]["channel"] = int(args.channel)
+        config["GENERAL"]["channel"] = int(args.channel)
     if args.interface:
-        config["general"]["interface"] = args.interface
+        config["GENERAL"]["interface"] = args.interface
     if args.ssid:
-        config["general"]["ssid"] = args.ssid
+        config["GENERAL"]["ssid"] = args.ssid
 
     # validate config.
     if validate(config):
@@ -186,6 +186,7 @@ def load(config_file: str) -> Union[dict, bool]:
         import configparser
         config = configparser.ConfigParser()
         config.read(config_file)
+        log.debug(config)
     except FileNotFoundError:
         log.exception("could not find config file")
     if config:
