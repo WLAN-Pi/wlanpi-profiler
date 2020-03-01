@@ -272,9 +272,6 @@ def is_fakeap_interface_valid(config: configparser.ConfigParser) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     discovered_interfaces = []
     interface = config.get("GENERAL", "interface")
-    if interface is None:
-        log.critical(f"interface config cannot be empty")
-        return False
     interface_command = (
         "find /sys/class/net -follow -maxdepth 2 -name phy80211 | cut -d / -f 5"
     )
