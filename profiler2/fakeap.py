@@ -1,4 +1,20 @@
 # -*- coding: utf-8 -*-
+#
+# profiler2: a Wi-Fi client capability analyzer
+# Copyright (C) 2020 WLAN Pi Community.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
 profiler2.fakeap
@@ -8,72 +24,58 @@ fake ap code handling beaconing and sniffing for the profiler
 """
 
 # standard library imports
-import binascii, inspect, logging, os, sys, multiprocessing, threading
-from time import gmtime, sleep, time
-from datetime import timedelta, datetime
-from ctypes import c_ulonglong
+import inspect, logging, os, sys
+from time import sleep, time
 
 # third party imports
-_pyx_presence = True
 
 try:
     import scapy
-    import pyx
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print(
             "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
         )
         sys.exit(-1)
-    if error.name == "pyx":
-        _pyx_presence = False
 
-# logging.getLogger("scapy").setLevel(logging.DEBUG)
-# logging.getLogger("scapy.runtime").setLevel(logging.DEBUG)
 from scapy.all import (
     Dot11,
-    Dot11AssoReq,
     Dot11Auth,
     Dot11Beacon,
     Dot11Elt,
-    Dot11EltRates,
-    Dot11ProbeReq,
     Dot11ProbeResp,
-    hexdump,
     conf as scapyconf,
-    sendp,
     sniff,
 )
 
 # app imports
 from .constants import (
     DOT11_SUBTYPE_ASSOC_REQ,
-    DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_SUBTYPE_AUTH_REQ,
     DOT11_SUBTYPE_BEACON,
     DOT11_SUBTYPE_PROBE_REQ,
     DOT11_SUBTYPE_PROBE_RESP,
+    DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_TYPE_MANAGEMENT,
 )
-
 from .helpers import (
-    convert_timestamp_to_uptime,
-    next_sequence_number,
-    get_radiotap_header,
     build_fake_frame_ies,
-    prep_interface,
+    # convert_timestamp_to_uptime,
     get_mac,
-    get_frequency_bytes,
+    get_radiotap_header,
+    next_sequence_number,
 )
 
 
 class TxBeacons(object):
+    """ Handle Tx of fake AP frames """
+
     def __init__(
         self, args, boot_time, lock, sequence_number, ssid, interface, channel
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info(f"scapy version: {scapy.__version__}")
-        self.log.info(f"beacons pid: {os.getpid()}")
+        self.log.debug(f"beacon pid: {os.getpid()}; parent pid: {os.getppid()}")
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
@@ -103,18 +105,19 @@ class TxBeacons(object):
                 / beacon_frame_ies
             )
 
-        # self.log.debug("origin beacon hexdump")
-        # self.log.debug(hexdump(self.beacon_frame))
+        # self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
     def every(self, interval, task):
+        """ Attempt to address beacon drift """
         start_time = time()
         while True:
             task()
             sleep(interval - ((time() - start_time) % interval))
 
     def beacon(self):
+        """ Update and Tx Beacon Frame """
         frame = self.beacon_frame
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
@@ -143,11 +146,13 @@ class TxBeacons(object):
 
 
 class Sniffer(object):
+    """ Handle sniffing probes and association requests """
+
     def __init__(
         self, args, boot_time, lock, sequence_number, ssid, interface, channel, queue
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.info(f"sniffer pid: {os.getpid()}")
+        self.log.debug(f"sniffer pid: {os.getpid()}; parent pid: {os.getppid()}")
 
         self.queue = queue
         self.boot_time = boot_time
@@ -193,13 +198,13 @@ class Sniffer(object):
         )
 
     def received_frame(self, packet):
-        """ handles incoming packets for profiling """
+        """ Handle incoming packets for profiling """
         try:
             if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
                 if packet.addr1 == self.mac:  # if we are the receiver
                     self.dot11_auth_cb(packet.addr2)
             elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                ssid = packet[Dot11Elt].info
+                ssid = packet[Dot11Elt].info.decode()
                 # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
                 if ssid == self.ssid or packet[Dot11Elt].len == 0:
                     self.dot11_probe_request_cb(packet)
@@ -209,23 +214,22 @@ class Sniffer(object):
             ):
                 if packet.addr1 == self.mac:  # if we are the receiver
                     self.dot11_assoc_request_cb(packet)
-            else:
-                pass
         except AttributeError as error:
             self.log.exception(error)
         except Exception as error:
             self.log.exception(error)
 
     def probe_response(self, probe_request):
-        """ send probe resp to assist with profiler discovery """
+        """ Send probe resp to assist with profiler discovery """
         frame = self.probe_response_frame
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-
         self.l2socket.send(frame)
+        # self.log.debug(f"sent probe resp to {probe_request.addr2}")
 
     def assoc_req(self, frame):
+        """ Put association request on queue for the Profiler """
         if frame.addr2 in self.assoc_reqs.keys():
             self.log.info(
                 f"ignoring already seen assoc req from client mac {frame.addr2}"
@@ -236,7 +240,7 @@ class Sniffer(object):
             self.queue.put(frame)
 
     def auth(self, receiver):
-        """ required to get the station to send an assoc request """
+        """ Send authentication frame to get the station to prompt an assoc request """
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
         with self.sequence_number.get_lock():

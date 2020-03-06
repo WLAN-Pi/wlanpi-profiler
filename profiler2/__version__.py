@@ -5,9 +5,9 @@
 # |_|
 
 __title__ = "profiler2"
-__description__ = "WLAN Pi client profiler version 2"
+__description__ = "a Wi-Fi client capability analyzer"
 __url__ = "https://github.com/WLAN-Pi"
-__author__ = "Jerry Olla, Josh Schmelzle, Kobe Watkins, Nigel Bowden"
+__author__ = "WLAN Pi Community"
 __author_email__ = "profiler@wlanpi.com"
 __version__ = "0.0.1"
 __status__ = "alpha"

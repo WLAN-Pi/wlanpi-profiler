@@ -72,3 +72,10 @@ sudo ip link set wlp4s0 up
 airmon-ng check kill
 systemctl stop NetworkManager
 ```
+
+# Check NIC Info
+
+```buildoutcfg
+sudo iw dev
+sudo iw wlan0 info
+```

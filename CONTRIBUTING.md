@@ -7,7 +7,7 @@ following additional notes.
 
 The GitHub issue tracker is for *bug reports* and *feature requests*. Please do
 not use it to ask questions about usage. These questions should
-instead be directed to through other channels.
+instead be directed through other channels.
 
 ## Good Bug Reports
 
@@ -16,14 +16,16 @@ Please be aware of the following things when filing bug reports:
 1. Avoid raising duplicate issues. *Please* use the GitHub issue search feature
    to check whether your bug report or feature request has been mentioned in
    the past. Duplicate bug reports and feature requests are a huge maintenance
-   burden on the limited resources of the project. If it is clear from your
-   report that you would have struggled to find the original, that's ok, but
-   if searching for a selection of words in your issue title would have found
-   the duplicate then the issue will likely be closed extremely abruptly.
+   burden on the project maintainers. If it is clear from your report that you 
+   would have struggled to find the original, that's ok, but if searching for 
+   a selection of words in your issue title would have found the duplicate
+   then the issue will likely be closed.
+
 2. When filing bug reports about exceptions or tracebacks, please include the
    *complete* traceback. Partial tracebacks, or just the exception text, are
    not helpful. Issues that do not contain complete tracebacks may be closed
    without warning.
+
 3. Make sure you provide a suitable amount of information to work with. This
    means you should provide:
 

@@ -1,4 +1,4 @@
-# RealTek vs MediaTek Performance
+# RealTek vs MediaTek Driver Performance
 
 MediaTek adapters seem to perform better.
 

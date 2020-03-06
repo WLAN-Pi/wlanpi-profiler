@@ -1,4 +1,20 @@
 # -*- coding: utf-8 -*-
+#
+# profiler2: a Wi-Fi client capability analyzer
+# Copyright (C) 2020 WLAN Pi Community.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
 profiler2.profiler
@@ -9,157 +25,167 @@ profiler code goes here, separate from fake ap code.
 
 # standard library imports
 import csv, inspect, logging
-from manuf import manuf
 import os, sys
 import time
 
 # third party imports
-from scapy.all import hexdump, wrpcap, Dot11Elt
+from manuf import manuf
+
+from pymongo import MongoClient
+
+from scapy.all import wrpcap
 
 # app imports
-from .helpers import generate_menu_report, flag_last_object, bytes_to_int
-
 from .constants import (
-    POWER_MIN_MAX_TAG,
-    SUPPORTED_CHANNELS_TAG,
-    HT_CAPABILITIES_TAG,
-    RSN_CAPABILITIES_TAG,
-    FT_CAPABILITIES_TAG,
-    RM_CAPABILITIES_TAG,
+    CLIENTS_DIR,
     EXT_CAPABILITIES_TAG,
-    VHT_CAPABILITIES_TAG,
     EXT_IE_TAG,
+    FT_CAPABILITIES_TAG,
+    HT_CAPABILITIES_TAG,
+    POWER_MIN_MAX_TAG,
+    REPORTS_DIR,
+    RM_CAPABILITIES_TAG,
+    ROOT_DIR,
+    RSN_CAPABILITIES_TAG,
+    SUPPORTED_CHANNELS_TAG,
+    VHT_CAPABILITIES_TAG,
 )
+from .helpers import Capability, flag_last_object, generate_menu_report
 
 
 class Profiler(object):
-    def __init__(
-        self, args, queue, clients_dir, reports_dir, channel, ssid, menu_report_file
-    ):
+    """ Code handling analysis of client capablities """
+
+    def __init__(self, args, queue, config):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.info(f"profiler pid: {os.getpid()}")
+        self.log.debug(f"profiler pid: {os.getpid()}; parent pid: {os.getppid()}")
         self.args = args
         self.analyzed_hash = {}
-        self.channel = channel
-        self.ssid = ssid
+        self.config = config
+        self.channel = int(config.get("GENERAL").get("channel"))
+        self.ssid = config.get("GENERAL").get("ssid")
+        self.reports_dir = os.path.join(self.args.files_root, ROOT_DIR, REPORTS_DIR)
+        self.clients_dir = os.path.join(self.args.files_root, ROOT_DIR, CLIENTS_DIR)
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
-        self.clients_dir = clients_dir
-        self.reports_dir = reports_dir
-        self.menu_report_file = menu_report_file
         if self.args.menu_mode:
             generate_menu_report(
-                menu_report_file,
-                self.channel,
-                self.ssid,
-                self.client_profiled_count,
-                self.last_manuf,
-                args,
+                self.config, self.client_profiled_count, self.last_manuf
             )
         self.csv_file = os.path.join(
             self.reports_dir, f"db-{time.strftime('%Y-%m-%dt%H-%M-%S')}.csv"
         )
 
         while True:
-            frame = queue.get()
-            if frame.addr2 in self.analyzed_hash.keys():
-                self.log(f"already seen {frame.addr2}, ignoring...")
-            else:
-                # self.log.debug(
-                #    f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
-                # )
-                self.analyzed_hash[frame.addr2] = frame
+            self.profile(queue)
 
-                self.log.debug(f"starting oui lookup for {frame.addr2}")
-                lookup = manuf.MacParser(update=False)
-                oui_manuf = lookup.get_manuf(frame.addr2)
-                self.last_manuf = oui_manuf
-                self.log.debug(f"{frame.addr2} oui lookup matched to {oui_manuf}")
+    def profile(self, queue):
+        """ Handle profiling clients as they come into the queue """
+        frame = queue.get()
+        if frame.addr2 in self.analyzed_hash.keys():
+            self.log(f"already seen {frame.addr2}, ignoring...")
+        else:
+            # self.log.debug(
+            #    f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
+            # )
+            self.analyzed_hash[frame.addr2] = frame
 
-                analysis, capabilities, capability_dict = self.analyze_assoc_req(
-                    oui_manuf, frame
+            self.log.debug(f"starting oui lookup for {frame.addr2}")
+            lookup = manuf.MacParser(update=False)
+            oui_manuf = lookup.get_manuf(frame.addr2)
+            self.last_manuf = oui_manuf
+            self.log.debug(f"{frame.addr2} oui lookup matched to {oui_manuf}")
+
+            capabilities = self.analyze_assoc_req(frame)
+
+            text_report = self.generate_text_report(
+                oui_manuf, capabilities, frame.addr2
+            )
+
+            print(text_report)
+
+            self.log.debug(f"writing assoc req from {frame.addr2} to file")
+            self.write_assoc_req_pcap(frame)
+
+            self.log.debug(f"writing text and csv report for {frame.addr2}")
+            self.write_analysis_to_file(
+                text_report, capabilities, frame.addr2, oui_manuf
+            )
+
+            self.client_profiled_count += 1
+            self.log.debug(f"{self.client_profiled_count} clients profiled")
+            if self.args.crust:
+                self.db_report(capabilities, frame.addr2, oui_manuf)
+            if self.args.menu_mode:
+                generate_menu_report(
+                    self.config, self.client_profiled_count, self.last_manuf
+                )
+            if self.args.pcap_analysis_only:
+                self.log.info(
+                    f"exiting because we analyzed 1 frame from {self.args.file_analysis_only}"
+                )
+                sys.exit()
+
+    @staticmethod
+    def generate_text_report(
+        oui_manuf: str, capabilities: list, client_mac: str
+    ) -> str:
+        """ Generate a report for output """
+        # start report
+        text_report = "\n"
+        text_report += "-" * 60
+        text_report += f"\nClient capabilities report - Client MAC: {client_mac}\n"
+        text_report += f"(OUI manufacturer lookup: {oui_manuf or 'Unknown'})\n"
+        text_report += "-" * 60
+        text_report += "\n"
+
+        for capability in capabilities:
+            if capability.name is not None and capability.value is not None:
+                text_report += (
+                    "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
                 )
 
-                print(analysis)
+        text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
+        return text_report
 
-                # TODO: PORT IP DETECTION CODE OVER
-                # print results URL
-                # global SSH_DEST_IP
-
-                # if SSH_DEST_IP:
-                #    print("[View PCAP & Client Report : http://{}/profiler/clients/{} ]\n".format(SSH_DEST_IP, mac_addr))
-
-                self.log.debug(f"writing assoc req from {frame.addr2} to file")
-                self.write_assoc_req(frame)
-
-                self.write_analysis(
-                    analysis, capabilities, capability_dict, frame.addr2, oui_manuf
-                )
-
-                self.client_profiled_count += 1
-                self.log.debug(f"{self.client_profiled_count} clients profiled")
-
-                if args.menu_mode:
-                    generate_menu_report(
-                        menu_report_file,
-                        self.channel,
-                        self.ssid,
-                        self.client_profiled_count,
-                        self.last_manuf,
-                        args,
-                    )
-                if args.file_analysis_only:
-                    self.log.info(
-                        f"exiting because we analyzed 1 frame from {args.file_analysis_only}"
-                    )
-                    sys.exit()
-
-    def write_analysis(self, analysis, capabilities, capability_dict, mac, oui_manuf):
+    def write_analysis_to_file(self, text_report, capabilities, client_mac, oui_manuf):
+        """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
-        mac = mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{mac}.txt")
+        client_mac = client_mac.replace(":", "-", 5)
+        filename = os.path.join(self.clients_dir, f"{client_mac}.txt")
         try:
             with open(filename, "w") as writer:
-                writer.write(analysis)
+                writer.write(text_report)
         except Exception as error:
             log.error(f"error creating file to dump client info ({filename})")
             log.exception(error)
             sys.exit(-1)
+
+        out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
+
+        out_fieldnames = ["Client_Mac", "OUI_Manuf"]
+
+        for capability in capabilities:
+            if capability.name is not None and capability.value is not None:
+                out_fieldnames.append(capability.name)
+                out_row[capability.name] = capability.value
 
         # Check if csv file exists
         if not os.path.exists(self.csv_file):
 
             # create file with csv headers
             with open(self.csv_file, mode="w") as file_obj:
-                writer = csv.DictWriter(
-                    file_obj, fieldnames=["Client_Mac"] + ["OUI_Manuf"] + capabilities
-                )
+                writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
                 writer.writeheader()
 
         # append data to csv file
         with open(self.csv_file, mode="a") as file_obj:
-            writer = csv.DictWriter(
-                file_obj, fieldnames=["Client_Mac"] + ["OUI_Manuf"] + capabilities
-            )
-            writer.writerow(
-                {
-                    "Client_Mac": mac,
-                    "OUI_Manuf": oui_manuf,
-                    "802.11k": capability_dict["802.11k"],
-                    "802.11r": capability_dict["802.11r"],
-                    "802.11v": capability_dict["802.11v"],
-                    "802.11w": capability_dict["802.11w"],
-                    "802.11n": capability_dict["802.11n"],
-                    "802.11ac": capability_dict["802.11ac"],
-                    "802.11ax_draft": capability_dict["802.11ax_draft"],
-                    "Max_Power": capability_dict["Max_Power"],
-                    "Min_Power": capability_dict["Min_Power"],
-                    "Supported_Channels": capability_dict["Supported_Channels"],
-                }
-            )
+            writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
+            writer.writerow(out_row)
 
-    def write_assoc_req(self, frame):
+    def write_assoc_req_pcap(self, frame):
+        """ Write client association request to pcap file on WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         mac = frame.addr2.replace(":", "-", 5)
         dest = os.path.join(self.clients_dir, mac)
@@ -176,17 +202,34 @@ class Profiler(object):
         filename = os.path.join(dest, f"{mac}.pcap")
         wrpcap(filename, [frame])
 
+    def db_report(self, capabilities: list, mac_addr: str, oui_manuf: str) -> None:
+        """ Insert results into database for the WebUI """
+        log = logging.getLogger(inspect.stack()[0][3])
+        try:
+            client = MongoClient()
+            db = client.wlanpi
+            insert_data = {"mac_addr": mac_addr, "mac_oui_manuf": oui_manuf}
+            for capability in capabilities:
+                if capability.db_key == "Supported_Channels":
+                    for channel in capability.db_value:
+                        insert_data["channel_" + str(channel)] = 1
+                else:
+                    insert_data[capability.db_key] = capability.db_value
+
+            inserted_id = db.profiler_results.insert_one(insert_data).inserted_id
+            print("\t\tAdded result to database. objectid={0}".format(inserted_id))
+        except Exception as error:
+            log.exception(f"{error}")
+
     @staticmethod
-    def process_information_elements(frame):
-        buffer = bytes(frame)
-        # strip radiotap header
-        buffer = buffer[32:]
-        # strip dot11
-        buffer = buffer[24:]
-        # strip params
-        buffer = buffer[4:]
-        # strip fcs
-        buffer = buffer[:-4]
+    def process_information_elements(buffer: bytes) -> dict:
+        """
+        Parse a 802.11 payload and returns a dict of IEs
+
+        Does not handle headers or FCS.
+
+        You must strip those before passing the payload in.
+        """
         # init element vars
         information_elements = {}
         element_id = 0
@@ -225,49 +268,346 @@ class Profiler(object):
                 information_elements[element_id] = element_data
         return information_elements
 
-    def analyze_assoc_req(self, oui_manuf, frame):
+    @staticmethod
+    def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> []:
+        """ Check for 802.11n support """
+        dot11n = Capability(
+            name="802.11n", value="Not reported*", db_key="802.11n", db_value=0
+        )
+        dot11n_ss = Capability(db_key="802.11n_ss", db_value=0)
+
+        if HT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+
+            spatial_streams = 0
+
+            # mcs octets 1 - 4 indicate # streams supported (up to 4 streams only)
+            for mcs_octet in range(3, 7):
+
+                mcs_octet_value = dot11_elt_dict[HT_CAPABILITIES_TAG][mcs_octet]
+
+                if mcs_octet_value & 255:
+                    spatial_streams += 1
+
+            dot11n.value = f"Supported ({spatial_streams}ss)"
+            dot11n.db_value = 1
+            dot11n_ss.db_value = spatial_streams
+
+        return [dot11n, dot11n_ss]
+
+    @staticmethod
+    def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> []:
+        """ Check for 802.11ac support """
+        dot11ac = Capability(
+            name="802.11ac", value="Not reported*", db_key="802.11ac", db_value=0
+        )
+        dot11ac_ss = Capability(db_key="802.11ac_ss", db_value=0)
+        dot11ac_su_bf = Capability(db_key="802.11ac_su_bf", db_value=0)
+        dot11ac_mu_bf = Capability(db_key="802.11ac_mu_bf", db_value=0)
+
+        if VHT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+            # Check for number streams supported
+            mcs_upper_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][5]
+            mcs_lower_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][4]
+            mcs_rx_map = (mcs_upper_octet * 256) + mcs_lower_octet
+
+            # define the bit pair we need to look at
+            spatial_streams = 0
+            stream_mask = 3
+
+            # move through each bit pair & test for '10' (stream supported)
+            for _mcs_bits in range(1, 9):
+
+                if (mcs_rx_map & stream_mask) != stream_mask:
+
+                    # stream mask bits both '1' when mcs map range not supported
+                    spatial_streams += 1
+
+                # shift to next mcs range bit pair (stream)
+                stream_mask = stream_mask * 4
+
+            dot11ac.value = f"Supported ({spatial_streams}ss)"
+            dot11ac.db_value = 1
+            dot11ac_ss.db_value = spatial_streams
+
+            # check for SU & MU beam formee support
+            mu_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][2]
+            su_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][1]
+
+            beam_form_mask = 16
+
+            # bit 4 indicates support for both octets (1 = supported, 0 = not supported)
+            if su_octet & beam_form_mask:
+                dot11ac.value += ", SU BF supported"
+                dot11ac_su_bf.db_value = 1
+            else:
+                dot11ac.value += ", SU BF not supported"
+
+            if mu_octet & beam_form_mask:
+                dot11ac.value += ", MU BF supported"
+                dot11ac_mu_bf.db_value = 1
+            else:
+                dot11ac.value += ", MU BF not supported"
+
+        return [dot11ac, dot11ac_ss, dot11ac_su_bf, dot11ac_mu_bf]
+
+    @staticmethod
+    def analyze_rm_capabilities_ie(dot11_elt_dict: dict) -> []:
+        """ Check for 802.11k support """
+        dot11k = Capability(
+            name="802.11k",
+            value="Not reported* - treat with caution, many clients lie about this",
+            db_key="802.11k",
+            db_value=0,
+        )
+        if RM_CAPABILITIES_TAG in dot11_elt_dict.keys():
+            dot11k.value = "Supported"
+            dot11k.db_value = 1
+
+        return [dot11k]
+
+    @staticmethod
+    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_enabled: bool) -> []:
+        """ Check for 802.11r support """
+        dot11r = Capability(
+            name="802.11r", value="Not reported*", db_key="802.11r", db_value=0
+        )
+        if not ft_enabled:
+            dot11r.value = "Reporting disabled (--no11r option used)"
+        elif FT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+            dot11r.value = "Supported"
+            dot11r.db_value = 1
+        else:
+            pass
+
+        return [dot11r]
+
+    @staticmethod
+    def analyze_ext_capabilities_ie(dot11_elt_dict: dict) -> []:
+        """ Check for 802.11v support """
+        dot11v = Capability(
+            name="802.11v", value="Not reported*", db_key="802.11v", db_value=0
+        )
+
+        if EXT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+
+            ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_TAG]
+
+            # check octet 3 exists
+            if 3 <= len(ext_cap_list):
+
+                # bit 4 of octet 3 in the extended capabilites field
+                octet3 = ext_cap_list[2]
+                bss_trans_support = int("00001000", 2)
+
+                # 'And' octet 3 to test for bss transition support
+                if octet3 & bss_trans_support:
+                    dot11v.value = "Supported"
+                    dot11v.db_value = 1
+
+        return [dot11v]
+
+    @staticmethod
+    def analyze_rsn_capabilities_ie(dot11_elt_dict: dict) -> []:
+        """ Check for 802.11w support """
+        dot11w = Capability(
+            name="802.11w", value="Not reported", db_key="802.11w", db_value=0
+        )
+
+        if RSN_CAPABILITIES_TAG in dot11_elt_dict.keys():
+
+            rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_TAG]
+            rsn_len = len(rsn_cap_list) - 2
+            pmf_oct = rsn_cap_list[rsn_len]
+
+            # bit 8 of 2nd last octet in the rsn capabilites field
+            if 127 <= pmf_oct:
+                dot11w.value = "Supported"
+                dot11w.db_value = 1
+
+        return [dot11w]
+
+    @staticmethod
+    def analyze_power_capability_ie(dot11_elt_dict: dict) -> []:
+        """ Check for supported power capabilities """
+        max_power_cap = Capability(
+            name="Max_Power",
+            value="Not reported",
+            db_key="max_power",
+            db_value="Not reported",
+        )
+        min_power_cap = Capability(
+            name="Min_Power",
+            value="Not reported",
+            db_key="min_power",
+            db_value="Not reported",
+        )
+
+        if POWER_MIN_MAX_TAG in dot11_elt_dict.keys():
+
+            # octet 3 of power capabilites
+            max_power = dot11_elt_dict[POWER_MIN_MAX_TAG][1]
+            min_power = dot11_elt_dict[POWER_MIN_MAX_TAG][0]
+
+            # check if signed
+            if min_power > 127:
+                signed_min_power = (256 - min_power) * (-1)
+            else:
+                signed_min_power = min_power
+
+            max_power_cap.value = f"{max_power} dBm"
+            max_power_cap.db_value = max_power
+            min_power_cap.value = f"{signed_min_power} dBm"
+            min_power_cap.db_value = signed_min_power
+
+        return [max_power_cap, min_power_cap]
+
+    @staticmethod
+    def analyze_supported_channels_ie(dot11_elt_dict: dict) -> []:
+        """ Check supported channels """
+        supported_channels = Capability(
+            name="Supported_Channels",
+            value="Not reported",
+            db_key="SupportedChannels",
+            db_value=None,
+        )
+        if SUPPORTED_CHANNELS_TAG in dot11_elt_dict.keys():
+            channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_TAG]
+            channel_list = []
+
+            while channel_sets_list:
+
+                start_channel = channel_sets_list.pop(0)
+                channel_range = channel_sets_list.pop(0)
+
+                # check for if 2.4Ghz or 5GHz
+                if start_channel > 14:
+                    channel_multiplier = 4
+                else:
+                    channel_multiplier = 1
+
+                for i in range(channel_range):
+                    channel_list.append(start_channel + (i * channel_multiplier))
+
+            supported_channels.value = ", ".join(map(str, channel_list))
+            supported_channels.db_value = channel_list
+
+        return [supported_channels]
+
+    @staticmethod
+    def analyze_extension_ies(dot11_elt_dict: dict, he_enabled: bool) -> []:
+        """
+        Check for 802.11ax support
+
+        TODO: Need to add more 11ax detection features and add them in to the
+              report. For example: support for OFDMA UL, OFDMA DL, MU-MIMO UL
+              MU-MIMO DL, BSS Colouring etc.
+        """
+        dot11ax_draft = Capability(
+            name="802.11ax_draft",
+            value="Not supported",
+            db_key="802.11ax_draft",
+            db_value="0",
+        )
+        if not he_enabled:
+            dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
+        else:
+            if EXT_IE_TAG in dot11_elt_dict.keys():
+
+                ext_ie_id = str(dot11_elt_dict[EXT_IE_TAG][0])
+
+                dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
+
+                # check for 802.11ax support
+                if ext_ie_id in dot11ax_draft_ids.keys():
+                    dot11ax_draft.value = "Supported (Draft)"
+                    dot11ax_draft.db_value = 1
+
+        return [dot11ax_draft]
+
+    def analyze_assoc_req(self, frame) -> []:
+        """ Tear apart the association request for analysis """
+        log = logging.getLogger(inspect.stack()[0][3])
+
+        log.debug(f"processing information elements for client MAC {frame.addr2}")
+
+        # strip radiotap
+        ie_buffer = bytes(frame.payload)
+
+        # strip dot11
+        ie_buffer = ie_buffer[24:]
+
+        # strip params
+        ie_buffer = ie_buffer[4:]
+
+        # strip fcs
+        ie_buffer = ie_buffer[:-4]
+
+        # convert buffer to ie dict
+        dot11_elt_dict = self.process_information_elements(ie_buffer)
+
+        log.debug(
+            f"{len(dot11_elt_dict)} IEs detected in assoc req from {frame.addr2}: {dot11_elt_dict.keys()}"
+        )
+
+        # dictionary to store capabilities as we decode them
+        capabilities = []
+
+        # check if 11k supported
+        capabilities += self.analyze_rm_capabilities_ie(dot11_elt_dict)
+
+        # check if 11r supported
+        capabilities += self.analyze_ft_capabilities_ie(
+            dot11_elt_dict, self.args.ft_enabled
+        )
+
+        # check if 11v supported
+        capabilities += self.analyze_ext_capabilities_ie(dot11_elt_dict)
+
+        # check if 11w supported
+        capabilities += self.analyze_rsn_capabilities_ie(dot11_elt_dict)
+
+        # check for 11n support
+        capabilities += self.analyze_ht_capabilities_ie(dot11_elt_dict)
+
+        # check for 11ac support
+        capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
+
+        # check for Ext tags (e.g. 802.11ax draft support)
+        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.args.he_enabled)
+
+        # check supported power capabilities
+        capabilities += self.analyze_power_capability_ie(dot11_elt_dict)
+
+        # check supported channels
+        capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
+
+        return capabilities
+
+    def analyze_assoc_req_old(self, oui_manuf, frame):
+        """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
         log.debug(f"processing {frame.addr2} information elements")
-        dot11_elt_dict = self.process_information_elements(frame)
 
-        log.debug(f"{hexdump(frame)}")
-        log.debug(dot11_elt_dict)
+        # strip radiotap
+        ie_buffer = bytes(frame.payload)
+
+        # strip dot11
+        ie_buffer = ie_buffer[24:]
+
+        # strip params
+        ie_buffer = ie_buffer[4:]
+
+        # strip fcs
+        ie_buffer = ie_buffer[:-4]
+
+        # convert buffer to ie dict
+        dot11_elt_dict = self.process_information_elements(ie_buffer)
+
+        log.debug(f"{len(dot11_elt_dict)} IDs of IEs detected {dot11_elt_dict.keys()}")
+
         log.debug(f"analyzing {frame.addr2} assoc req")
 
-        # dot11_elt = frame.getlayer(Dot11Elt)
-
-        # common dictionary to store all tag lists
-        # dot11_elt_dict = {}
-
-        # analyze the 802.11 frame tag lists & store in a dictionary
-        # while dot11_elt:
-
-            # get tag number
-            # dot11_elt_id = str(dot11_elt.ID)
-
-            # get tag list
-            # dot11_elt_info = dot11_elt.getfieldval("info")
-            # dot11_elt_info = dot11_elt.info
-
-            # convert tag list in to usable format (decimal list of values)
-            # py2 to py3 notes:
-            #     Python 3 map returns a generator.
-            #     Python 2 str is a sequence of bytes.
-            #     Python 3 str is a sequence of unicode characters.
-            #     Python 3 bytes are handled by the bytes type.
-            #     bytes objects yield integers when iterating or indexing, not characters
-            # dec_array = list(bytes(dot11_elt_info))
-
-            # print(f"{dot11_elt_id}, {dot11_elt_info}, {dec_array}")
-            # print(f"{type(dot11_elt_id)}, {type(dot11_elt_info)}, {type(dec_array)}")
-
-            # store each tag list in a common tag dictionary
-            # dot11_elt_dict[dot11_elt_id] = dec_array
-
-            # move to next layer - end of while loop
-            # dot11_elt = dot11_elt.payload.getlayer(Dot11Elt)
-        log.debug(f"IDs of IEs detected {dot11_elt_dict.keys()}")
         # dictionary to store capabilities as we decode them
         capability_dict = {}
 
@@ -302,7 +642,7 @@ class Profiler(object):
             stream_mask = 3
 
             # move through each bit pair & test for '10' (stream supported)
-            for mcs_bits in range(1, 9):
+            for _mcs_bits in range(1, 9):
 
                 if (mcs_rx_map & stream_mask) != stream_mask:
 
@@ -470,11 +810,8 @@ class Profiler(object):
             "Supported_Channels",
         ]
         for key in capabilities:
-            report_text += "{:<20} {:<20}".format(key, capability_dict[key]) + "\n"
+            report_text += "{0:<20} {1:<20}".format(key, capability_dict[key]) + "\n"
 
-        report_text += (
-            "\n\n"
-            + "* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
-        )
+        report_text += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
 
         return report_text, capabilities, capability_dict
