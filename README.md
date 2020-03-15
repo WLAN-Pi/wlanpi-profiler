@@ -19,13 +19,13 @@ capabilities across each client type may vary, depending on factors like client 
 
 each client includes capability details in an 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and then report on the clients capabilities. 
 
-one big note here is that the client will match the capabilities advertised by an access point.  for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams.
+one big caveat here is that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
-## profiling
+## profiling (TODO: update for WLAN Pi v2.0)
 
-this script addresses the capabilities problem by advertising that the highest feature sets. this is to trick the client to reveal its full capabilities. these are then analyzed from the association frame used when the client attempts to associate to the fake AP.
+the capabilities are analyzed from the association frame sent from the client when it attempts to associate to the profiler's fake AP.
 
-once profiled, a textual report prints in real-time to the screen, and results write to a directory on the WLAN Pi server. results include a copy of the report and also the association frame in PCAP format. 
+once profiled, a textual report prints in real-time to the screen, and results write to a directory on the WLAN Pi server. results include a copy of the report and also the association frame in PCAP format.
 
 note that further association requests by a profiled client are ignored until the profiler is restarted.
 
