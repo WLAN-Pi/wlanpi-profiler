@@ -218,8 +218,8 @@ def report_cleanup(_dir) -> None:
         try:
             print(f"removing old file: {_file}")
             os.unlink(os.path.join(_dir, _file))
-        except Exception as error:
-            log.exception(f"issue removing file: {error}")
+        except Exception:
+            log.exception("issue removing files")
 
 
 def setup_config(args) -> dict:
@@ -234,7 +234,7 @@ def setup_config(args) -> dict:
 
     if not parser:
         # couldn't find default config.ini file or user provided config
-        log.warning(f"couldn't find config at {args.config}")
+        log.warning("couldn't find config at %s", args.config)
 
     config = {}
 
@@ -271,7 +271,7 @@ def setup_config(args) -> dict:
 
     # validate config.
     if validate(config):
-        log.debug(f"config: {config}")
+        log.debug("config: %s", config)
         return config
     else:
         log.error("configuration validation failed... exiting...")
@@ -348,9 +348,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 for c in commands
             ]
             return True
-        except Exception as error:
-            log.error("error setting wlan interface config")
-            log.exception(error)
+        except Exception:
+            log.exception("error setting wlan interface config")
     else:
         log.error("failed to prep interface config...")
         return False
@@ -371,7 +370,7 @@ def check_config_missing(config: dict) -> bool:
             raise KeyError("missing ssid from config")
 
     except KeyError:
-        log.error(sys.exc_info()[1])
+        log.error("%s", sys.exc_info()[1])
         return False
     return True
 
@@ -381,21 +380,22 @@ def update_manuf() -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(
-            f"manuf flat file located at {os.path.join(manuf.__path__[0], 'manuf')}"
+            "manuf flat file located at %s", os.path.join(manuf.__path__[0], "manuf")
         )
         log.debug(
-            f"manuf last modified time: {ctime(os.path.getmtime(os.path.join(manuf.__path__[0], 'manuf')))}"
+            "manuf last modified time: %s",
+            ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
-        log.debug(f"running 'sudo manuf --update'")
+        log.debug("running 'sudo manuf --update'")
         subprocess.run(
             ["sudo", "manuf", "--update"], shell=False, check=True, capture_output=True
         )
         log.debug(
-            f"manuf last modified time: {ctime(os.path.getmtime(os.path.join(manuf.__path__[0], 'manuf')))}"
+            "manuf last modified time: %s",
+            ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
-    except Exception as error:
-        print("problem updating manuf. make sure manuf-ng is installed...")
-        print(f"{error}")
+    except Exception:
+        log.exception("problem updating manuf. make sure manuf-ng is installed...")
         print("exiting...")
         return False
     return True
@@ -410,13 +410,11 @@ def is_fakeap_interface_valid(config: dict) -> bool:
         if "phy80211" in os.listdir(os.path.join("/sys/class/net", iface)):
             discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
-        log.info(
-            f"{interface} is in discovered interfaces: {', '.join(discovered_interfaces)}"
-        )
+        log.info("%s is in discovered interfaces: ", ", ".join(discovered_interfaces))
         return True
     else:
         log.critical(
-            f"interface {interface} is not in discovered interfaces: {discovered_interfaces}"
+            "interface %s is not in discovered interfaces: ", discovered_interfaces
         )
         return False
 
@@ -426,9 +424,9 @@ def is_ssid_valid(config: dict) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
 
     ssid = config.get("GENERAL").get("ssid")
-    log.info(f"ssid is {ssid}")
+    log.info("ssid is %s", ssid)
     if len(ssid) > 32:
-        log.critical(f"ssid length cannot be greater than 32")
+        log.critical("ssid length cannot be greater than 32")
         return False
     return True
 
@@ -438,10 +436,10 @@ def is_channel_valid(config: dict) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     channel = config.get("GENERAL").get("channel")
     if int(channel) in CHANNELS:
-        log.info(f"{channel} is a valid 802.11 channel")
+        log.info("%s is a valid 802.11 channel", channel)
         return True
     else:
-        log.critical(f"channel {channel} is not a valid channel")
+        log.critical("channel %s is not a valid channel", channel)
         return False
 
 
@@ -626,7 +624,7 @@ def generate_menu_report(config: dict, client_count: int, last_manuf: str) -> No
         f"SSID: {ssid}\r",
         f"Clients:{client_count} ({last_manuf})",
     ]
-    log.debug(f"report: {report}")
+    log.debug("report: %s", report)
     with open(menu_file, "w") as file:
         for _ in report:
             file.write(_)
@@ -641,11 +639,10 @@ def get_ssh_destination_ip() -> Union[str, bool]:
             _socket = str(_socket)
             if "22" in _socket and "ESTABLISHED" in _socket:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", _socket)
-    except Exception as error:
+    except Exception:
         log.exception(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
         )
-        log.exception(f"{error}")
         return False
     else:
         return dest_ip_re.group(1)

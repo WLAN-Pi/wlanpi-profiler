@@ -44,6 +44,7 @@ if sys.version_info < (3, 6):
 
 
 def main() -> None:
+    """ Set up args and start the profiler manager """
     parser = helpers.setup_parser()
     args = parser.parse_args()
     manager.start(args)

@@ -48,9 +48,9 @@ def start(args):
     signal.signal(signal.SIGINT, signal_handler)
     helpers.setup_logger(args)
 
-    log.info(f"{__name__.split('.')[0]} version {__version__}")
-    log.info(f"python platform version is {platform.python_version()}")
-    log.debug(f"args: {args}")
+    log.info("%s version %s", __name__.split(".")[0], __version__)
+    log.info("python platform version is", platform.python_version())
+    log.debug("args: %s", args)
 
     if args.oui_update:
         sys.exit(0) if helpers.update_manuf() else sys.exit(-1)
@@ -74,15 +74,15 @@ def start(args):
 
     helpers.generate_run_message(config)
 
-    log.debug(f"pid {os.getpid()}")
+    log.debug("pid %s", os.getpid())
 
     if args.pcap_analysis_only:
         log.info("not starting beacon or sniffer - user wants to do file analysis only")
         try:
             frame = rdpcap(args.pcap_analysis_only)
-        except FileNotFoundError as error:
-            log.error(f"could not find file {args.pcap_analysis_only}")
-            log.exception(f"{error}")
+        except FileNotFoundError:
+            log.exception("could not find file", args.pcap_analysis_only)
+            print("exiting...")
             sys.exit(-1)
 
         # extract the first frame object from pcap
@@ -101,6 +101,7 @@ def start(args):
         log.info("start interface prep...")
         if not helpers.prep_interface(interface, "monitor", channel):
             log.error("failed to prep interface")
+            print("exiting...")
             sys.exit(-1)
         log.info("done prep interface...")
 

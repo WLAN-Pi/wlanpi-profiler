@@ -74,8 +74,8 @@ class TxBeacons(object):
         self, args, boot_time, lock, sequence_number, ssid, interface, channel
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.info(f"scapy version: {scapy.__version__}")
-        self.log.debug(f"beacon pid: {os.getpid()}; parent pid: {os.getppid()}")
+        self.log.info("scapy version: %s", scapy.__version__)
+        self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
         self.args = args
         self.sequence_number = sequence_number
@@ -138,10 +138,9 @@ class TxBeacons(object):
         # unsigned long long
         # size is 8
 
-        # self.log.debug(f"frame timestamp: {convert_timestamp_to_uptime(ts)}")
+        # self.log.debug("frame timestamp: %s", convert_timestamp_to_uptime(ts))
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
-        # TODO: investigate (low priority)
         self.l2socket.send(frame)
 
 
@@ -152,7 +151,7 @@ class Sniffer(object):
         self, args, boot_time, lock, sequence_number, ssid, interface, channel, queue
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug(f"sniffer pid: {os.getpid()}; parent pid: {os.getppid()}")
+        self.log.debug("sniffer %s; parent pid: %s", os.getpid(), os.getppid())
 
         self.queue = queue
         self.boot_time = boot_time
@@ -199,25 +198,20 @@ class Sniffer(object):
 
     def received_frame(self, packet):
         """ Handle incoming packets for profiling """
-        try:
-            if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-                if packet.addr1 == self.mac:  # if we are the receiver
-                    self.dot11_auth_cb(packet.addr2)
-            elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                ssid = packet[Dot11Elt].info.decode()
-                # self.log.debug(f"probe req for {ssid} by MAC {packet.addr2}")
-                if ssid == self.ssid or packet[Dot11Elt].len == 0:
-                    self.dot11_probe_request_cb(packet)
-            elif (
-                packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
-                or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
-            ):
-                if packet.addr1 == self.mac:  # if we are the receiver
-                    self.dot11_assoc_request_cb(packet)
-        except AttributeError as error:
-            self.log.exception(error)
-        except Exception as error:
-            self.log.exception(error)
+        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
+            if packet.addr1 == self.mac:  # if we are the receiver
+                self.dot11_auth_cb(packet.addr2)
+        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+            ssid = packet[Dot11Elt].info.decode()
+            # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
+            if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                self.dot11_probe_request_cb(packet)
+        elif (
+            packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
+            or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
+        ):
+            if packet.addr1 == self.mac:  # if we are the receiver
+                self.dot11_assoc_request_cb(packet)
 
     def probe_response(self, probe_request):
         """ Send probe resp to assist with profiler discovery """
@@ -226,17 +220,17 @@ class Sniffer(object):
             frame.sequence_number = next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
         self.l2socket.send(frame)
-        # self.log.debug(f"sent probe resp to {probe_request.addr2}")
+        # self.log.debug("sent probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame):
         """ Put association request on queue for the Profiler """
         if frame.addr2 in self.assoc_reqs.keys():
             self.log.info(
-                f"ignoring already seen assoc req from client mac {frame.addr2}"
+                "ignoring already seen assoc req from client mac %s", frame.addr2
             )
         else:
             self.assoc_reqs[frame.addr2] = frame
-            self.log.debug(f"adding assoc req from {frame.addr2} to queue")
+            self.log.debug("adding assoc req from %s to queue", frame.addr2)
             self.queue.put(frame)
 
     def auth(self, receiver):
@@ -246,5 +240,5 @@ class Sniffer(object):
         with self.sequence_number.get_lock():
             frame.sequence_number = next_sequence_number(self.sequence_number) - 1
 
-        # self.log.debug(f"sending authentication (0x0B) to {receiver}")
+        # self.log.debug("sending authentication (0x0B) to %s", receiver)
         self.l2socket.send(frame)
