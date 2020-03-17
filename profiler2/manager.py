@@ -49,7 +49,7 @@ def start(args):
     helpers.setup_logger(args)
 
     log.info("%s version %s", __name__.split(".")[0], __version__)
-    log.info("python platform version is", platform.python_version())
+    log.info("python platform version is %s", platform.python_version())
     log.debug("args: %s", args)
 
     if args.oui_update:
