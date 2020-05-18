@@ -1,6 +1,6 @@
-Relase x.x.x:
+Relase 0.0.1.dev2:
 
-- TODO
+- Remove pymongo dependency and related code
 
 Release 0.0.1.dev1:
 
