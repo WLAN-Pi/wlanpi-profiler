@@ -31,8 +31,6 @@ import time
 # third party imports
 from manuf import manuf
 
-from pymongo import MongoClient
-
 from scapy.all import wrpcap
 
 # app imports
@@ -114,8 +112,6 @@ class Profiler(object):
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
-            if self.args.crust:
-                self.db_report(capabilities, frame.addr2, oui_manuf)
             if self.args.menu_mode:
                 generate_menu_report(
                     self.config, self.client_profiled_count, self.last_manuf
@@ -200,25 +196,6 @@ class Profiler(object):
         # dump out the frame to a file
         filename = os.path.join(dest, f"{mac}.pcap")
         wrpcap(filename, [frame])
-
-    def db_report(self, capabilities: list, mac_addr: str, oui_manuf: str) -> None:
-        """ Insert results into database for the WebUI """
-        log = logging.getLogger(inspect.stack()[0][3])
-        try:
-            client = MongoClient()
-            db = client.wlanpi
-            insert_data = {"mac_addr": mac_addr, "mac_oui_manuf": oui_manuf}
-            for capability in capabilities:
-                if capability.db_key == "Supported_Channels":
-                    for channel in capability.db_value:
-                        insert_data["channel_" + str(channel)] = 1
-                else:
-                    insert_data[capability.db_key] = capability.db_value
-
-            inserted_id = db.profiler_results.insert_one(insert_data).inserted_id
-            print("\t\tAdded result to database. objectid={0}".format(inserted_id))
-        except Exception:
-            log.exception("problem writing results to mongo db")
 
     @staticmethod
     def process_information_elements(buffer: bytes) -> dict:

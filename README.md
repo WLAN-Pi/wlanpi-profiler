@@ -68,7 +68,7 @@ sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
 ```
 usage: profiler2 [-h] [-i INTERFACE] [-c CHANNEL] [-s SSID | --host_ssid]
                  [--file <FILE>] [--config <FILE>] [--noAP] [--no11ax]
-                 [--no11r] [--menu_mode] [--menu_file <FILE>] [--crust]
+                 [--no11r] [--menu_mode] [--menu_file <FILE>]
                  [--files_root <PATH>] [--clean] [--update] [--test]
                  [--logging [{debug,info}]] [--version]
 
@@ -85,7 +85,6 @@ optional arguments:
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --menu_mode           BakeBit menu reporting
   --menu_file <FILE>    FPMS
-  --crust               Use the WLANPI-crust datastore
   --files_root <PATH>   default root directory for reporting and pcaps
   --clean               cleans out the old CSV reports
   --update              initiates Internet update of OUI database
