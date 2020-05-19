@@ -81,7 +81,7 @@ def start(args):
         try:
             frame = rdpcap(args.pcap_analysis_only)
         except FileNotFoundError:
-            log.exception("could not find file", args.pcap_analysis_only)
+            log.exception("could not find file %s", args.pcap_analysis_only)
             print("exiting...")
             sys.exit(-1)
 
