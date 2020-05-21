@@ -152,8 +152,9 @@ class Profiler(object):
         text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
         return text_report
 
-    def write_analysis_to_file_system(self, text_report, capabilities,
-    client_mac, oui_manuf, band):
+    def write_analysis_to_file_system(
+        self, text_report, capabilities, client_mac, oui_manuf, band
+    ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file

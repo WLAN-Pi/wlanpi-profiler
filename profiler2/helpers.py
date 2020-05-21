@@ -64,7 +64,7 @@ except Exception:
 # is netstat installed?
 try:
     result = subprocess.run(
-        ["netstat", "--version"], shell=False, check=True, capture_output=True 
+        ["netstat", "--version"], shell=False, check=True, capture_output=True
     )
 except Exception:
     print(
@@ -411,11 +411,17 @@ def is_fakeap_interface_valid(config: dict) -> bool:
             if "phy80211" in os.listdir(iface_path):
                 discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
-        log.info("%s is in discovered interfaces: [%s]", interface, ", ".join(discovered_interfaces))
+        log.info(
+            "%s is in discovered interfaces: [%s]",
+            interface,
+            ", ".join(discovered_interfaces),
+        )
         return True
     else:
         log.critical(
-            "%s interface not found in not phy80211 interfaces: %s", interface, discovered_interfaces
+            "%s interface not found in not phy80211 interfaces: %s",
+            interface,
+            discovered_interfaces,
         )
         return False
 

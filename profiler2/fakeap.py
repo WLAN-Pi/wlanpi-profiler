@@ -193,7 +193,7 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-        
+
         sniff(
             iface=self.interface,
             prn=self.received_frame_cb,
