@@ -61,6 +61,17 @@ except Exception:
     )
     sys.exit(-1)
 
+# is netstat installed?
+try:
+    result = subprocess.run(
+        ["netstat", "--version"], shell=False, check=True, capture_output=True 
+    )
+except Exception:
+    print(
+        "problem checking netstat version. is netstat installed and functioning? exiting..."
+    )
+    sys.exit(-1)
+
 # app imports
 from .__version__ import __version__
 from .constants import CHANNELS, CLIENTS_DIR, REPORTS_DIR, ROOT_DIR
@@ -127,7 +138,7 @@ def setup_parser() -> argparse:
         "--file",
         metavar="<FILE>",
         dest="pcap_analysis_only",
-        help="read first packet of pcap file expecting an association request frame",
+        help="read in first packet of pcap (expecting an association request frame)",
     )
     config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
     parser.add_argument(
@@ -171,17 +182,10 @@ def setup_parser() -> argparse:
         help="change menu report file location for WLAN Pi FPMS",
     )
     parser.add_argument(
-        "--crust",
-        dest="crust",
-        action="store_true",
-        default=False,
-        help="use the WLANPI-crust datastore",
-    )
-    parser.add_argument(
         "--files_root",
         metavar="<PATH>",
         dest="files_root",
-        default="/var/www/html/files",
+        default="/var/www/html",
         help="default root directory for reporting and pcaps",
     )
     parser.add_argument(
@@ -232,14 +236,14 @@ def setup_config(args) -> dict:
     else:
         parser = None
 
+    # handle if we can not find default config.ini file or user provided config
     if not parser:
-        # couldn't find default config.ini file or user provided config
-        log.warning("couldn't find config at %s", args.config)
+        log.warning("can not find config at %s", args.config)
 
     config = {}
 
+    # we want to work with a dict whether we have config.ini or not.
     if parser:
-        # we want to work with a dict whether we have config.ini or not.
         config = convert_configparser_to_dict(parser)
 
     if "GENERAL" not in config:
@@ -260,8 +264,6 @@ def setup_config(args) -> dict:
         config["GENERAL"]["he_enabled"] = args.he_enabled
     if args.listen_only:
         config["GENERAL"]["listen_only"] = args.listen_only
-    if args.crust:
-        config["GENERAL"]["crust"] = args.crust
     if args.menu_file:
         config["GENERAL"]["menu_file"] = args.menu_file
     if args.files_root:
@@ -269,7 +271,7 @@ def setup_config(args) -> dict:
     if args.menu_file:
         config["GENERAL"]["menu_file"] = args.menu_file
 
-    # validate config.
+    # run our validator function on the config.
     if validate(config):
         log.debug("config: %s", config)
         return config
@@ -313,9 +315,6 @@ def validate(config: dict) -> bool:
     log.info("checking config")
 
     if not check_config_missing(config):
-        return False
-
-    if not is_fakeap_interface_valid(config):
         return False
 
     if not is_ssid_valid(config):
@@ -376,7 +375,7 @@ def check_config_missing(config: dict) -> bool:
 
 
 def update_manuf() -> bool:
-    """ Ypdate manuf flat file from Internet """
+    """ Update manuf flat file from Internet """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(
@@ -407,14 +406,16 @@ def is_fakeap_interface_valid(config: dict) -> bool:
     discovered_interfaces = []
     interface = config.get("GENERAL").get("interface")
     for iface in os.listdir("/sys/class/net"):
-        if "phy80211" in os.listdir(os.path.join("/sys/class/net", iface)):
-            discovered_interfaces.append(iface)
+        iface_path = os.path.join("/sys/class/net", iface)
+        if os.path.isdir(iface_path):
+            if "phy80211" in os.listdir(iface_path):
+                discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
-        log.info("%s is in discovered interfaces: ", ", ".join(discovered_interfaces))
+        log.info("%s is in discovered interfaces: [%s]", interface, ", ".join(discovered_interfaces))
         return True
     else:
         log.critical(
-            "interface %s is not in discovered interfaces: ", discovered_interfaces
+            "%s interface not found in not phy80211 interfaces: %s", interface, discovered_interfaces
         )
         return False
 

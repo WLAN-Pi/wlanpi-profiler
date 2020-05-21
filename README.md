@@ -1,13 +1,15 @@
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/master/docs/images/profiler2-pybadge.svg)
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer for the WLAN Pi platform written in Python 3 (Py3). it checks the 802.11 capabilities based on tricking a client to send an association request frame.
+profiler2 is a Wi-Fi client capability analyzer for the WLAN Pi platform. 
 
-the script does two primary things:
+it does two primary things:
 
-- create a "fake" Access Point broadcasting a network name (SSID) defined by you (default is `WLAN Pi`)
-- analyze association requests from Wi-Fi clients that attempt to associate to the fake AP
+- create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
+- analyzes association requests from Wi-Fi clients that attempt association to the fake AP
+
+when the client attempt to connect, it will send an association frame, this is what is used to analyze the 802.11 capabilities.
 
 ## why is this useful?
 
@@ -21,7 +23,7 @@ each client includes capability details in an 802.11 association frame sent to a
 
 one big caveat here is that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
-## profiling (TODO: update for WLAN Pi v2.0)
+## profiling (*WARNING* this is likely to change in future versions)
 
 the capabilities are analyzed from the association frame sent from the client when it attempts to associate to the profiler's fake AP.
 
@@ -29,7 +31,7 @@ once profiled, a textual report prints in real-time to the screen, and results w
 
 note that further association requests by a profiled client are ignored until the profiler is restarted.
 
-## reports
+## reports (*WARNING* this is likely to change in future versions)
 
 report files are dumped in the following web directories for browsing:
 
@@ -42,9 +44,9 @@ report files are dumped in the following web directories for browsing:
 
 pre-reqs:
 
-- minimum Python version 3.6
-- `scapy`, `pymongo` and `manuf-ng` Py3 modules
-- `tcpdump` and `airmon-ng`
+- minimum Python version required is 3.6 or higher
+- `scapy`, and `manuf-ng` Py3 modules
+- `netstat`, `tcpdump`, and `airmon-ng` tools installed
 
 install: 
 
@@ -53,11 +55,12 @@ install:
 git clone <repo>
 cd <repo>
 
-# install with pip
+# install with pip (recommended)
 sudo python3 -m pip install .
 sudo profiler2
 
-# run without installing examples
+# run but do not install with pip
+cd <repo>
 sudo python3 -m profiler2 
 sudo python3 -m profiler2 <optional params>
 sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
@@ -68,7 +71,7 @@ sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
 ```
 usage: profiler2 [-h] [-i INTERFACE] [-c CHANNEL] [-s SSID | --host_ssid]
                  [--file <FILE>] [--config <FILE>] [--noAP] [--no11ax]
-                 [--no11r] [--menu_mode] [--menu_file <FILE>] [--crust]
+                 [--no11r] [--menu_mode] [--menu_file <FILE>]
                  [--files_root <PATH>] [--clean] [--update] [--test]
                  [--logging [{debug,info}]] [--version]
 
@@ -85,7 +88,6 @@ optional arguments:
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --menu_mode           BakeBit menu reporting
   --menu_file <FILE>    FPMS
-  --crust               Use the WLANPI-crust datastore
   --files_root <PATH>   default root directory for reporting and pcaps
   --clean               cleans out the old CSV reports
   --update              initiates Internet update of OUI database
@@ -98,32 +100,37 @@ optional arguments:
 
 ```
 # capture frames on channel 48 using the default SSID
-sudo python3 -m profiler2 -c 48
+sudo profiler2 -c 48
 ```
 
 ```
 # capture frames on channel 36 using an SSID called 'JOIN ME'
-sudo python3 -m profiler2 -c 36 -s "JOIN ME"
+sudo profiler2 -c 36 -s "JOIN ME"
 ```
 
 ```
 # capture frames on channel 100 with 802.11r disabled for clients that don't like 802.11r
-sudo python3 -m profiler2 -c 100 --no11r
+sudo profiler2 -c 100 --no11r
 ```
 
 ```
 # capture frames on the default channel with 802.11ax disabled for clients that don't like 802.11ax
-sudo python3 -m profiler2 --no11ax
+sudo profiler2 --no11ax
 ```
 
 ```
 # capture frames on channel 100 without the fake AP running (Rx only, no Tx)
-sudo python3 -m profiler2 --noAP -c 100
+sudo profiler2 --noAP -c 100
 ```
 
 ```
 # analyze an association request in a previously captured PCAP file (must be only frame in file)
-sudo python3 -m profiler2 --file assoc_frame.pcap
+sudo profiler2 --file assoc_frame.pcap
+```
+
+```
+# debugging
+sudo profiler2 --logging debug
 ```
 
 ## MAC OUI database update
@@ -152,4 +159,4 @@ to change the default operation of the script, a configuration file called `conf
 
 ## thanks
 
-- Nigel Bowden and the WLAN Pi Community (including Kobe Watkins, Philipp Ebbecke, Jerry Olla) for all their efforts on the first versions of the profiler
+- Nigel Bowden and the WLAN Pi Community (including Kobe Watkins, Philipp Ebbecke, Jerry Olla) for all their input and effort on the first versions of the profiler

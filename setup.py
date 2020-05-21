@@ -17,7 +17,7 @@ try:
 except FileNotFoundError:
     long_description = about["__description__"]
 
-requires = ["scapy", "manuf-ng", "pymongo"]
+requires = ["scapy", "manuf-ng"]
 
 setup(
     name=about["__title__"],

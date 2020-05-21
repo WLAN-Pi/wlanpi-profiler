@@ -31,8 +31,6 @@ import time
 # third party imports
 from manuf import manuf
 
-from pymongo import MongoClient
-
 from scapy.all import wrpcap
 
 # app imports
@@ -104,26 +102,31 @@ class Profiler(object):
 
             print(text_report)
 
+            if self.channel < 15:
+                band = "2.4"
+            elif self.channel > 30 and self.channel < 170:
+                band = "5.8"
+            else:
+                band = "unknown"
+
             self.log.debug("writing assoc req from %s to file", frame.addr2)
-            self.write_assoc_req_pcap(frame)
+            self.write_assoc_req_pcap(frame, band)
 
             self.log.debug("writing text and csv report for %s", frame.addr2)
-            self.write_analysis_to_file(
-                text_report, capabilities, frame.addr2, oui_manuf
+            self.write_analysis_to_file_system(
+                text_report, capabilities, frame.addr2, oui_manuf, band
             )
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
-            if self.args.crust:
-                self.db_report(capabilities, frame.addr2, oui_manuf)
             if self.args.menu_mode:
                 generate_menu_report(
                     self.config, self.client_profiled_count, self.last_manuf
                 )
             if self.args.pcap_analysis_only:
                 self.log.info(
-                    "exiting because we analyzed 1 frame from",
-                    self.args.file_analysis_only,
+                    "exiting because user explicitly told us to analyze %s",
+                    self.args.pcap_analysis_only,
                 )
                 sys.exit()
 
@@ -149,12 +152,13 @@ class Profiler(object):
         text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
         return text_report
 
-    def write_analysis_to_file(self, text_report, capabilities, client_mac, oui_manuf):
+    def write_analysis_to_file_system(self, text_report, capabilities,
+    client_mac, oui_manuf, band):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = client_mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{client_mac}.txt")
+        filename = os.path.join(self.clients_dir, f"{client_mac}.{band}.txt")
         try:
             with open(filename, "w") as writer:
                 writer.write(text_report)
@@ -184,7 +188,7 @@ class Profiler(object):
             writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
             writer.writerow(out_row)
 
-    def write_assoc_req_pcap(self, frame):
+    def write_assoc_req_pcap(self, frame, band):
         """ Write client association request to pcap file on WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         mac = frame.addr2.replace(":", "-", 5)
@@ -198,27 +202,8 @@ class Profiler(object):
                 sys.exit(-1)
 
         # dump out the frame to a file
-        filename = os.path.join(dest, f"{mac}.pcap")
+        filename = os.path.join(dest, f"{mac}.{band}.pcap")
         wrpcap(filename, [frame])
-
-    def db_report(self, capabilities: list, mac_addr: str, oui_manuf: str) -> None:
-        """ Insert results into database for the WebUI """
-        log = logging.getLogger(inspect.stack()[0][3])
-        try:
-            client = MongoClient()
-            db = client.wlanpi
-            insert_data = {"mac_addr": mac_addr, "mac_oui_manuf": oui_manuf}
-            for capability in capabilities:
-                if capability.db_key == "Supported_Channels":
-                    for channel in capability.db_value:
-                        insert_data["channel_" + str(channel)] = 1
-                else:
-                    insert_data[capability.db_key] = capability.db_value
-
-            inserted_id = db.profiler_results.insert_one(insert_data).inserted_id
-            print("\t\tAdded result to database. objectid={0}".format(inserted_id))
-        except Exception:
-            log.exception("problem writing results to mongo db")
 
     @staticmethod
     def process_information_elements(buffer: bytes) -> dict:

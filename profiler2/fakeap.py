@@ -141,7 +141,11 @@ class TxBeacons(object):
         # self.log.debug("frame timestamp: %s", convert_timestamp_to_uptime(ts))
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
-        self.l2socket.send(frame)
+        try:
+            self.l2socket.send(frame)
+        except OSError as error:
+            print(f"{error}; exiting...")
+            sys.exit(-1)
 
 
 class Sniffer(object):
@@ -189,6 +193,7 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
+        
         sniff(
             iface=self.interface,
             prn=self.received_frame_cb,
