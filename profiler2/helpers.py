@@ -406,7 +406,7 @@ def is_fakeap_interface_valid(config: dict) -> bool:
             if "phy80211" in os.listdir(iface_path):
                 discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
-        log.info("%s is in discovered interfaces: ", ", ".join(discovered_interfaces))
+        log.info("%s is in discovered interfaces: %s", interface, ", ".join(discovered_interfaces))
         return True
     else:
         log.critical(
