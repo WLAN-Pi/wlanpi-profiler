@@ -9,7 +9,7 @@ it does two primary things:
 - create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
 - analyzes association requests from Wi-Fi clients that attempt association to the fake AP
 
-when the client attempt to connect, it will send an association frame, this is what is used to analyze the 802.11 capabilities.
+when the client attempts to connect, it will send an association frame which is used to analyze the client's 802.11 capabilities.
 
 ## why is this useful?
 
