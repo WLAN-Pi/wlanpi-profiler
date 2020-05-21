@@ -1,7 +1,8 @@
-Relase 0.0.1.dev2:
+Release 0.0.1.dev2:
 
+- 2.4 or 5.8 GHz markings are now appended to output filenames
 - Minor refactors and bug fixes
-- Allow user to run w/o valid WLAN interface for pcap analysis mode
+- Allow user to run w/o valid WLAN interface for pcap analysis mode (say running from WSL)
 - Remove pymongo dependency and related code
 
 Release 0.0.1.dev1:
