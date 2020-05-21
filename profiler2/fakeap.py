@@ -144,8 +144,7 @@ class TxBeacons(object):
         try:
             self.l2socket.send(frame)
         except OSError as error:
-            print(f"{error}")
-            print("exiting...")
+            print(f"{error}; exiting")
             sys.exit(-1)
 
 
@@ -194,12 +193,16 @@ class Sniffer(object):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-        sniff(
-            iface=self.interface,
-            prn=self.received_frame_cb,
-            store=0,
-            filter=self.bpf_filter,
-        )
+        try:
+            sniff(
+                iface=self.interface,
+                prn=self.received_frame_cb,
+                store=0,
+                filter=self.bpf_filter,
+            )
+        except OSError as error:
+            print(f"{error}; exiting...")
+            sys.exit(-1)
 
     def received_frame(self, packet):
         """ Handle incoming packets for profiling """
