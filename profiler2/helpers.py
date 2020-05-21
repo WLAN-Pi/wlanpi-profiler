@@ -61,6 +61,17 @@ except Exception:
     )
     sys.exit(-1)
 
+# is netstat installed?
+try:
+    result = subprocess.run(
+        ["netstat", "--version"], shell=False, check=True, capture_output=True 
+    )
+except Exception:
+    print(
+        "problem checking netstat version. is netstat installed and functioning? exiting..."
+    )
+    sys.exit(-1)
+
 # app imports
 from .__version__ import __version__
 from .constants import CHANNELS, CLIENTS_DIR, REPORTS_DIR, ROOT_DIR

@@ -43,8 +43,8 @@ report files are dumped in the following web directories for browsing:
 pre-reqs:
 
 - minimum Python version 3.6
-- `scapy`, `pymongo` and `manuf-ng` Py3 modules
-- `tcpdump` and `airmon-ng`
+- `scapy`, and `manuf-ng` Py3 modules
+- `netstat`, `tcpdump`, and `airmon-ng`
 
 install: 
 
