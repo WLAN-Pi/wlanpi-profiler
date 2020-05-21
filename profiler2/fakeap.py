@@ -144,7 +144,9 @@ class TxBeacons(object):
         try:
             self.l2socket.send(frame)
         except OSError as error:
-            print("caught error")
+            print(f"{error}")
+            print("exiting...")
+            sys.exit(-1)
 
 
 class Sniffer(object):
