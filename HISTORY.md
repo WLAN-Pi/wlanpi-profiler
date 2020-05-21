@@ -1,5 +1,7 @@
 Relase 0.0.1.dev2:
 
+- Minor refactors and bug fixes
+- Allow user to run w/o valid WLAN interface for pcap analysis mode
 - Remove pymongo dependency and related code
 
 Release 0.0.1.dev1:

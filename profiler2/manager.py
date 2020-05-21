@@ -72,8 +72,6 @@ def start(args):
 
     queue = mp.Queue()
 
-    helpers.generate_run_message(config)
-
     log.debug("pid %s", os.getpid())
 
     if args.pcap_analysis_only:
@@ -91,6 +89,8 @@ def start(args):
         # put frame into the multiprocessing queue for the profiler to read later
         queue.put(assoc_req_frame)
     else:
+        helpers.generate_run_message(config)
+
         from .fakeap import TxBeacons, Sniffer
 
         boot_time = datetime.now().timestamp()

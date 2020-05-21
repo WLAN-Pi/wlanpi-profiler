@@ -118,7 +118,7 @@ class Profiler(object):
                 )
             if self.args.pcap_analysis_only:
                 self.log.info(
-                    "exiting because we analyzed 1 frame from %s",
+                    "exiting because user explicitly told us to analyze %s",
                     self.args.pcap_analysis_only,
                 )
                 sys.exit()
