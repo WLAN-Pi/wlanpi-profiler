@@ -89,6 +89,9 @@ def start(args):
         # put frame into the multiprocessing queue for the profiler to read later
         queue.put(assoc_req_frame)
     else:
+        if not helpers.is_fakeap_interface_valid(config):
+            sys.exit(-1)
+
         helpers.generate_run_message(config)
 
         from .fakeap import TxBeacons, Sniffer

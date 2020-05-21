@@ -317,12 +317,6 @@ def validate(config: dict) -> bool:
     if not check_config_missing(config):
         return False
 
-    if not is_fakeap_interface_valid(config):
-        # TODO
-        # this check needs to be done when beacon/sniff is actually requested
-        # bc user may only want to analysis static pcap file
-        pass # return False
-
     if not is_ssid_valid(config):
         return False
 
