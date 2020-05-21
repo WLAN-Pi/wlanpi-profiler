@@ -75,9 +75,9 @@ class Profiler(object):
         )
 
         while True:
-            self.profile(queue, config)
+            self.profile(queue)
 
-    def profile(self, queue, config):
+    def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
         if frame.addr2 in self.analyzed_hash.keys():
@@ -102,9 +102,9 @@ class Profiler(object):
 
             print(text_report)
 
-            if config.channel < 15:
+            if self.channel < 15:
                 band = "2.4"
-            elif config.channel > 30 and config.channel < 170:
+            elif self.channel > 30 and self.channel < 170:
                 band = "5.8"
             else:
                 band = "unknown"
