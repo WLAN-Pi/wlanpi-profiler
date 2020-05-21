@@ -307,7 +307,7 @@ def validate(config: dict) -> bool:
         return False
 
     if not is_fakeap_interface_valid(config):
-        return False
+        pass # return False
 
     if not is_ssid_valid(config):
         return False
