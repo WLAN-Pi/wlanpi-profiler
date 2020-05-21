@@ -75,9 +75,9 @@ class Profiler(object):
         )
 
         while True:
-            self.profile(queue)
+            self.profile(queue, config)
 
-    def profile(self, queue):
+    def profile(self, queue, config):
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
         if frame.addr2 in self.analyzed_hash.keys():
@@ -102,12 +102,19 @@ class Profiler(object):
 
             print(text_report)
 
+            if config.channel < 15:
+                band = "2.4"
+            elif config.channel > 30 and config.channel < 170:
+                band = "5.8"
+            else:
+                band = "unknown"
+
             self.log.debug("writing assoc req from %s to file", frame.addr2)
-            self.write_assoc_req_pcap(frame)
+            self.write_assoc_req_pcap(frame, band)
 
             self.log.debug("writing text and csv report for %s", frame.addr2)
-            self.write_analysis_to_file(
-                text_report, capabilities, frame.addr2, oui_manuf
+            self.write_analysis_to_file_system(
+                text_report, capabilities, frame.addr2, oui_manuf, band
             )
 
             self.client_profiled_count += 1
@@ -145,12 +152,13 @@ class Profiler(object):
         text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
         return text_report
 
-    def write_analysis_to_file(self, text_report, capabilities, client_mac, oui_manuf):
+    def write_analysis_to_file_system(self, text_report, capabilities,
+    client_mac, oui_manuf, band):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = client_mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{client_mac}.txt")
+        filename = os.path.join(self.clients_dir, f"{client_mac}.{band}.txt")
         try:
             with open(filename, "w") as writer:
                 writer.write(text_report)
@@ -180,7 +188,7 @@ class Profiler(object):
             writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
             writer.writerow(out_row)
 
-    def write_assoc_req_pcap(self, frame):
+    def write_assoc_req_pcap(self, frame, band):
         """ Write client association request to pcap file on WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         mac = frame.addr2.replace(":", "-", 5)
@@ -194,7 +202,7 @@ class Profiler(object):
                 sys.exit(-1)
 
         # dump out the frame to a file
-        filename = os.path.join(dest, f"{mac}.pcap")
+        filename = os.path.join(dest, f"{mac}.{band}.pcap")
         wrpcap(filename, [frame])
 
     @staticmethod
