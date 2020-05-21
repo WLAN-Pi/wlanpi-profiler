@@ -398,14 +398,15 @@ def is_fakeap_interface_valid(config: dict) -> bool:
     discovered_interfaces = []
     interface = config.get("GENERAL").get("interface")
     for iface in os.listdir("/sys/class/net"):
-        if "phy80211" in os.listdir(os.path.join("/sys/class/net", iface)):
-            discovered_interfaces.append(iface)
+        if os.path.isdir(os.path.join("/sys/class/net", iface)):
+            if "phy80211" in os.listdir(os.path.join("/sys/class/net", iface)):
+                discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
         log.info("%s is in discovered interfaces: ", ", ".join(discovered_interfaces))
         return True
     else:
         log.critical(
-            "interface %s is not in discovered interfaces: ", discovered_interfaces
+            "%s interface not found in not phy80211 interfaces: %s", interface, discovered_interfaces
         )
         return False
 
