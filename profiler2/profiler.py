@@ -103,9 +103,9 @@ class Profiler(object):
             print(text_report)
 
             if self.channel < 15:
-                band = "2.4"
+                band = "2.4GHz"
             elif self.channel > 30 and self.channel < 170:
-                band = "5.8"
+                band = "5.0GHz"
             else:
                 band = "unknown"
 
