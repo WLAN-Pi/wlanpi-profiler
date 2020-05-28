@@ -45,13 +45,13 @@ if sys.version_info < (3, 6):
 
 def main() -> None:
     """ Set up args and start the profiler manager """
-    parser = helpers.setup_parser()
-    args = parser.parse_args()
-    manager.start(args)
+    if os.geteuid() == 0:
+        parser = helpers.setup_parser()
+        args = parser.parse_args()
+        manager.start(args)
+    else:
+        print("must run as root... exiting...")
 
 
 if __name__ == "__main__":
-    if os.geteuid() == 0:
-        main()
-    else:
-        print("must run as root... exiting...")
+    main()
