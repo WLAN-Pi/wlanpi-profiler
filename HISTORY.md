@@ -1,3 +1,7 @@
+Release 0.0.1.dev3:
+
+- Fix permissions check
+
 Release 0.0.1.dev2:
 
 - 2.4 or 5.8 GHz markings are now appended to output filenames
