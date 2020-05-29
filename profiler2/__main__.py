@@ -21,7 +21,7 @@
 profiler2
 ~~~~~~~~~
 
-py3 version of the WLAN Pi profiler
+Wi-Fi client capabilities analyzer for the WLAN Pi
 """
 
 import os

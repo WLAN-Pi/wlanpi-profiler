@@ -86,7 +86,7 @@ def start(args):
         # extract the first frame object from pcap
         assoc_req_frame = frame[0]
 
-        # put frame into the multiprocessing queue for the profiler to read later
+        # put frame into the multiprocessing queue for the profiler to analyze
         queue.put(assoc_req_frame)
     else:
         if not helpers.is_fakeap_interface_valid(config):
