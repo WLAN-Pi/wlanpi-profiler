@@ -159,7 +159,7 @@ class Profiler(object):
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = client_mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{client_mac}.{band}.txt")
+        filename = os.path.join(self.clients_dir, f"{client_mac}_{band}.txt")
         try:
             with open(filename, "w") as writer:
                 writer.write(text_report)
@@ -203,7 +203,7 @@ class Profiler(object):
                 sys.exit(-1)
 
         # dump out the frame to a file
-        filename = os.path.join(dest, f"{mac}.{band}.pcap")
+        filename = os.path.join(dest, f"{mac}_{band}.pcap")
         wrpcap(filename, [frame])
 
     @staticmethod
