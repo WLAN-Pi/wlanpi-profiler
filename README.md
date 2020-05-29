@@ -1,4 +1,4 @@
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/master/docs/images/profiler2-pybadge.svg)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/master/docs/images/profiler2-pybadge-w-logo.svg)
 
 # profiler2
 
@@ -9,7 +9,7 @@ it does two primary things:
 - create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
 - analyzes association requests from Wi-Fi clients that attempt association to the fake AP
 
-when the client attempt to connect, it will send an association frame, this is what is used to analyze the 802.11 capabilities.
+when the client attempts to connect, it will send an association frame which is used to analyze the client's 802.11 capabilities.
 
 ## why is this useful?
 
@@ -44,7 +44,7 @@ report files are dumped in the following web directories for browsing:
 
 pre-reqs:
 
-- minimum Python version required is 3.6 or higher
+- minimum Python version required is 3.7 or higher
 - `scapy`, and `manuf-ng` Py3 modules
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed
 
