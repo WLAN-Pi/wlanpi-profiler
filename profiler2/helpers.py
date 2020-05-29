@@ -646,7 +646,10 @@ def get_ssh_destination_ip() -> Union[str, bool]:
         )
         return False
     else:
-        return dest_ip_re.group(1)
+        if dest_ip_re:
+            return dest_ip_re.group(1)
+        else:
+            return False
 
 
 def generate_run_message(config: dict) -> Union[str, bool]:
