@@ -28,7 +28,7 @@ setup(
     author=about["__author__"],
     author_email=about["__author_email__"],
     url=about["__url__"],
-    python_requires="~=3.6,",
+    python_requires="~=3.7,",
     license=about["__license__"],
     classifiers=[
         "Natural Language :: English",

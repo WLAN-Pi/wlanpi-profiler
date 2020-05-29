@@ -44,7 +44,7 @@ report files are dumped in the following web directories for browsing:
 
 pre-reqs:
 
-- minimum Python version required is 3.6 or higher
+- minimum Python version required is 3.7 or higher
 - `scapy`, and `manuf-ng` Py3 modules
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed
 
