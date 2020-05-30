@@ -82,8 +82,8 @@ def setup_logger(args) -> logging.Logger:
     if args.logging:
         if args.logging == "debug":
             logging_level = logging.DEBUG
-        #if args.logging == "info":
-        #    logging_level = logging.INFO
+        if args.logging == "warning":
+            logging_level = logging.WARNING
     else:
         logging_level = logging.INFO
 
@@ -206,7 +206,7 @@ def setup_parser() -> argparse:
         "--logging",
         help="increase output for debugging",
         nargs="?",
-        choices=("debug"),# "info"),
+        choices=("debug", "warning"),
     )
     parser.add_argument(
         "--version", "-V", action="version", version=f"%(prog)s {__version__}"
