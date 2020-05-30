@@ -40,5 +40,5 @@ setup(
     packages=find_packages(exclude=("tests", "test")),
     include_package_data=True,
     install_requires=requires,
-    entry_points={"console_scripts": ["profiler2=profiler2.__main__:main"]},
+    entry_points={"console_scripts": ["profiler=profiler2.__main__:main"]},
 )

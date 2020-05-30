@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 WLAN Pi Community.
+# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -21,7 +21,7 @@
 profiler2
 ~~~~~~~~~
 
-py3 version of the WLAN Pi profiler
+Wi-Fi client capabilities analyzer for the WLAN Pi
 """
 
 import os
@@ -45,13 +45,13 @@ if sys.version_info < (3, 6):
 
 def main() -> None:
     """ Set up args and start the profiler manager """
-    parser = helpers.setup_parser()
-    args = parser.parse_args()
-    manager.start(args)
+    if os.geteuid() == 0:
+        parser = helpers.setup_parser()
+        args = parser.parse_args()
+        manager.start(args)
+    else:
+        print("must run as root... exiting...")
 
 
 if __name__ == "__main__":
-    if os.geteuid() == 0:
-        main()
-    else:
-        print("must run as root... exiting...")
+    main()

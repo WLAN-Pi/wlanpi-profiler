@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 WLAN Pi Community.
+# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -64,7 +64,7 @@ except Exception:
 # is netstat installed?
 try:
     result = subprocess.run(
-        ["netstat", "--version"], shell=False, check=True, capture_output=True 
+        ["netstat", "--version"], shell=False, check=True, capture_output=True
     )
 except Exception:
     print(
@@ -82,10 +82,10 @@ def setup_logger(args) -> logging.Logger:
     if args.logging:
         if args.logging == "debug":
             logging_level = logging.DEBUG
-        if args.logging == "info":
-            logging_level = logging.INFO
+        if args.logging == "warning":
+            logging_level = logging.WARNING
     else:
-        logging_level = logging.WARNING
+        logging_level = logging.INFO
 
     default_logging = {
         "version": 1,
@@ -206,7 +206,7 @@ def setup_parser() -> argparse:
         "--logging",
         help="increase output for debugging",
         nargs="?",
-        choices=("debug", "info"),
+        choices=("debug", "warning"),
     )
     parser.add_argument(
         "--version", "-V", action="version", version=f"%(prog)s {__version__}"
@@ -411,11 +411,17 @@ def is_fakeap_interface_valid(config: dict) -> bool:
             if "phy80211" in os.listdir(iface_path):
                 discovered_interfaces.append(iface)
     if interface in discovered_interfaces:
-        log.info("%s is in discovered interfaces: [%s]", interface, ", ".join(discovered_interfaces))
+        log.info(
+            "%s is in discovered interfaces: [%s]",
+            interface,
+            ", ".join(discovered_interfaces),
+        )
         return True
     else:
         log.critical(
-            "%s interface not found in not phy80211 interfaces: %s", interface, discovered_interfaces
+            "%s interface not found in not phy80211 interfaces: %s",
+            interface,
+            discovered_interfaces,
         )
         return False
 

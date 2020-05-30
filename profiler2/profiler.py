@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 WLAN Pi Community.
+# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -100,12 +100,12 @@ class Profiler(object):
                 oui_manuf, capabilities, frame.addr2
             )
 
-            print(text_report)
+            self.log.info(text_report)
 
             if self.channel < 15:
-                band = "2.4"
+                band = "2.4GHz"
             elif self.channel > 30 and self.channel < 170:
-                band = "5.8"
+                band = "5.0GHz"
             else:
                 band = "unknown"
 
@@ -152,13 +152,14 @@ class Profiler(object):
         text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
         return text_report
 
-    def write_analysis_to_file_system(self, text_report, capabilities,
-    client_mac, oui_manuf, band):
+    def write_analysis_to_file_system(
+        self, text_report, capabilities, client_mac, oui_manuf, band
+    ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = client_mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{client_mac}.{band}.txt")
+        filename = os.path.join(self.clients_dir, f"{client_mac}_{band}.txt")
         try:
             with open(filename, "w") as writer:
                 writer.write(text_report)
@@ -202,7 +203,7 @@ class Profiler(object):
                 sys.exit(-1)
 
         # dump out the frame to a file
-        filename = os.path.join(dest, f"{mac}.{band}.pcap")
+        filename = os.path.join(dest, f"{mac}_{band}.pcap")
         wrpcap(filename, [frame])
 
     @staticmethod
