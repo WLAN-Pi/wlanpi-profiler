@@ -45,7 +45,7 @@ report files are dumped in the following web directories for browsing:
 pre-reqs:
 
 - minimum Python version required is 3.7 or higher
--`netstat`, `tcpdump`, and `airmon-ng` tools installed
+- `netstat`, `tcpdump`, and `airmon-ng` tools installed
 
 pip install method (recommended): 
 
