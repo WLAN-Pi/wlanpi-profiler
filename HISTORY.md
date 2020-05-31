@@ -1,3 +1,11 @@
+Release 0.0.1.dev5:
+
+- TBD
+
+Release 0.0.1.dev4:
+
+- Specify required scapy version in install_requires and requirements
+
 Release 0.0.1.dev3:
 
 - Console_scripts entry point changed from profiler2 to profiler
