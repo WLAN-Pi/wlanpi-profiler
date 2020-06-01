@@ -1,3 +1,7 @@
+Release 0.0.1.dev6:
+
+- Fix a helper function returning wrong IP of SSH session
+
 Release 0.0.1.dev5:
 
 - Fix bug that prevents profiler.service starting from cockpit
