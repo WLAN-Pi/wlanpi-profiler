@@ -1,3 +1,12 @@
+Release 0.0.1.dev5:
+
+- Fix bug that prevents profiler.service starting from cockpit
+- Only run on Python>=3.7 
+
+Release 0.0.1.dev4:
+
+- Specify required scapy version in install_requires and requirements
+
 Release 0.0.1.dev3:
 
 - Console_scripts entry point changed from profiler2 to profiler
@@ -23,7 +32,6 @@ Release 0.0.1.dev1:
 - `manuf` package appears to be abandoned in Py3. replaced with [manuf-ng](https://github.com/daniel-leicht/manuf-ng)
 - Add `--oui_update` switch to trigger manuf.py to update the local OUI flat file from Internet
 - Add `--no11ax` switch to disable Tx of 802.11ax HE information elements
-- Add `--crust` switch to add support for WLAN Pi v2.0 WebUI
 - Add `--host_ssid` switch to use the WLAN Pi's hostname as the SSID
 - Add `--logging` switch to increase print verbosity for debugging
 - Begin use of `pytest` and `tox` to standardize testing and linting

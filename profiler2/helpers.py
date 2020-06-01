@@ -642,10 +642,11 @@ def get_ssh_destination_ip() -> Union[str, bool]:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         cp = subprocess.run(["netstat", "-tnpa"], capture_output=True)
-        for _socket in cp.stdout.splitlines():
-            _socket = str(_socket)
-            if "22" in _socket and "ESTABLISHED" in _socket:
-                dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", _socket)
+        dest_ip_re = None
+        for socket in cp.stdout.splitlines():
+            socket = str(socket)
+            if "22" in socket and "ESTABLISHED" in socket:
+                dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
     except Exception:
         log.exception(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"

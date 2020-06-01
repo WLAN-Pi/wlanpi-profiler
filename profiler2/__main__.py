@@ -34,10 +34,10 @@ from . import helpers, manager
 if "linux" not in sys.platform:
     sys.exit("{0} only works on Linux... exiting...".format(os.path.basename(__file__)))
 
-# hard set no support for python < v3.6
-if sys.version_info < (3, 6):
+# hard set no support for python < v3.7
+if sys.version_info < (3, 7):
     sys.exit(
-        "{0} requires Python version 3.6 or higher...\nyou are trying to run with Python version {1}...\nexiting...".format(
+        "{0} requires Python version 3.7 or higher...\nyou are trying to run with Python version {1}...\nexiting...".format(
             os.path.basename(__file__), platform.python_version()
         )
     )
