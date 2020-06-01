@@ -21,17 +21,17 @@ capabilities across each client type may vary, depending on factors like client 
 
 each client includes capability details in an 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and then report on the clients capabilities. 
 
-one big caveat here is that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
+one caveat is the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
-## profiling (*WARNING* some of the details are likely to change in future versions)
+## profiling (*WARNING* subject to change in future versions)
 
-the capabilities are analyzed from the association frame sent from the client when it attempts to associate to the profiler's fake AP.
+the client's capabilities are analyzed based on the client's association frame. the client will send an association frame when it attempts to associate to the profiler's fake AP. 
 
 once profiled, a textual report prints in real-time to the screen, and results write to a directory on the WLAN Pi server. results include a copy of the report and also the association frame in PCAP format. 
 
-note that further association requests by a profiled client are ignored until the profiler is restarted.
+note that further association requests by a profiled client are ignored until the profiler script/service is restarted.
 
-## reports (*WARNING* some of the details are likely to change in future versions)
+## reports (*WARNING* subject to change in future versions)
 
 report files are dumped in the following web directories for browsing:
 
@@ -45,7 +45,7 @@ report files are dumped in the following web directories for browsing:
 pre-reqs:
 
 - minimum Python version required is 3.7 or higher
--`netstat`, `tcpdump`, and `airmon-ng` tools installed
+- `netstat`, `tcpdump`, and `airmon-ng` tools installed
 
 pip install method (recommended): 
 
