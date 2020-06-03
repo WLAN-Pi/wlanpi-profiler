@@ -642,21 +642,18 @@ def get_ssh_destination_ip() -> Union[str, bool]:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         cp = subprocess.run(["netstat", "-tnpa"], capture_output=True)
-        dest_ip_re = None
         for socket in cp.stdout.splitlines():
             socket = str(socket)
             if "22" in socket and "ESTABLISHED" in socket:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
+                return dest_ip_re.group(1)
     except Exception:
         log.exception(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
         )
         return False
     else:
-        if dest_ip_re:
-            return dest_ip_re.group(1)
-        else:
-            return False
+        return False
 
 
 def generate_run_message(config: dict) -> Union[str, bool]:
