@@ -105,7 +105,7 @@ class Profiler(object):
             if self.channel < 15:
                 band = "2.4GHz"
             elif self.channel > 30 and self.channel < 170:
-                band = "5.0GHz"
+                band = "5.8GHz"
             else:
                 band = "unknown"
 
