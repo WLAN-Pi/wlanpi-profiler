@@ -105,7 +105,7 @@ class Profiler(object):
             if self.channel < 15:
                 band = "2.4GHz"
             elif self.channel > 30 and self.channel < 170:
-                band = "5.0GHz"
+                band = "5.8GHz"
             else:
                 band = "unknown"
 
@@ -159,12 +159,21 @@ class Profiler(object):
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = client_mac.replace(":", "-", 5)
-        filename = os.path.join(self.clients_dir, f"{client_mac}_{band}.txt")
+        dest = os.path.join(self.clients_dir, client_mac)
+
+        if not os.path.isdir(dest):
+            try:
+                os.mkdir(dest)
+            except Exception:
+                log.error("problem creating %s directory", dest)
+                sys.exit(-1) 
+
+        filename = os.path.join(dest, f"{client_mac}_{band}.txt")
         try:
             with open(filename, "w") as writer:
                 writer.write(text_report)
         except Exception:
-            log.error("error creating file to dump client info (%s)", filename)
+            log.error("error creating flat file to dump client info (%s)", filename)
             sys.exit(-1)
 
         out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
