@@ -1,7 +1,7 @@
 Release 0.0.1.dev6:
 
 - Fix a helper function returning wrong IP of SSH session
-- Place all flat files for a particular client in it's subfolder
+- Place all flat files for a particular client in its subfolder
 - Lock down scapy to version 2.4.3
 - Change 5.0 GHz band marking to 5.8GHz
 
