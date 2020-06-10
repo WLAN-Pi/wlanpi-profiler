@@ -2,20 +2,24 @@
 
 import sys
 import os
-from setuptools import find_packages, setup
+
+from codecs import open
+from setuptools import setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
 # load the package's __version__.py module as a dictionary
 about = {}
-with open(os.path.join(here, "profiler2", "__version__.py")) as f:
+with open(os.path.join(here, "profiler2", "__version__.py"), "r", "utf-8") as f:
     exec(f.read(), about)
 
 try:
     with open("README.md", "r") as f:
         readme = f.read()
 except FileNotFoundError:
-    long_description = about["__description__"]
+    readme = about["__description__"]
+
+packages = ["profiler2"]
 
 requires = ["scapy>=2.4.3", "manuf-ng>=1.0.0"]
 
@@ -37,7 +41,11 @@ setup(
         "Intended Audience :: System Administrators",
         "Topic :: Utilities",
     ],
-    packages=find_packages(exclude=("tests", "test")),
+    packages=packages,
+    project_urls={
+        'Documentation': 'https://docs.wlanpi.com',
+        'Source': 'https://github.com/joshschmelzle/profiler2',
+    },
     include_package_data=True,
     install_requires=requires,
     entry_points={"console_scripts": ["profiler=profiler2.__main__:main"]},
