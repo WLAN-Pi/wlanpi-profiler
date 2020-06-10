@@ -204,7 +204,7 @@ def setup_parser() -> argparse:
     )
     parser.add_argument(
         "--logging",
-        help="increase output for debugging",
+        help="change logging output",
         nargs="?",
         choices=("debug", "warning"),
     )
