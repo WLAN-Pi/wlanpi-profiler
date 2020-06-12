@@ -141,7 +141,7 @@ sudo profiler --logging debug
 
 ## MAC OUI database update
 
-MAC OUI lookup is included in the reports to show the manufacturer of the client based on the 6-byte MAC OUI. This feature is provided by a Python module called "manuf-ng". It uses a local MAC OUI database file to lookup the OUI.
+MAC OUI lookup is included in the reports to show the manufacturer of the client based on the 6-byte MAC OUI. This feature is provided by a Python module called "manuf". It uses a local MAC OUI database file to lookup the OUI.
 
 If you find that some clients are not being profiled with a manufacturer, the OUI file may need to be updated. This can be done from the CLI of the WLAN Pi:
 
