@@ -1,33 +1,37 @@
-Release 0.0.1.dev6:
+Release 0.1.dev7
+
+- `manuf` is no longer abandoned. replace `manuf-ng` with `manuf`
+
+Release 0.1.dev6:
 
 - Fix a helper function returning wrong IP of SSH session
 - Place all flat files for a particular client in its subfolder
 - Lock down scapy to version 2.4.3
 - Change 5.0 GHz band marking to 5.8GHz
 
-Release 0.0.1.dev5:
+Release 0.1.dev5:
 
 - Fix bug that prevents profiler.service starting from cockpit
 - Only run on Python>=3.7 
 
-Release 0.0.1.dev4:
+Release 0.1.dev4:
 
 - Specify required scapy version in install_requires and requirements
 
-Release 0.0.1.dev3:
+Release 0.1.dev3:
 
 - Console_scripts entry point changed from profiler2 to profiler
 - Minor bug fixes
 - Fix permissions check
 
-Release 0.0.1.dev2:
+Release 0.1.dev2:
 
 - 2.4 or 5 GHz markings are now appended to output filenames
 - Minor refactors and bug fixes
 - Allow user to run w/o valid WLAN interface for pcap analysis mode (say running from WSL)
 - Remove pymongo dependency and related code
 
-Release 0.0.1.dev1:
+Release 0.1.dev1:
 
 - Port of original [profiler](https://github.com/WLAN-Pi/profiler) to Python 3.7 (:snake:)
 - Dependency on `sheriffsparks/scapy-fakeap` removed

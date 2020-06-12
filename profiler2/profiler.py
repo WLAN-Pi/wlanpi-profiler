@@ -166,7 +166,7 @@ class Profiler(object):
                 os.mkdir(dest)
             except Exception:
                 log.error("problem creating %s directory", dest)
-                sys.exit(-1) 
+                sys.exit(-1)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
         try:

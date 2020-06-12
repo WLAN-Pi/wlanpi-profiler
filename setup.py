@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import sys
 import os
-
 from codecs import open
+
 from setuptools import setup
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -21,7 +20,7 @@ except FileNotFoundError:
 
 packages = ["profiler2"]
 
-requires = ["scapy>=2.4.3", "manuf==1.1.1"]
+requires = ["tox==3.15.2", "scapy==2.4.3", "manuf==1.1.1"]
 
 setup(
     name=about["__title__"],
@@ -43,8 +42,8 @@ setup(
     ],
     packages=packages,
     project_urls={
-        'Documentation': 'https://docs.wlanpi.com',
-        'Source': 'https://github.com/joshschmelzle/profiler2',
+        "Documentation": "https://docs.wlanpi.com",
+        "Source": "https://github.com/joshschmelzle/profiler2",
     },
     include_package_data=True,
     install_requires=requires,
