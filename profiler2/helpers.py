@@ -43,7 +43,7 @@ try:
     )
 except ModuleNotFoundError as error:
     if error.name == "manuf":
-        print(f"{error}. please install manuf-ng... exiting...")
+        print(f"{error}. please install manuf... exiting...")
     elif error.name == "scapy":
         print(f"{error}. please install scapy... exiting...")
     else:
@@ -394,7 +394,7 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
     except Exception:
-        log.exception("problem updating manuf. make sure manuf-ng is installed...")
+        log.exception("problem updating manuf. make sure manuf is installed...")
         print("exiting...")
         return False
     return True
