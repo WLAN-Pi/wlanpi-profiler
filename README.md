@@ -59,7 +59,7 @@ sudo profiler
 
 run profiler without pip install (optional/for development):
 
-- first make sure `scapy`, and `manuf-ng` Py3 modules are installed (pip install method handles this for you)
+- first make sure `scapy`, and `manuf` Py3 modules are installed (pip install method handles this for you)
 
 ```
 # get code
