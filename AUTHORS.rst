@@ -9,3 +9,4 @@ Patches and Suggestions
 ```````````````````````
 
 - Nigel Bowden `@wifinigel <https://github.com/wifinigel>`_.
+- Keith Miller `@packetologist <https://github.com/kmillerusaf>`_.
