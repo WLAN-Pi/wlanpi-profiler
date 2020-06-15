@@ -1,5 +1,6 @@
 Release 0.1.dev7
 
+- minor changes to flat file output
 - `manuf` is no longer abandoned. replace `manuf-ng` with `manuf`
 
 Release 0.1.dev6:

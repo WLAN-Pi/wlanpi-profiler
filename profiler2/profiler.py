@@ -149,7 +149,7 @@ class Profiler(object):
                     "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
                 )
 
-        text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
+        text_report += "\n* Reported client capabilities are dependent on available features at time of client association."
         return text_report
 
     def write_analysis_to_file_system(
@@ -482,7 +482,7 @@ class Profiler(object):
                 for i in range(channel_range):
                     channel_list.append(start_channel + (i * channel_multiplier))
 
-            supported_channels.value = ", ".join(map(str, channel_list))
+            supported_channels.value = ",".join(map(str, channel_list))
             supported_channels.db_value = channel_list
 
         return [supported_channels]
