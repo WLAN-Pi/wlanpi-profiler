@@ -116,7 +116,7 @@ def setup_parser() -> argparse:
             a Wi-Fi client analyzer for identifying supported 802.11 capabilities
             """
         ),
-        epilog=f"made with Python by the WLAN Pi Community",
+        epilog="made with Python by the WLAN Pi Community",
         fromfile_prefix_chars="2",
     )
     parser.add_argument(
@@ -642,8 +642,8 @@ def get_ssh_destination_ip() -> Union[str, bool]:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         cp = subprocess.run(["netstat", "-tnpa"], capture_output=True)
-        for socket in cp.stdout.splitlines():
-            socket = str(socket)
+        for line in cp.stdout.splitlines():
+            socket = str(line)
             if "22" in socket and "ESTABLISHED" in socket:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
                 return dest_ip_re.group(1)
