@@ -360,12 +360,12 @@ class Profiler(object):
         return [dot11k]
 
     @staticmethod
-    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_enabled: bool) -> []:
+    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> []:
         """ Check for 802.11r support """
         dot11r = Capability(
             name="802.11r", value="Not reported*", db_key="802.11r", db_value=0
         )
-        if not ft_enabled:
+        if ft_disabled:
             dot11r.value = "Reporting disabled (--no11r option used)"
         elif FT_CAPABILITIES_TAG in dot11_elt_dict.keys():
             dot11r.value = "Supported"
@@ -488,7 +488,7 @@ class Profiler(object):
         return [supported_channels]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict: dict, he_enabled: bool) -> []:
+    def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
         """
         Check for 802.11ax support
 
@@ -502,7 +502,7 @@ class Profiler(object):
             db_key="802.11ax_draft",
             db_value="0",
         )
-        if not he_enabled:
+        if he_disabled:
             dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
         else:
             if EXT_IE_TAG in dot11_elt_dict.keys():
@@ -554,7 +554,7 @@ class Profiler(object):
 
         # check if 11r supported
         capabilities += self.analyze_ft_capabilities_ie(
-            dot11_elt_dict, self.args.ft_enabled
+            dot11_elt_dict, self.args.ft_disabled
         )
 
         # check if 11v supported
@@ -570,7 +570,7 @@ class Profiler(object):
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
         # check for Ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.args.he_enabled)
+        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.args.he_disabled)
 
         # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)

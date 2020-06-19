@@ -156,15 +156,24 @@ def setup_parser() -> argparse:
         help="enable listen only mode (Rx only)",
     )
     parser.add_argument(
+        "--noprep",
+        dest="no_interface_prep",
+        action="store_true",
+        default=False,
+        help="disable interface preperation",
+    )
+    parser.add_argument(
         "--no11ax",
-        dest="he_enabled",
-        action="store_false",
+        dest="he_disabled",
+        action="store_true",
+        default=False,
         help="turn off 802.11ax High Efficiency (HE) reporting",
     )
     parser.add_argument(
         "--no11r",
-        dest="ft_enabled",
-        action="store_false",
+        dest="ft_disabled",
+        action="store_true",
+        default=False,
         help="turn off 802.11r Fast Transition (FT) reporting",
     )
     parser.add_argument(
@@ -258,14 +267,12 @@ def setup_config(args) -> dict:
         config["GENERAL"]["ssid"] = args.ssid
     elif args.hostname_as_ssid:
         config["GENERAL"]["ssid"] = socket.gethostname()
-    if args.ft_enabled:
-        config["GENERAL"]["ft_enabled"] = args.ft_enabled
-    if args.he_enabled:
-        config["GENERAL"]["he_enabled"] = args.he_enabled
+    if args.ft_disabled:
+        config["GENERAL"]["ft_disabled"] = args.ft_disabled
+    if args.he_disabled:
+        config["GENERAL"]["he_disabled"] = args.he_disabled
     if args.listen_only:
         config["GENERAL"]["listen_only"] = args.listen_only
-    if args.menu_file:
-        config["GENERAL"]["menu_file"] = args.menu_file
     if args.files_root:
         config["GENERAL"]["files_root"] = args.files_root
     if args.menu_file:
@@ -505,12 +512,13 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
     ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
-    if args.ft_enabled:
+    if args.ft_disabled:
+        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+    else:
         mobility_domain_data = b"\x45\xc2\x00"
         mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
         rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
-    else:
-        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+
     rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
     ht_info_data = (
@@ -540,7 +548,21 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
     he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
     he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
 
-    if args.ft_enabled:
+    if args.ft_disabled:
+        frame = (
+            essid
+            / rates
+            / dsset
+            / dtim
+            / ht_capabilities
+            / rsn
+            / ht_information
+            / rm_enabled_cap
+            / extended
+            / vht_capabilities
+            / vht_operation
+        )
+    else:
         frame = (
             essid
             / rates
@@ -555,24 +577,10 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
             / vht_capabilities
             / vht_operation
         )
-    else:
-        frame = (
-            essid
-            / rates
-            / dsset
-            / dtim
-            / ht_capabilities
-            / rsn
-            / ht_information
-            / rm_enabled_cap
-            / extended
-            / vht_capabilities
-            / vht_operation
-        )
-    if args.he_enabled:
-        frame = frame / he_capabilities / he_operation / wmm
-    else:
+    if args.he_disabled:
         frame = frame / wmm
+    else:
+        frame = frame / he_capabilities / he_operation / wmm
 
     return frame
 
@@ -623,12 +631,12 @@ def generate_menu_report(config: dict, client_count: int, last_manuf: str) -> No
     log = logging.getLogger(inspect.stack()[0][3])
     menu_file = config.get("GENERAL").get("menu_file")
     channel = int(config.get("GENERAL").get("channel"))
-    ft_enabled = config.get("GENERAL").get("ft_enabled")
-    he_enabled = config.get("GENERAL").get("he_enabled")
+    ft_disabled = config.get("GENERAL").get("ft_disabled")
+    he_disabled = config.get("GENERAL").get("he_disabled")
     ssid = config.get("GENERAL").get("ssid")
     report = [
         "Status: running\r",
-        f"Ch:{channel} 11r:{'Yes' if ft_enabled else 'No'} 11ax:{'Yes' if he_enabled else 'No'}\r",
+        f"Ch:{channel} 11r:{'No' if ft_disabled else 'Yes'} 11ax:{'No' if he_disabled else 'Yes'}\r",
         f"SSID: {ssid}\r",
         f"Clients:{client_count} ({last_manuf})",
     ]
