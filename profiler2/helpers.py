@@ -375,7 +375,7 @@ def check_config_missing(config: dict) -> bool:
 
 
 def update_manuf() -> bool:
-    """ Update manuf flat file from Internet """
+    """ Wrapper around manuf for updating manuf OUI file from Internet """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(
@@ -386,9 +386,10 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
         log.debug("running 'sudo manuf --update'")
-        subprocess.run(
+        sp = subprocess.run(
             ["sudo", "manuf", "--update"], shell=False, check=True, capture_output=True
         )
+        log.info("%s", str(sp))
         log.debug(
             "manuf last modified time: %s",
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
@@ -648,7 +649,7 @@ def get_ssh_destination_ip() -> Union[str, bool]:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
                 return dest_ip_re.group(1)
     except Exception:
-        log.exception(
+        log.warning(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
         )
         return False
