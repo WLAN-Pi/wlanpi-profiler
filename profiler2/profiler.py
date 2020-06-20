@@ -154,14 +154,12 @@ class Profiler(object):
     ) -> str:
         """ Generate a report for output """
         # start report
-        text_report = f"\nClient capabilities report\n"
-        text_report += "-" * 60
+        text_report = "-" * 45
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
         text_report += f"\n - Capture channel: {channel}\n"
-        text_report += "-" * 60
+        text_report += "-" * 45
         text_report += "\n"
-
         for capability in capabilities:
             if capability.name is not None and capability.value is not None:
                 text_report += (
