@@ -115,12 +115,15 @@ def start(args):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
-        log.info("start interface prep...")
-        if not helpers.prep_interface(interface, "monitor", channel):
-            log.error("failed to prep interface")
-            print("exiting...")
-            sys.exit(-1)
-        log.info("done prep interface...")
+        if args.no_interface_prep:
+            log.warning("skipping interface prep...")
+        else:
+            log.info("start interface prep...")
+            if not helpers.prep_interface(interface, "monitor", channel):
+                log.error("failed to prep interface")
+                print("exiting...")
+                sys.exit(-1)
+            log.info("done prep interface...")
 
         if args.listen_only:
             log.info("beacon process not started due to listen only mode")
