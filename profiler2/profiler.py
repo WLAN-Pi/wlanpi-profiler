@@ -115,7 +115,7 @@ class Profiler(object):
             capabilities = self.analyze_assoc_req(frame)
 
             text_report = self.generate_text_report(
-                oui_manuf, capabilities, frame.addr2
+                oui_manuf, capabilities, frame.addr2, self.channel
             )
 
             self.log.info(text_report)
@@ -137,7 +137,7 @@ class Profiler(object):
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
-            if self.args.menu_mode:
+            if self.menu_mode:
                 generate_menu_report(
                     self.config, self.client_profiled_count, self.last_manuf, "running"
                 )
@@ -150,14 +150,15 @@ class Profiler(object):
 
     @staticmethod
     def generate_text_report(
-        oui_manuf: str, capabilities: list, client_mac: str
+        oui_manuf: str, capabilities: list, client_mac: str, channel: int
     ) -> str:
         """ Generate a report for output """
         # start report
-        text_report = "\n"
+        text_report = f"\nClient capabilities report\n"
         text_report += "-" * 60
-        text_report += f"\nClient capabilities report - Client MAC: {client_mac}\n"
-        text_report += f"(OUI manufacturer lookup: {oui_manuf or 'Unknown'})\n"
+        text_report += f"\n - Client MAC: {client_mac}"
+        text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
+        text_report += f"\n - Capture channel: {channel}\n"
         text_report += "-" * 60
         text_report += "\n"
 

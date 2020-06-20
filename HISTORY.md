@@ -1,7 +1,9 @@
-Release 0.1.dev7
+Release 1.0.0-alpha1
 
+- create and change default branch from master to main
+- reset version numbers
 - fix handling of --no11r and --no11ax args 
-- menu mode improvements and now enabled by default
+- menu mode improvements and enabled by default
 - minor changes to flat file output
 - `manuf` is no longer abandoned - replaced `manuf-ng` with `manuf`
 
@@ -29,7 +31,7 @@ Release 0.1.dev3:
 
 Release 0.1.dev2:
 
-- 2.4 or 5 GHz markings are now appended to output filenames
+- 2.4 or 5 GHz markings are now appended to filenames for flat files
 - Minor refactors and bug fixes
 - Allow user to run w/o valid WLAN interface for pcap analysis mode (say running from WSL)
 - Remove pymongo dependency and related code
