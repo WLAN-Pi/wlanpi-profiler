@@ -75,13 +75,14 @@ class Profiler(object):
         self.config = config
         self.channel = int(config.get("GENERAL").get("channel"))
         self.ssid = config.get("GENERAL").get("ssid")
+        self.menu_mode = config.get("GENERAL").get("menu_mode")
         self.reports_dir = os.path.join(self.args.files_root, ROOT_DIR, REPORTS_DIR)
         self.clients_dir = os.path.join(self.args.files_root, ROOT_DIR, CLIENTS_DIR)
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
-        if self.args.menu_mode:
+        if self.menu_mode:
             generate_menu_report(
-                self.config, self.client_profiled_count, self.last_manuf
+                self.config, self.client_profiled_count, self.last_manuf, "running"
             )
         self.csv_file = os.path.join(
             self.reports_dir, f"db-{time.strftime('%Y-%m-%dt%H-%M-%S')}.csv"
@@ -89,6 +90,10 @@ class Profiler(object):
 
         while True:
             self.profile(queue)
+
+    def __del__(self):
+        if self.menu_mode:
+            generate_menu_report(self.config, 0, "N/A", "stopped")
 
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
@@ -134,11 +139,11 @@ class Profiler(object):
             self.log.debug("%s clients profiled", self.client_profiled_count)
             if self.args.menu_mode:
                 generate_menu_report(
-                    self.config, self.client_profiled_count, self.last_manuf
+                    self.config, self.client_profiled_count, self.last_manuf, "running"
                 )
             if self.args.pcap_analysis_only:
                 self.log.info(
-                    "exiting because user explicitly told us to analyze %s",
+                    "exiting because we were told to only analyze %s",
                     self.args.pcap_analysis_only,
                 )
                 sys.exit()
@@ -583,7 +588,9 @@ class Profiler(object):
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
         # check for Ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.args.he_disabled)
+        capabilities += self.analyze_extension_ies(
+            dot11_elt_dict, self.args.he_disabled
+        )
 
         # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)

@@ -367,8 +367,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 for c in commands
             ]
             return True
-        except Exception:
-            log.exception("error setting wlan interface config")
+        except Exception as error:
+            log.exception("error setting wlan interface config: %s", error)
     else:
         log.error("failed to prep interface config...")
         return False
@@ -639,7 +639,9 @@ def get_mac(interface: str) -> str:
     return mac
 
 
-def generate_menu_report(config: dict, client_count: int, last_manuf: str) -> None:
+def generate_menu_report(
+    config: dict, client_count: int, last_manuf: str, status: str
+) -> None:
     """ Create report for WLAN Pi FPMS """
     log = logging.getLogger(inspect.stack()[0][3])
     menu_file = config.get("GENERAL").get("menu_file")
@@ -648,7 +650,7 @@ def generate_menu_report(config: dict, client_count: int, last_manuf: str) -> No
     he_disabled = config.get("GENERAL").get("he_disabled")
     ssid = config.get("GENERAL").get("ssid")
     report = [
-        "Status: running\r",
+        f"Status: {status}\r",
         f"Ch:{channel} 11r:{'No' if ft_disabled else 'Yes'} 11ax:{'No' if he_disabled else 'Yes'}\r",
         f"SSID: {ssid}\r",
         f"Clients:{client_count} ({last_manuf})",

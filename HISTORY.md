@@ -1,7 +1,9 @@
 Release 0.1.dev7
 
+- fix handling of --no11r and --no11ax args 
+- menu mode improvements and now enabled by default
 - minor changes to flat file output
-- `manuf` is no longer abandoned. replace `manuf-ng` with `manuf`
+- `manuf` is no longer abandoned - replaced `manuf-ng` with `manuf`
 
 Release 0.1.dev6:
 
