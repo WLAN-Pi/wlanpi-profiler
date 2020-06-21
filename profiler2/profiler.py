@@ -67,17 +67,20 @@ from .helpers import Capability, flag_last_object, generate_menu_report
 class Profiler(object):
     """ Code handling analysis of client capablities """
 
-    def __init__(self, args, queue, config):
+    def __init__(self, config, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("profiler pid: %s; parent pid: %s", os.getpid(), os.getppid())
-        self.args = args
         self.analyzed_hash = {}
         self.config = config
         self.channel = int(config.get("GENERAL").get("channel"))
         self.ssid = config.get("GENERAL").get("ssid")
         self.menu_mode = config.get("GENERAL").get("menu_mode")
-        self.reports_dir = os.path.join(self.args.files_root, ROOT_DIR, REPORTS_DIR)
-        self.clients_dir = os.path.join(self.args.files_root, ROOT_DIR, CLIENTS_DIR)
+        self.files_root = config.get("GENERAL").get("files_root")
+        self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+        self.ft_disabled = config.get("GENERAL").get("ft_disabled")
+        self.he_disabled = config.get("GENERAL").get("he_disabled")
+        self.reports_dir = os.path.join(self.files_root, ROOT_DIR, REPORTS_DIR)
+        self.clients_dir = os.path.join(self.files_root, ROOT_DIR, CLIENTS_DIR)
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
         if self.menu_mode:
@@ -141,10 +144,10 @@ class Profiler(object):
                 generate_menu_report(
                     self.config, self.client_profiled_count, self.last_manuf, "running"
                 )
-            if self.args.pcap_analysis_only:
+            if self.pcap_analysis:
                 self.log.info(
                     "exiting because we were told to only analyze %s",
-                    self.args.pcap_analysis_only,
+                    self.pcap_analysis,
                 )
                 sys.exit()
 
@@ -571,7 +574,7 @@ class Profiler(object):
 
         # check if 11r supported
         capabilities += self.analyze_ft_capabilities_ie(
-            dot11_elt_dict, self.args.ft_disabled
+            dot11_elt_dict, self.ft_disabled
         )
 
         # check if 11v supported
@@ -587,9 +590,7 @@ class Profiler(object):
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
         # check for Ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(
-            dot11_elt_dict, self.args.he_disabled
-        )
+        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.he_disabled)
 
         # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)

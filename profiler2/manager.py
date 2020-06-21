@@ -62,8 +62,8 @@ def start(args):
     signal.signal(signal.SIGINT, signal_handler)
     helpers.setup_logger(args)
 
-    log.info("%s version %s", __name__.split(".")[0], __version__)
-    log.info("python platform version is %s", platform.python_version())
+    log.debug("%s version %s", __name__.split(".")[0], __version__)
+    log.debug("python platform version is %s", platform.python_version())
     log.debug("args: %s", args)
 
     if args.oui_update:
@@ -81,19 +81,19 @@ def start(args):
         sys.exit(0)
 
     interface = config.get("GENERAL").get("interface")
-    ssid = config.get("GENERAL").get("ssid")
     channel = int(config.get("GENERAL").get("channel"))
-
+    pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+    listen_only = config.get("GENERAL").get("listen_only")
     queue = mp.Queue()
 
-    log.debug("pid %s", os.getpid())
+    log.debug("%s pid %s", __name__, os.getpid())
 
-    if args.pcap_analysis_only:
+    if pcap_analysis:
         log.info("not starting beacon or sniffer - user wants to do file analysis only")
         try:
-            frame = rdpcap(args.pcap_analysis_only)
+            frame = rdpcap(pcap_analysis)
         except FileNotFoundError:
-            log.exception("could not find file %s", args.pcap_analysis_only)
+            log.exception("could not find file %s", pcap_analysis)
             print("exiting...")
             sys.exit(-1)
 
@@ -103,9 +103,6 @@ def start(args):
         # put frame into the multiprocessing queue for the profiler to analyze
         queue.put(assoc_req_frame)
     else:
-        if not helpers.is_fakeap_interface_valid(config):
-            sys.exit(-1)
-
         helpers.generate_run_message(config)
 
         from .fakeap import TxBeacons, Sniffer
@@ -125,33 +122,24 @@ def start(args):
                 sys.exit(-1)
             log.info("done prep interface...")
 
-        if args.listen_only:
+        if listen_only:
             log.info("beacon process not started due to listen only mode")
         else:
             log.info("starting beacon process")
             mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
-                args=(args, boot_time, lock, sequence_number, ssid, interface, channel),
+                args=(config, boot_time, lock, sequence_number),
             ).start()
 
         log.info("starting sniffer process")
         mp.Process(
             name="sniffer",
             target=Sniffer,
-            args=(
-                args,
-                boot_time,
-                lock,
-                sequence_number,
-                ssid,
-                interface,
-                channel,
-                queue,
-            ),
+            args=(config, boot_time, lock, sequence_number, queue),
         ).start()
 
     from .profiler import Profiler
 
     log.info("starting profiler process")
-    mp.Process(name="profiler", target=Profiler, args=(args, queue, config)).start()
+    mp.Process(name="profiler", target=Profiler, args=(config, queue)).start()

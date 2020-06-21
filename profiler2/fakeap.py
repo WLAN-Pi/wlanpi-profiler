@@ -83,25 +83,23 @@ from .helpers import (
 class TxBeacons(object):
     """ Handle Tx of fake AP frames """
 
-    def __init__(
-        self, args, boot_time, lock, sequence_number, ssid, interface, channel
-    ):
+    def __init__(self, config, boot_time, lock, sequence_number):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.info("scapy version: %s", scapy.__version__)
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
-        self.args = args
+        self.config = config
         self.sequence_number = sequence_number
-        self.ssid = ssid
-        self.interface = interface
-        self.channel = channel
+        self.ssid = config.get("GENERAL").get("ssid")
+        self.interface = config.get("GENERAL").get("interface")
+        self.channel = int(config.get("GENERAL").get("channel"))
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
         self.beacon_interval = 0.102400
 
         with lock:
-            self.mac = get_mac(interface)
+            self.mac = get_mac(self.interface)
             dot11 = Dot11(
                 type=DOT11_TYPE_MANAGEMENT,
                 subtype=DOT11_SUBTYPE_BEACON,
@@ -110,7 +108,7 @@ class TxBeacons(object):
                 addr3=self.mac,
             )
             dot11beacon = Dot11Beacon(beacon_interval=1, cap=0x1111)
-            beacon_frame_ies = build_fake_frame_ies(self.ssid, self.channel, self.args)
+            beacon_frame_ies = build_fake_frame_ies(self.config)
             self.beacon_frame = (
                 get_radiotap_header(self.channel)
                 / dot11
@@ -164,19 +162,17 @@ class TxBeacons(object):
 class Sniffer(object):
     """ Handle sniffing probes and association requests """
 
-    def __init__(
-        self, args, boot_time, lock, sequence_number, ssid, interface, channel, queue
-    ):
+    def __init__(self, config, boot_time, lock, sequence_number, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer %s; parent pid: %s", os.getpid(), os.getppid())
 
         self.queue = queue
         self.boot_time = boot_time
-        self.args = args
+        self.config = config
         self.sequence_number = sequence_number
-        self.ssid = ssid
-        self.interface = interface
-        self.channel = channel
+        self.ssid = config.get("GENERAL").get("ssid")
+        self.interface = config.get("GENERAL").get("interface")
+        self.channel = int(config.get("GENERAL").get("channel"))
         self.assoc_reqs = {}
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
@@ -191,8 +187,8 @@ class Sniffer(object):
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
         with lock:
-            probe_resp_ies = build_fake_frame_ies(self.ssid, self.channel, self.args)
-            self.mac = get_mac(interface)
+            probe_resp_ies = build_fake_frame_ies(self.config)
+            self.mac = get_mac(self.interface)
             self.probe_response_frame = (
                 get_radiotap_header(self.channel)
                 / Dot11(
