@@ -40,6 +40,7 @@ provides init functions that are used to help setup the app.
 import argparse, configparser, inspect, logging, logging.config, os, re, socket, subprocess, sys, textwrap
 from dataclasses import dataclass
 from datetime import timedelta
+from distutils.util import strtobool
 from multiprocessing import Value
 from time import ctime
 from typing import Union
@@ -306,11 +307,17 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
 
     The resulting dictionary has sections as keys which point to a dict of the
     section options as key => value pairs.
+
+    If there is a string representation of truth, it is converted from str to bool.
     """
     _dict = {}
     for section in config.sections():
         _dict[section] = {}
         for key, value in config.items(section):
+            try:
+                value = bool(strtobool(value))
+            except ValueError:
+                pass
             _dict[section][key] = value
     return _dict
 
