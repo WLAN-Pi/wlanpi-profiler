@@ -1,11 +1,11 @@
 Release 1.0.0-alpha1
 
-- create and change default branch from master to main
-- reset version numbers
-- fix handling of --no11r and --no11ax args 
-- menu mode improvements and enabled by default
-- minor changes to flat file output
-- `manuf` is no longer abandoned - replaced `manuf-ng` with `manuf`
+- create and change default branch from master to main   
+- increment version to 1.0.0-alpha1                                      
+- fix handling of --no11r and --no11ax from either args or config file
+- menu mode tweaks and is now enabled by default
+- minor changes to flat file output such as including the capture channel
+- `manuf` is no longer abandoned: replaced it's fork `manuf-ng` with `manuf`
 
 Release 0.1.dev6:
 
