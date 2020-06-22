@@ -1,20 +1,33 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
+# Copyright 2020 Josh Schmelzle
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
 
 """
 profiler2.helpers
@@ -27,6 +40,7 @@ provides init functions that are used to help setup the app.
 import argparse, configparser, inspect, logging, logging.config, os, re, socket, subprocess, sys, textwrap
 from dataclasses import dataclass
 from datetime import timedelta
+from distutils.util import strtobool
 from multiprocessing import Value
 from time import ctime
 from typing import Union
@@ -107,6 +121,50 @@ def setup_logger(args) -> logging.Logger:
     # return logging.getLogger(__name__)
 
 
+def check_channel(value: str) -> int:
+    """ Check if channel is valid """
+    channel = int(value)
+    error_msg = "%s is not a valid channel value" % channel
+    if channel <= 0:
+        raise argparse.ArgumentTypeError(error_msg)
+    if channel in CHANNELS:
+        return channel
+    else:
+        raise argparse.ArgumentTypeError(error_msg)
+
+
+def check_ssid(ssid: str) -> str:
+    """ Check if SSID is valid """
+    if len(ssid) > 32:
+        raise argparse.ArgumentTypeError("%s length is greater than 32" % ssid)
+    return ssid
+
+
+def check_interface(interface: str) -> str:
+    """ Check that the interface we've been asked to run on actually exists """
+    log = logging.getLogger(inspect.stack()[0][3])
+    discovered_interfaces = []
+    for iface in os.listdir("/sys/class/net"):
+        iface_path = os.path.join("/sys/class/net", iface)
+        if os.path.isdir(iface_path):
+            if "phy80211" in os.listdir(iface_path):
+                discovered_interfaces.append(iface)
+    if interface not in discovered_interfaces:
+        log.info(
+            "%s interface not found in not phy80211 interfaces: %s"
+            % interface
+            % discovered_interfaces
+        )
+        raise argparse.ArgumentTypeError("%s is not a valid interface" % interface)
+    else:
+        log.debug(
+            "%s is in discovered interfaces: [%s]",
+            interface,
+            ", ".join(discovered_interfaces),
+        )
+        return interface
+
+
 def setup_parser() -> argparse:
     """ Set default values and handle arg parser """
     parser = argparse.ArgumentParser(
@@ -116,37 +174,34 @@ def setup_parser() -> argparse:
             a Wi-Fi client analyzer for identifying supported 802.11 capabilities
             """
         ),
-        epilog=f"made with Python by the WLAN Pi Community",
+        epilog="made with Python by Josh Schmelzle",
         fromfile_prefix_chars="2",
     )
     parser.add_argument(
-        "-i", dest="interface", help="set network interface for profiler"
+        "-i", dest="interface", type=check_interface, help="set network interface for profiler"
     )
-    parser.add_argument("-c", dest="channel", help="802.11 channel to broadcast on")
+    parser.add_argument(
+        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on",
+    )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
-        "-s", dest="ssid", help="set network identifier for profiler SSID"
+        "-s",
+        dest="ssid",
+        type=check_ssid,
+        help="set network identifier for profiler SSID",
     )
     ssid_group.add_argument(
-        "--host_ssid",
-        dest="hostname_as_ssid",
+        "--hostname_ssid",
+        dest="hostname_ssid",
         action="store_true",
         default=False,
-        help="use the WLAN Pi's hostname as profiler SSID",
+        help="use the WLAN Pi's hostname for the SSID",
     )
     parser.add_argument(
-        "--file",
+        "--pcap",
         metavar="<FILE>",
-        dest="pcap_analysis_only",
-        help="read in first packet of pcap (expecting an association request frame)",
-    )
-    config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
-    parser.add_argument(
-        "--config",
-        type=str,
-        metavar="<FILE>",
-        default=config,
-        help="specify path for configuration file",
+        dest="pcap_analysis",
+        help="analyze first packet of pcap (expecting an association request frame)",
     )
     parser.add_argument(
         "--noAP",
@@ -155,45 +210,78 @@ def setup_parser() -> argparse:
         default=False,
         help="enable listen only mode (Rx only)",
     )
-    parser.add_argument(
-        "--no11ax",
+    dot11r_group = parser.add_mutually_exclusive_group()
+    dot11r_group.add_argument(
+        "--11r",
+        dest="ft_enabled",
+        action="store_true",
+        default=False,
+        help="turn on 802.11r Fast Transition (FT) reporting (override --config file)",
+    )
+    dot11r_group.add_argument(
+        "--no11r",
+        dest="ft_disabled",
+        action="store_true",
+        default=False,
+        help="turn off 802.11r Fast Transition (FT) reporting",
+    )
+    dot11ax_group = parser.add_mutually_exclusive_group()
+    dot11ax_group.add_argument(
+        "--11ax",
         dest="he_enabled",
-        action="store_false",
+        action="store_true",
+        default=False,
+        help="turn on 802.11ax High Efficiency (HE) reporting (override --config file)",
+    )
+    dot11ax_group.add_argument(
+        "--no11ax",
+        dest="he_disabled",
+        action="store_true",
+        default=False,
         help="turn off 802.11ax High Efficiency (HE) reporting",
     )
     parser.add_argument(
-        "--no11r",
-        dest="ft_enabled",
-        action="store_false",
-        help="turn off 802.11r Fast Transition (FT) reporting",
-    )
-    parser.add_argument(
-        "--menu_mode",
-        dest="menu_mode",
+        "--noprep",
+        dest="no_interface_prep",
         action="store_true",
         default=False,
-        help="enable WLAN Pi FPMS menu reporting",
+        help="disable interface preperation",
+    )
+    # parser.add_argument(
+    #     "--menu_mode",
+    #     dest="menu_mode",
+    #     action="store_true",
+    #     default=False,
+    #     help="enable WLAN Pi FPMS menu reporting",
+    # )
+    config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
+    parser.add_argument(
+        "--config",
+        type=str,
+        metavar="<FILE>",
+        default=config,
+        help="customize path for configuration file",
     )
     parser.add_argument(
         "--menu_file",
         metavar="<FILE>",
         dest="menu_file",
         default="/tmp/profiler_menu_report.txt",
-        help="change menu report file location for WLAN Pi FPMS",
+        help="customize menu report file location for WLAN Pi FPMS",
     )
     parser.add_argument(
         "--files_root",
         metavar="<PATH>",
         dest="files_root",
         default="/var/www/html",
-        help="default root directory for reporting and pcaps",
+        help="customize default root directory for reporting and pcaps",
     )
     parser.add_argument(
         "--clean",
         dest="clean",
         action="store_true",
         default=False,
-        help="cleans out the old CSV reports",
+        help="deletes CSV reports",
     )
     parser.add_argument(
         "--oui_update",
@@ -204,7 +292,7 @@ def setup_parser() -> argparse:
     )
     parser.add_argument(
         "--logging",
-        help="increase output for debugging",
+        help="change logging output",
         nargs="?",
         choices=("debug", "warning"),
     )
@@ -218,9 +306,13 @@ def report_cleanup(_dir) -> None:
     """ Purge reports """
     log = logging.getLogger(inspect.stack()[0][3])
 
+    print(f"Delete the following files: {os.listdir(_dir)}")
+    if not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
+        sys.exit(1)
+
     for _file in os.listdir(_dir):
         try:
-            print(f"removing old file: {_file}")
+            log.info(f"removing old file: {_file}")
             os.unlink(os.path.join(_dir, _file))
         except Exception:
             log.exception("issue removing files")
@@ -249,6 +341,10 @@ def setup_config(args) -> dict:
     if "GENERAL" not in config:
         config["GENERAL"] = {}
 
+    # handle config settings
+    if config["GENERAL"]["hostname_ssid"]:
+        config["GENERAL"]["ssid"] = socket.gethostname()
+
     # did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
@@ -256,16 +352,20 @@ def setup_config(args) -> dict:
         config["GENERAL"]["interface"] = args.interface
     if args.ssid:
         config["GENERAL"]["ssid"] = args.ssid
-    elif args.hostname_as_ssid:
+    elif args.hostname_ssid:
         config["GENERAL"]["ssid"] = socket.gethostname()
     if args.ft_enabled:
-        config["GENERAL"]["ft_enabled"] = args.ft_enabled
+        config["GENERAL"]["ft_disabled"] = False
+    if args.ft_disabled:
+        config["GENERAL"]["ft_disabled"] = args.ft_disabled
     if args.he_enabled:
-        config["GENERAL"]["he_enabled"] = args.he_enabled
+        config["GENERAL"]["he_disabled"] = False
+    if args.he_disabled:
+        config["GENERAL"]["he_disabled"] = args.he_disabled
     if args.listen_only:
         config["GENERAL"]["listen_only"] = args.listen_only
-    if args.menu_file:
-        config["GENERAL"]["menu_file"] = args.menu_file
+    if args.pcap_analysis:
+        config["GENERAL"]["pcap_analysis"] = args.pcap_analysis
     if args.files_root:
         config["GENERAL"]["files_root"] = args.files_root
     if args.menu_file:
@@ -286,11 +386,17 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
 
     The resulting dictionary has sections as keys which point to a dict of the
     section options as key => value pairs.
+
+    If there is a string representation of truth, it is converted from str to bool.
     """
     _dict = {}
     for section in config.sections():
         _dict[section] = {}
         for key, value in config.items(section):
+            try:
+                value = bool(strtobool(value))
+            except ValueError:
+                pass
             _dict[section][key] = value
     return _dict
 
@@ -310,22 +416,15 @@ def load_config(config_file: str) -> Union[configparser.ConfigParser, bool]:
 
 
 def validate(config: dict) -> bool:
-    """ Make sure  """
-    log = logging.getLogger(inspect.stack()[0][3])
-    log.info("checking config")
-
+    """ Validate minimum config to run is OK """
     if not check_config_missing(config):
         return False
 
-    if not is_ssid_valid(config):
-        return False
+    check_ssid(config.get("GENERAL").get("ssid"))
 
-    if not is_channel_valid(config):
-        return False
+    check_channel(config.get("GENERAL").get("channel"))
 
     verify_reporting_directories(config)
-
-    log.info("finish checking config")
 
     return True
 
@@ -347,8 +446,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 for c in commands
             ]
             return True
-        except Exception:
-            log.exception("error setting wlan interface config")
+        except Exception as error:
+            log.exception("error setting wlan interface config: %s", error)
     else:
         log.error("failed to prep interface config...")
         return False
@@ -375,7 +474,7 @@ def check_config_missing(config: dict) -> bool:
 
 
 def update_manuf() -> bool:
-    """ Update manuf flat file from Internet """
+    """ Wrapper around manuf for updating manuf OUI file from Internet """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(
@@ -386,9 +485,10 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
         log.debug("running 'sudo manuf --update'")
-        subprocess.run(
+        sp = subprocess.run(
             ["sudo", "manuf", "--update"], shell=False, check=True, capture_output=True
         )
+        log.info("%s", str(sp))
         log.debug(
             "manuf last modified time: %s",
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
@@ -398,56 +498,6 @@ def update_manuf() -> bool:
         print("exiting...")
         return False
     return True
-
-
-def is_fakeap_interface_valid(config: dict) -> bool:
-    """ Check that the interface we've been asked to run on actually exists """
-    log = logging.getLogger(inspect.stack()[0][3])
-    discovered_interfaces = []
-    interface = config.get("GENERAL").get("interface")
-    for iface in os.listdir("/sys/class/net"):
-        iface_path = os.path.join("/sys/class/net", iface)
-        if os.path.isdir(iface_path):
-            if "phy80211" in os.listdir(iface_path):
-                discovered_interfaces.append(iface)
-    if interface in discovered_interfaces:
-        log.info(
-            "%s is in discovered interfaces: [%s]",
-            interface,
-            ", ".join(discovered_interfaces),
-        )
-        return True
-    else:
-        log.critical(
-            "%s interface not found in not phy80211 interfaces: %s",
-            interface,
-            discovered_interfaces,
-        )
-        return False
-
-
-def is_ssid_valid(config: dict) -> bool:
-    """ Check profiler AP SSID is valid """
-    log = logging.getLogger(inspect.stack()[0][3])
-
-    ssid = config.get("GENERAL").get("ssid")
-    log.info("ssid is %s", ssid)
-    if len(ssid) > 32:
-        log.critical("ssid length cannot be greater than 32")
-        return False
-    return True
-
-
-def is_channel_valid(config: dict) -> bool:
-    """ Check profiler AP channel is valid """
-    log = logging.getLogger(inspect.stack()[0][3])
-    channel = config.get("GENERAL").get("channel")
-    if int(channel) in CHANNELS:
-        log.info("%s is a valid 802.11 channel", channel)
-        return True
-    else:
-        log.critical("channel %s is not a valid channel", channel)
-        return False
 
 
 def verify_reporting_directories(config: dict):
@@ -487,8 +537,13 @@ def get_frequency_bytes(channel: int) -> bytes:
     return freq.to_bytes(2, byteorder="little")
 
 
-def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
+def build_fake_frame_ies(config: dict) -> Dot11Elt:
     """ Build base frame for beacon and probe resp """
+    ssid = config.get("GENERAL").get("ssid")
+    channel = int(config.get("GENERAL").get("channel"))
+    ft_disabled = config.get("GENERAL").get("ft_disabled")
+    he_disabled = config.get("GENERAL").get("he_disabled")
+
     ssid = bytes(ssid, "utf-8")
     essid = Dot11Elt(ID="SSID", info=ssid)
 
@@ -504,12 +559,13 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
     ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
-    if args.ft_enabled:
+    if ft_disabled:
+        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+    else:
         mobility_domain_data = b"\x45\xc2\x00"
         mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
         rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
-    else:
-        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+
     rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
     ht_info_data = (
@@ -539,7 +595,21 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
     he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
     he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
 
-    if args.ft_enabled:
+    if ft_disabled:
+        frame = (
+            essid
+            / rates
+            / dsset
+            / dtim
+            / ht_capabilities
+            / rsn
+            / ht_information
+            / rm_enabled_cap
+            / extended
+            / vht_capabilities
+            / vht_operation
+        )
+    else:
         frame = (
             essid
             / rates
@@ -554,24 +624,10 @@ def build_fake_frame_ies(ssid: str, channel: int, args) -> Dot11Elt:
             / vht_capabilities
             / vht_operation
         )
-    else:
-        frame = (
-            essid
-            / rates
-            / dsset
-            / dtim
-            / ht_capabilities
-            / rsn
-            / ht_information
-            / rm_enabled_cap
-            / extended
-            / vht_capabilities
-            / vht_operation
-        )
-    if args.he_enabled:
-        frame = frame / he_capabilities / he_operation / wmm
-    else:
+    if he_disabled:
         frame = frame / wmm
+    else:
+        frame = frame / he_capabilities / he_operation / wmm
 
     return frame
 
@@ -617,17 +673,19 @@ def get_mac(interface: str) -> str:
     return mac
 
 
-def generate_menu_report(config: dict, client_count: int, last_manuf: str) -> None:
+def generate_menu_report(
+    config: dict, client_count: int, last_manuf: str, status: str
+) -> None:
     """ Create report for WLAN Pi FPMS """
     log = logging.getLogger(inspect.stack()[0][3])
     menu_file = config.get("GENERAL").get("menu_file")
     channel = int(config.get("GENERAL").get("channel"))
-    ft_enabled = config.get("GENERAL").get("ft_enabled")
-    he_enabled = config.get("GENERAL").get("he_enabled")
+    ft_disabled = config.get("GENERAL").get("ft_disabled")
+    he_disabled = config.get("GENERAL").get("he_disabled")
     ssid = config.get("GENERAL").get("ssid")
     report = [
-        "Status: running\r",
-        f"Ch:{channel} 11r:{'Yes' if ft_enabled else 'No'} 11ax:{'Yes' if he_enabled else 'No'}\r",
+        f"Status: {status}\r",
+        f"Ch:{channel} 11r:{'No' if ft_disabled else 'Yes'} 11ax:{'No' if he_disabled else 'Yes'}\r",
         f"SSID: {ssid}\r",
         f"Clients:{client_count} ({last_manuf})",
     ]
@@ -642,13 +700,13 @@ def get_ssh_destination_ip() -> Union[str, bool]:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         cp = subprocess.run(["netstat", "-tnpa"], capture_output=True)
-        for socket in cp.stdout.splitlines():
-            socket = str(socket)
+        for line in cp.stdout.splitlines():
+            socket = str(line)
             if "22" in socket and "ESTABLISHED" in socket:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
                 return dest_ip_re.group(1)
     except Exception:
-        log.exception(
+        log.warning(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
         )
         return False

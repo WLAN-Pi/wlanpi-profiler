@@ -1,20 +1,33 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
+# Copyright 2020 Josh Schmelzle
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
 
 """
 profiler2.profiler
@@ -54,21 +67,25 @@ from .helpers import Capability, flag_last_object, generate_menu_report
 class Profiler(object):
     """ Code handling analysis of client capablities """
 
-    def __init__(self, args, queue, config):
+    def __init__(self, config, queue):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("profiler pid: %s; parent pid: %s", os.getpid(), os.getppid())
-        self.args = args
         self.analyzed_hash = {}
         self.config = config
         self.channel = int(config.get("GENERAL").get("channel"))
         self.ssid = config.get("GENERAL").get("ssid")
-        self.reports_dir = os.path.join(self.args.files_root, ROOT_DIR, REPORTS_DIR)
-        self.clients_dir = os.path.join(self.args.files_root, ROOT_DIR, CLIENTS_DIR)
+        self.menu_mode = config.get("GENERAL").get("menu_mode")
+        self.files_root = config.get("GENERAL").get("files_root")
+        self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+        self.ft_disabled = config.get("GENERAL").get("ft_disabled")
+        self.he_disabled = config.get("GENERAL").get("he_disabled")
+        self.reports_dir = os.path.join(self.files_root, ROOT_DIR, REPORTS_DIR)
+        self.clients_dir = os.path.join(self.files_root, ROOT_DIR, CLIENTS_DIR)
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
-        if self.args.menu_mode:
+        if self.menu_mode:
             generate_menu_report(
-                self.config, self.client_profiled_count, self.last_manuf
+                self.config, self.client_profiled_count, self.last_manuf, "running"
             )
         self.csv_file = os.path.join(
             self.reports_dir, f"db-{time.strftime('%Y-%m-%dt%H-%M-%S')}.csv"
@@ -76,6 +93,10 @@ class Profiler(object):
 
         while True:
             self.profile(queue)
+
+    def __del__(self):
+        if self.menu_mode:
+            generate_menu_report(self.config, 0, "N/A", "stopped")
 
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
@@ -97,7 +118,7 @@ class Profiler(object):
             capabilities = self.analyze_assoc_req(frame)
 
             text_report = self.generate_text_report(
-                oui_manuf, capabilities, frame.addr2
+                oui_manuf, capabilities, frame.addr2, self.channel
             )
 
             self.log.info(text_report)
@@ -119,37 +140,36 @@ class Profiler(object):
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
-            if self.args.menu_mode:
+            if self.menu_mode:
                 generate_menu_report(
-                    self.config, self.client_profiled_count, self.last_manuf
+                    self.config, self.client_profiled_count, self.last_manuf, "running"
                 )
-            if self.args.pcap_analysis_only:
+            if self.pcap_analysis:
                 self.log.info(
-                    "exiting because user explicitly told us to analyze %s",
-                    self.args.pcap_analysis_only,
+                    "exiting because we were told to only analyze %s",
+                    self.pcap_analysis,
                 )
                 sys.exit()
 
     @staticmethod
     def generate_text_report(
-        oui_manuf: str, capabilities: list, client_mac: str
+        oui_manuf: str, capabilities: list, client_mac: str, channel: int
     ) -> str:
         """ Generate a report for output """
         # start report
-        text_report = "\n"
-        text_report += "-" * 60
-        text_report += f"\nClient capabilities report - Client MAC: {client_mac}\n"
-        text_report += f"(OUI manufacturer lookup: {oui_manuf or 'Unknown'})\n"
-        text_report += "-" * 60
+        text_report = "-" * 45
+        text_report += f"\n - Client MAC: {client_mac}"
+        text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
+        text_report += f"\n - Capture channel: {channel}\n"
+        text_report += "-" * 45
         text_report += "\n"
-
         for capability in capabilities:
             if capability.name is not None and capability.value is not None:
                 text_report += (
                     "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
                 )
 
-        text_report += "\n\n* Reported client capabilities are dependent on these features being available from the wireless network at time of client association\n\n"
+        text_report += "\n* Reported client capabilities are dependent on available features at time of client association."
         return text_report
 
     def write_analysis_to_file_system(
@@ -166,7 +186,7 @@ class Profiler(object):
                 os.mkdir(dest)
             except Exception:
                 log.error("problem creating %s directory", dest)
-                sys.exit(-1) 
+                sys.exit(-1)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
         try:
@@ -360,12 +380,12 @@ class Profiler(object):
         return [dot11k]
 
     @staticmethod
-    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_enabled: bool) -> []:
+    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> []:
         """ Check for 802.11r support """
         dot11r = Capability(
             name="802.11r", value="Not reported*", db_key="802.11r", db_value=0
         )
-        if not ft_enabled:
+        if ft_disabled:
             dot11r.value = "Reporting disabled (--no11r option used)"
         elif FT_CAPABILITIES_TAG in dot11_elt_dict.keys():
             dot11r.value = "Supported"
@@ -482,13 +502,13 @@ class Profiler(object):
                 for i in range(channel_range):
                     channel_list.append(start_channel + (i * channel_multiplier))
 
-            supported_channels.value = ", ".join(map(str, channel_list))
+            supported_channels.value = ",".join(map(str, channel_list))
             supported_channels.db_value = channel_list
 
         return [supported_channels]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict: dict, he_enabled: bool) -> []:
+    def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
         """
         Check for 802.11ax support
 
@@ -502,7 +522,7 @@ class Profiler(object):
             db_key="802.11ax_draft",
             db_value="0",
         )
-        if not he_enabled:
+        if he_disabled:
             dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
         else:
             if EXT_IE_TAG in dot11_elt_dict.keys():
@@ -554,7 +574,7 @@ class Profiler(object):
 
         # check if 11r supported
         capabilities += self.analyze_ft_capabilities_ie(
-            dot11_elt_dict, self.args.ft_enabled
+            dot11_elt_dict, self.ft_disabled
         )
 
         # check if 11v supported
@@ -570,7 +590,7 @@ class Profiler(object):
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
         # check for Ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.args.he_enabled)
+        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.he_disabled)
 
         # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)

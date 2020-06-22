@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright (C) 2020 Josh Schmelzle, WLAN Pi Community.
+# Copyright 2020 Josh Schmelzle
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 
 """
 profiler2.manager
@@ -48,8 +62,8 @@ def start(args):
     signal.signal(signal.SIGINT, signal_handler)
     helpers.setup_logger(args)
 
-    log.info("%s version %s", __name__.split(".")[0], __version__)
-    log.info("python platform version is %s", platform.python_version())
+    log.debug("%s version %s", __name__.split(".")[0], __version__)
+    log.debug("python platform version is %s", platform.python_version())
     log.debug("args: %s", args)
 
     if args.oui_update:
@@ -67,19 +81,19 @@ def start(args):
         sys.exit(0)
 
     interface = config.get("GENERAL").get("interface")
-    ssid = config.get("GENERAL").get("ssid")
     channel = int(config.get("GENERAL").get("channel"))
-
+    pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+    listen_only = config.get("GENERAL").get("listen_only")
     queue = mp.Queue()
 
-    log.debug("pid %s", os.getpid())
+    log.debug("%s pid %s", __name__, os.getpid())
 
-    if args.pcap_analysis_only:
+    if pcap_analysis:
         log.info("not starting beacon or sniffer - user wants to do file analysis only")
         try:
-            frame = rdpcap(args.pcap_analysis_only)
+            frame = rdpcap(pcap_analysis)
         except FileNotFoundError:
-            log.exception("could not find file %s", args.pcap_analysis_only)
+            log.exception("could not find file %s", pcap_analysis)
             print("exiting...")
             sys.exit(-1)
 
@@ -89,9 +103,6 @@ def start(args):
         # put frame into the multiprocessing queue for the profiler to analyze
         queue.put(assoc_req_frame)
     else:
-        if not helpers.is_fakeap_interface_valid(config):
-            sys.exit(-1)
-
         helpers.generate_run_message(config)
 
         from .fakeap import TxBeacons, Sniffer
@@ -101,40 +112,34 @@ def start(args):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
-        log.info("start interface prep...")
-        if not helpers.prep_interface(interface, "monitor", channel):
-            log.error("failed to prep interface")
-            print("exiting...")
-            sys.exit(-1)
-        log.info("done prep interface...")
+        if args.no_interface_prep:
+            log.warning("skipping interface prep...")
+        else:
+            log.info("start interface prep...")
+            if not helpers.prep_interface(interface, "monitor", channel):
+                log.error("failed to prep interface")
+                print("exiting...")
+                sys.exit(-1)
+            log.info("done prep interface...")
 
-        if args.listen_only:
+        if listen_only:
             log.info("beacon process not started due to listen only mode")
         else:
             log.info("starting beacon process")
             mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
-                args=(args, boot_time, lock, sequence_number, ssid, interface, channel),
+                args=(config, boot_time, lock, sequence_number),
             ).start()
 
         log.info("starting sniffer process")
         mp.Process(
             name="sniffer",
             target=Sniffer,
-            args=(
-                args,
-                boot_time,
-                lock,
-                sequence_number,
-                ssid,
-                interface,
-                channel,
-                queue,
-            ),
+            args=(config, boot_time, lock, sequence_number, queue),
         ).start()
 
     from .profiler import Profiler
 
     log.info("starting profiler process")
-    mp.Process(name="profiler", target=Profiler, args=(args, queue, config)).start()
+    mp.Process(name="profiler", target=Profiler, args=(config, queue)).start()

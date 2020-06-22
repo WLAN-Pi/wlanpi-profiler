@@ -75,10 +75,12 @@ sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
 
 ```
 usage: profiler [-h] [-i INTERFACE] [-c CHANNEL] [-s SSID | --host_ssid]
-                [--file <FILE>] [--config <FILE>] [--noAP] [--no11ax]
-                [--no11r] [--menu_mode] [--menu_file <FILE>]
-                [--files_root <PATH>] [--clean] [--oui_update]
-                [--logging [{debug,warning}]] [--version]
+                   [--file <FILE>] [--config <FILE>] [--noAP] [--noprep]
+                   [--no11ax] [--no11r] [--menu_mode] [--menu_file <FILE>]
+                   [--files_root <PATH>] [--clean] [--oui_update]
+                   [--logging [{debug,warning}]] [--version]
+
+a Wi-Fi client analyzer for identifying supported 802.11 capabilities
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -90,6 +92,7 @@ optional arguments:
                         request frame)
   --config <FILE>       specify path for configuration file
   --noAP                enable listen only mode (Rx only)
+  --noprep              disable interface preperation
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --menu_mode           enable WLAN Pi FPMS menu reporting
@@ -98,7 +101,7 @@ optional arguments:
   --clean               cleans out the old CSV reports
   --oui_update          initiates Internet update of OUI database
   --logging [{debug,warning}]
-                        increase output for debugging
+                        change logging output
   --version, -V         show program's version number and exit
 ```
 
