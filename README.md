@@ -19,7 +19,7 @@ understanding client capabilities is a important part of the Wireless LAN (WLAN)
 
 capabilities across each client type may vary, depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
 
-each client includes its capability details in the 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and report on the clients capabilities.
+each client includes its capability details in the 802.11 association frame sent from the client to an access point. by capturing this frame, it is possible to decode and report on the clients claimed capabilities.
 
 please note that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
