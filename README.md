@@ -9,7 +9,7 @@ it does two primary things:
 - create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
 - analyzes association requests from Wi-Fi clients that attempt association to the fake AP
 
-when the client attempts to connect, it will send an association frame. profiler automates the analysis and reporting of the client's 802.11 capabilities.
+when the client attempts to connect, it will send an association frame. the purpose of this package is to automate the analysis and reporting of the client's 802.11 capabilities.
 
 ## why is this useful?
 
