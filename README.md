@@ -1,4 +1,4 @@
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/master/docs/images/profiler2-pybadge-w-logo.svg)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/main/docs/images/profiler2-pybadge-w-logo.svg)
 
 # profiler2
 
