@@ -2,14 +2,14 @@
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer for the WLAN Pi platform.
+profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/) platform.
 
 it does two primary things:
 
 - create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
 - analyzes association requests from Wi-Fi clients that attempt association to the fake AP
 
-when the client attempts to connect, it will send an association frame which is used to analyze the client's 802.11 capabilities.
+when the client attempts to connect, it will send an association frame. profiler automates the analysis and reporting of the client's 802.11 capabilities.
 
 ## why is this useful?
 
@@ -17,11 +17,11 @@ understanding client capabilities is a important part of the Wireless LAN (WLAN)
 
 ## capabilities
 
-capabilities across each client type may vary, depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, etc.
+capabilities across each client type may vary, depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
 
-each client includes capability details in an 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and then report on the clients capabilities. 
+each client includes its capability details in the 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and report on the clients capabilities.
 
-one caveat is the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
+please note that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
 ## profiling (*WARNING* subject to change in future versions)
 
@@ -45,9 +45,9 @@ report files are dumped in the following web directories for browsing:
 pre-reqs:
 
 - minimum Python version required is 3.7 or higher
-- `netstat`, `tcpdump`, and `airmon-ng` tools installed
+- `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
 
-pip install method (recommended): 
+installation with pip (recommended method): 
 
 ```
 # get code
@@ -57,9 +57,10 @@ sudo python3 -m pip install .
 sudo profiler
 ```
 
-run profiler without pip install (optional/for development):
+running the profiler without pip install (development/optional):
 
-- first make sure `scapy`, and `manuf` Py3 modules are installed (pip install method handles this for you)
+- first make sure `scapy`, and `manuf` Py3 modules are installed (pip install method handles this)
+- note that the package name is `profiler2` while the console script name is `profiler`
 
 ```
 # get code
@@ -74,11 +75,12 @@ sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
 # usage
 
 ```
-usage: profiler [-h] [-i INTERFACE] [-c CHANNEL] [-s SSID | --host_ssid]
-                   [--file <FILE>] [--config <FILE>] [--noAP] [--noprep]
-                   [--no11ax] [--no11r] [--menu_mode] [--menu_file <FILE>]
-                   [--files_root <PATH>] [--clean] [--oui_update]
-                   [--logging [{debug,warning}]] [--version]
+usage: profiler [-h] [-i INTERFACE] [-c CHANNEL]
+                [-s SSID | --hostname_ssid] [--pcap <FILE>] [--noAP]
+                [--11r | --no11r] [--11ax | --no11ax] [--noprep]
+                [--config <FILE>] [--menu_file <FILE>]
+                [--files_root <PATH>] [--clean] [--oui_update]
+                [--logging [{debug,warning}]] [--version]
 
 a Wi-Fi client analyzer for identifying supported 802.11 capabilities
 
@@ -87,18 +89,22 @@ optional arguments:
   -i INTERFACE          set network interface for profiler
   -c CHANNEL            802.11 channel to broadcast on
   -s SSID               set network identifier for profiler SSID
-  --host_ssid           use the WLAN Pi's hostname as profiler SSID
-  --file <FILE>         read in first packet of pcap (expecting an association
+  --hostname_ssid       use the WLAN Pi's hostname for the SSID
+  --pcap <FILE>         analyze first packet of pcap (expecting an association
                         request frame)
-  --config <FILE>       specify path for configuration file
   --noAP                enable listen only mode (Rx only)
-  --noprep              disable interface preperation
-  --no11ax              turn off 802.11ax High Efficiency (HE) reporting
+  --11r                 turn on 802.11r Fast Transition (FT) reporting
+                        (override --config file)
   --no11r               turn off 802.11r Fast Transition (FT) reporting
-  --menu_mode           enable WLAN Pi FPMS menu reporting
-  --menu_file <FILE>    change menu report file location for WLAN Pi FPMS
-  --files_root <PATH>   default root directory for reporting and pcaps
-  --clean               cleans out the old CSV reports
+  --11ax                turn on 802.11ax High Efficiency (HE) reporting
+                        (override --config file)
+  --no11ax              turn off 802.11ax High Efficiency (HE) reporting
+  --noprep              disable interface preperation
+  --config <FILE>       customize path for configuration file
+  --menu_file <FILE>    customize menu report file location for WLAN Pi FPMS
+  --files_root <PATH>   customize default root directory for reporting and
+                        pcaps
+  --clean               deletes CSV reports
   --oui_update          initiates Internet update of OUI database
   --logging [{debug,warning}]
                         change logging output
@@ -134,19 +140,21 @@ sudo profiler --noAP -c 100
 
 ```
 # analyze an association request in a previously captured PCAP file (must be only frame in file)
-sudo profiler --file assoc_frame.pcap
+sudo profiler --pcap assoc_frame.pcap
 ```
 
 ```
-# debugging
+# increase screen output for debugging
 sudo profiler --logging debug
 ```
 
 ## MAC OUI database update
 
-MAC OUI lookup is included in the reports to show the manufacturer of the client based on the 6-byte MAC OUI. This feature is provided by a Python module called "manuf". It uses a local MAC OUI database file to lookup the OUI.
+A lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. This is enabled by a wrapper around a Python module called `manuf`. 
 
-If you find that some clients are not being profiled with a manufacturer, the OUI file may need to be updated. This can be done from the CLI of the WLAN Pi:
+`manuf` uses a local flat file for OUI lookup. If you find that some clients are not identified in the results, the OUI file may need to be updated.
+
+With connectivity to the Internet, this can be done from the CLI of the WLAN Pi:
 
 ```
 sudo profiler --oui_update
@@ -154,18 +162,19 @@ sudo profiler --oui_update
 
 ## configuration
 
-to change the default operation of the script, a configuration file called `config.ini` can be found in the script directory. this can be used as a way to modify the channel, SSID, and interface used by the script. to leverage any configuration file changes the profiler must be restarted.  
+to change the default operation of the script (without passing in CLI args), a configuration file called `config.ini` can be found in the script directory. this can be used as a way to modify the channel, SSID, and interface used by the script. note that the profiler must be restarted to use updated values from the config file. 
 
 ## caveats
 
-- we try our best to make this as accurate as possible, however this project is maintained by unpaid volunteers. this is not guaranteed to report accurate info.
 - a client will generally only report the capabilities it has that match the network it associates to.
     - if you want the client to report all of its capabilities, it must associate with a network that supports those capabilities (e.g, a 3 spatial stream client will not report it supports 3 streams if the AP it associates with supports only 1 or 2 streams).
     - the profiler fake AP attempts to simulate a fully featured AP, but there may be cases where it does not behave as expected.
 - treat reporting of 802.11k capabilities with caution. to be sure, verify through other means like:
-    - check neighbor report requests from a WLC/AP debug
-    - gather and analyze a packet capture for action frames containing neighbor report
+    - check neighbor report requests from a WLC/AP debug.
+    - gather and analyze a packet capture for action frames containing neighbor report.
+- while we try our best to make this as accurate as possible, we do not guarantee this reports accurate info. trust, but verify.
 
 ## thanks
 
-- Nigel Bowden and the WLAN Pi Community (including Kobe Watkins, Philipp Ebbecke, Jerry Olla) for all their input and effort on the first versions of the profiler
+- Contributors (see AUTHORS.rst)
+- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler
