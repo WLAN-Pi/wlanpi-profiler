@@ -2,22 +2,22 @@
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/) platform.
+profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
-it does two primary things:
+it performs two primary functions:
 
-- create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
-- analyzes association requests from Wi-Fi clients that attempt association to the fake AP
+1. creates a "fake" Access Point (default SSID is `WLAN Pi`)
+2. analyze attempted client association requests 
 
-when the client attempts to connect, it will send an association frame. the purpose of this package is to automate the analysis and reporting of the client's 802.11 capabilities.
+the association request is a Layer 2 frame containing reported capabilities of the Wi-Fi client. profiler automates collection and analysis of these capabilities.
 
-## why is this useful?
+## why?
 
-understanding client capabilities is a important part of the Wireless LAN (WLAN) design process. it helps the designer better optimize the design based on client capabilities.
+understanding client capabilities is an important part of the Wireless LAN design process. the designer can optimize their design output based on capabilities of expected clients. 
 
-## capabilities
+## capabilities vary
 
-capabilities across each client type may vary, depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
+capabilities across each client type may vary; depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
 
 each client includes its capability details in the 802.11 association frame sent from the client to an access point. by capturing this frame, it is possible to decode and report on the clients claimed capabilities.
 
@@ -48,7 +48,7 @@ pre-reqs:
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
 
 installation with pip (recommended method): 
-
+understanding client capabilities is an important part of the Wireless LAN design process. the designer can optimize their design output based on capabilities of expected clients. 
 ```
 # get code
 git clone <repo>
