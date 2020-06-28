@@ -1,0 +1,7 @@
+[Unit]
+Description=wlan client profiler service
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/profiler

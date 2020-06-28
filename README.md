@@ -42,7 +42,7 @@ report files are dumped in the following web directories for browsing:
 
 # installation
 
-pre-reqs:
+requirements:
 
 - minimum Python version required is 3.7 or higher
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
@@ -50,17 +50,21 @@ pre-reqs:
 installation with pip (recommended method): 
 
 ```
-# get code
+# get code:
 git clone <repo>
-cd <repo>
+
+# install package
+cd <repo dir>
 sudo python3 -m pip install .
+
+# run the console script like:
 sudo profiler
 ```
 
 running the profiler without pip install (development/optional):
 
 - first make sure `scapy`, and `manuf` Py3 modules are installed (`python3 -m pip install -r requirements.txt`)
-- note that this method requires you to use the package name `profiler2`/
+- note that this method requires you to use the package name `profiler2`
 
 ```
 # get code
