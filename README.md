@@ -48,7 +48,7 @@ pre-reqs:
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
 
 installation with pip (recommended method): 
-understanding client capabilities is an important part of the Wireless LAN design process. the designer can optimize their design output based on capabilities of expected clients. 
+
 ```
 # get code
 git clone <repo>
@@ -59,8 +59,8 @@ sudo profiler
 
 running the profiler without pip install (development/optional):
 
-- first make sure `scapy`, and `manuf` Py3 modules are installed (pip install method handles this)
-- note that the package name is `profiler2` while the console script name is `profiler`
+- first make sure `scapy`, and `manuf` Py3 modules are installed (`python3 -m pip install -r requirements.txt`)
+- note that this method requires you to use the package name `profiler2`/
 
 ```
 # get code
