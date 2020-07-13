@@ -95,6 +95,7 @@ class Profiler(object):
             self.profile(queue)
 
     def __del__(self):
+        """ Clean up while we shut down """
         if self.menu_mode:
             generate_menu_report(self.config, 0, "N/A", "stopped")
 
@@ -509,13 +510,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
-        """
-        Check for 802.11ax support
-
-        TODO: Need to add more 11ax detection features and add them in to the
-              report. For example: support for OFDMA UL, OFDMA DL, MU-MIMO UL
-              MU-MIMO DL, BSS Colouring etc.
-        """
+        """ Check for 802.11ax support """
         dot11ax_draft = Capability(
             name="802.11ax_draft",
             value="Not supported",

@@ -151,16 +151,21 @@ def check_interface(interface: str) -> str:
                 discovered_interfaces.append(iface)
     if interface not in discovered_interfaces:
         log.info(
-            "%s interface not found in not phy80211 interfaces: %s"
-            % interface
-            % discovered_interfaces
+            "{interface} interface not found in not phy80211 interfaces: {discovered_interfaces}",
+            extra=dict(
+                interface=interface, discovered_interfaces=discovered_interfaces
+            ),
         )
-        raise argparse.ArgumentTypeError("%s is not a valid interface" % interface)
+        raise argparse.ArgumentTypeError(
+            "{interface} is not a valid interface", extra=dict(interface=interface)
+        )
     else:
         log.debug(
-            "%s is in discovered interfaces: [%s]",
-            interface,
-            ", ".join(discovered_interfaces),
+            "{interface} is in discovered interfaces: [{discovered_interfaces}]",
+            extra=dict(
+                interface=interface,
+                discovered_interfaces=", ".join(discovered_interfaces),
+            ),
         )
         return interface
 
@@ -178,10 +183,13 @@ def setup_parser() -> argparse:
         fromfile_prefix_chars="2",
     )
     parser.add_argument(
-        "-i", dest="interface", type=check_interface, help="set network interface for profiler"
+        "-i",
+        dest="interface",
+        type=check_interface,
+        help="set network interface for profiler",
     )
     parser.add_argument(
-        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on",
+        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
     )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
@@ -312,7 +320,7 @@ def report_cleanup(_dir) -> None:
 
     for _file in os.listdir(_dir):
         try:
-            log.info(f"removing old file: {_file}")
+            log.info("removing old file: {_file}", extra=dict(_file=_file))
             os.unlink(os.path.join(_dir, _file))
         except Exception:
             log.exception("issue removing files")
@@ -446,8 +454,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 for c in commands
             ]
             return True
-        except Exception as error:
-            log.exception("error setting wlan interface config: %s", error)
+        except Exception:
+            log.exception("error setting wlan interface config")
     else:
         log.error("failed to prep interface config...")
         return False
@@ -474,7 +482,7 @@ def check_config_missing(config: dict) -> bool:
 
 
 def update_manuf() -> bool:
-    """ Wrapper around manuf for updating manuf OUI file from Internet """
+    """ Manuf wrapper to update manuf OUI flat file from Internet """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(

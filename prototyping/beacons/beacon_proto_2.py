@@ -45,7 +45,7 @@ def build(name):
 
 hexdump(build("something else"))
 
-interval = 0.102400
+interval = 0.102_400
 delay = interval
 start = time()
 while True:

@@ -96,7 +96,7 @@ class TxBeacons(object):
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
-        self.beacon_interval = 0.102400
+        self.beacon_interval = 0.102_400
 
         with lock:
             self.mac = get_mac(self.interface)
@@ -135,7 +135,7 @@ class TxBeacons(object):
 
         # print(f"frame.sequence_number: {frame.sequence_number}")
         # frame.sequence_number value is updating here, but not updating in pcap for some adapters
-        # TODO: investigate. appears to impact MediaTek adapters vs RealTek
+        # this appears to impact MediaTek adapters vs RealTek
 
         # ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
         # frame[Dot11Beacon].timestamp = ts
