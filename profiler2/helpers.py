@@ -178,10 +178,13 @@ def setup_parser() -> argparse:
         fromfile_prefix_chars="2",
     )
     parser.add_argument(
-        "-i", dest="interface", type=check_interface, help="set network interface for profiler"
+        "-i",
+        dest="interface",
+        type=check_interface,
+        help="set network interface for profiler",
     )
     parser.add_argument(
-        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on",
+        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
     )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
