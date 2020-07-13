@@ -1,25 +1,25 @@
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/master/docs/images/profiler2-pybadge-w-logo.svg)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) ![versions](https://github.com/joshschmelzle/profiler2/blob/main/docs/images/profiler2-pybadge-w-logo.svg)
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/) platform.
+profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
-it does two primary things:
+it performs two primary functions:
 
-- create a "fake" Access Point broadcasting a network name (SSID: default is `WLAN Pi`)
-- analyzes association requests from Wi-Fi clients that attempt association to the fake AP
+1. creates a "fake" Access Point (default SSID is `WLAN Pi`)
+2. analyze attempted client association requests 
 
-when the client attempts to connect, it will send an association frame. profiler automates the analysis and reporting of the client's 802.11 capabilities.
+the association request is a Layer 2 frame containing reported capabilities of the Wi-Fi client. profiler automates collection and analysis of these capabilities.
 
-## why is this useful?
+## why?
 
-understanding client capabilities is a important part of the Wireless LAN (WLAN) design process. it helps the designer better optimize the design based on client capabilities.
+understanding client capabilities is an important part of the Wireless LAN design process. the designer can optimize their design output based on capabilities of expected clients. 
 
-## capabilities
+## capabilities vary
 
-capabilities across each client type may vary, depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
+capabilities across each client type may vary; depending on factors like client chipset, number of antennas, power mode (e.g iOS Low Power Mode), age of client, driver, etc.
 
-each client includes its capability details in the 802.11 association frame sent to an access point. by capturing this frame, it is possible to decode and report on the clients capabilities.
+each client includes its capability details in the 802.11 association frame sent from the client to an access point. by capturing this frame, it is possible to decode and report on the clients claimed capabilities.
 
 please note that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
@@ -42,7 +42,7 @@ report files are dumped in the following web directories for browsing:
 
 # installation
 
-pre-reqs:
+requirements:
 
 - minimum Python version required is 3.7 or higher
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
@@ -50,17 +50,21 @@ pre-reqs:
 installation with pip (recommended method): 
 
 ```
-# get code
+# get code:
 git clone <repo>
-cd <repo>
+
+# install package
+cd <repo dir>
 sudo python3 -m pip install .
+
+# run the console script like:
 sudo profiler
 ```
 
 running the profiler without pip install (development/optional):
 
-- first make sure `scapy`, and `manuf` Py3 modules are installed (pip install method handles this)
-- note that the package name is `profiler2` while the console script name is `profiler`
+- first make sure `scapy`, and `manuf` Py3 modules are installed (`python3 -m pip install -r requirements.txt`)
+- note that this method requires you to use the package name `profiler2`
 
 ```
 # get code
