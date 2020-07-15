@@ -1,7 +1,7 @@
 [Unit]
-Description=wlan client profiler service
+Description=profiler2 wlan client analyzer service
 After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart=/usr/local/bin/profiler
+ExecStart=/opt/wlanpi/pipx/bin/profiler
