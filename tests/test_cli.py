@@ -119,7 +119,7 @@ def test_config_input():
     assert output.returncode == 0, "Program did not exit cleanly"
 
 
-#def test_clean_input():
+# def test_clean_input():
 #    """Please don't judge me for this...."""
 #    ugly = '( sleep 20; echo "y\n" ) | sudo profiler --clean'
 #    output = subprocess.Popen(
