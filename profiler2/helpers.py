@@ -179,7 +179,6 @@ def setup_parser() -> argparse:
             a Wi-Fi client analyzer for identifying supported 802.11 capabilities
             """
         ),
-        epilog="made with Python by Josh Schmelzle",
         fromfile_prefix_chars="2",
     )
     parser.add_argument(
