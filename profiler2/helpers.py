@@ -292,6 +292,13 @@ def setup_parser() -> argparse:
         help="deletes CSV reports",
     )
     parser.add_argument(
+        "--yes",
+        dest="yes",
+        action="store_true",
+        default=False,
+        help="automatic yes to prompts",
+    )
+    parser.add_argument(
         "--oui_update",
         dest="oui_update",
         action="store_true",
@@ -310,17 +317,20 @@ def setup_parser() -> argparse:
     return parser
 
 
-def report_cleanup(_dir) -> None:
+def report_cleanup(_dir, yes) -> None:
     """ Purge reports """
     log = logging.getLogger(inspect.stack()[0][3])
 
     print(f"Delete the following files: {os.listdir(_dir)}")
-    if not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
+
+    if yes:
+        pass
+    elif not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
         sys.exit(1)
 
     for _file in os.listdir(_dir):
         try:
-            log.info("removing old file: {_file}", extra=dict(_file=_file))
+            log.info("removing report: %s", f"{_file}")
             os.unlink(os.path.join(_dir, _file))
         except Exception:
             log.exception("issue removing files")

@@ -1,7 +1,10 @@
+Release 1.0.0-alpha2
+
+- add --yes flag to support automatic yes to --clean y/n prompt
+
 Release 1.0.0-alpha1
 
 - create and change default branch from master to main
-- increment version to 1.0.0-alpha1
 - fix handling of `--no11r` and `--no11ax` modes from either CLI args or config file
 - menu mode tweaks and is now enabled by default
 - minor changes to flat file output such as including the capture channel

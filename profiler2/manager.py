@@ -77,7 +77,7 @@ def start(args):
             constants.ROOT_DIR,
             constants.REPORTS_DIR,
         )
-        helpers.report_cleanup(reports_dir)
+        helpers.report_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
     interface = config.get("GENERAL").get("interface")
