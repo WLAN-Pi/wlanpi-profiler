@@ -55,9 +55,21 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
+def are_we_root() -> bool:
+    """ Do we have root permissions? """
+    if os.geteuid() == 0:
+        return True
+    else:
+        return False
+
+
 def start(args):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
+
+    if not are_we_root():
+        log.error("must run with root permissions... exiting...")
+        sys.exit(-1)
 
     signal.signal(signal.SIGINT, signal_handler)
     helpers.setup_logger(args)

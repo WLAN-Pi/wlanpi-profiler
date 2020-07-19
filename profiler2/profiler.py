@@ -72,7 +72,7 @@ class Profiler(object):
         self.channel = int(config.get("GENERAL").get("channel"))
         self.ssid = config.get("GENERAL").get("ssid")
         self.menu_mode = config.get("GENERAL").get("menu_mode")
-        self.files_path  = config.get("GENERAL").get("files_path")
+        self.files_path = config.get("GENERAL").get("files_path")
         self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
         self.ft_disabled = config.get("GENERAL").get("ft_disabled")
         self.he_disabled = config.get("GENERAL").get("he_disabled")
@@ -529,7 +529,7 @@ class Profiler(object):
                     dot11ax_draft.db_value = 1
 
         return [dot11ax_draft]
-    
+
     def analyze_assoc_req(self, frame) -> []:
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])

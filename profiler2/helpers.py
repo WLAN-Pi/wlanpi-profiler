@@ -92,6 +92,7 @@ from .constants import CHANNELS
 
 FILES_PATH = "/var/www/html/profiler"
 
+
 def setup_logger(args) -> logging.Logger:
     """ Configure and set logging levels """
     if args.logging:
