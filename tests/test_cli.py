@@ -1,179 +1,94 @@
-# test_cli.py
+# -*- coding: utf-8 -*-
+
+import argparse, itertools, pathlib, sys
 
 import pytest
-import subprocess
-import signal
-import pathlib
+
 from profiler2 import helpers
-import sys
-
-insertion = "profiler"
-
-no_input_flags = [
-    "--hostname_ssid",
-    "--noAP",
-    "--no11ax",
-    "--no11r",
-    "--oui_update",
-    "--version",
-    "-V",
-    "-h",
-    "--help",
-    "--11r",
-    "--11ax",
-]
-
-debug_types = ["debug", "warning"]
+from profiler2.__version__ import __version__
 
 
-@pytest.fixture(scope="module")
-def load_pcap():
-    pcap = (
-        pathlib.Path(__file__).parent / "pcaps" / "iPhone11ProMax.pcap_randomized.pcap"
+@pytest.fixture
+def parser():
+    return helpers.setup_parser()
+
+
+class TestArgParsing:
+    def test_version(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["", "-V"])
+        out, err = capsys.readouterr()
+        assert out == f"{__version__}\n"
+        assert err == ""
+
+    def test_help(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["", "--help"])
+        out, err = capsys.readouterr()
+        assert err == ""
+
+    def test_pcap_fail(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["", "--pcap"])
+        out, err = capsys.readouterr()
+        assert "expected one argument" in err
+
+    def test_unknown_args(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args("notrealarg")
+        err = capsys.readouterr().err
+        assert "error: unrecognized arguments:" in err
+
+    def test_valid_ssid(self, parser, capsys):
+        parser.parse_args(["-s", "WLAN Pi"])
+        err = capsys.readouterr().err
+        assert err == ""
+
+    def test_invalid_ssid(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["-s", "this_is_a_really_long_string_really_too_long!!!"])
+        err = capsys.readouterr().err
+        assert "length is greater than 32" in err
+
+    @pytest.mark.parametrize(
+        "channel,expected",
+        [(["-c", "1"], ""), (["-c", "6"], ""), (["-c", "11"], ""), (["-c", "36"], "")],
     )
-    return pcap
+    def test_valid_channel(self, channel, expected, parser, capsys):
+        parser.parse_args(channel)
+        out, err = capsys.readouterr()
+        assert err == expected
 
+    def test_invalid_channel(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["", "-c", "15"])
+        err = capsys.readouterr().err
+        assert "is not a valid channel value" in err
 
-# def test_files_root(tmp_path, load_pcap):
-#    output = subprocess.Popen(
-#        [insertion, "--pcap", load_pcap, "--files_root", tmp_path],
-#        stdout=subprocess.PIPE,
-#        stderr=subprocess.PIPE,
-#    )
-#    try:
-#        output.wait(15)
-#    except subprocess.TimeoutExpired:
-#        output.send_signal(signal.SIGINT)
-#        output.wait()
-#    files = [path.name for path in pathlib.Path(tmp_path).rglob("*.*")]
-#    assert files, "Files not found"
-#    assert output.returncode == 0, "Program did not exit cleanly"
+    def test_invalid_interface(self, parser, capsys):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["", "-i", "fakest_interface_ever"])
+        err = capsys.readouterr().err
+        assert "invalid check_interface value:" in err
 
-
-def test_pcap_file(load_pcap):
-    output = subprocess.Popen(
-        [insertion, "--pcap", load_pcap], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    @pytest.mark.parametrize(
+        "args,expected",
+        [
+            (["--pcap", "fake_file_does_not_exist.pcap"], ""),
+            (["--noAP"], ""),
+            (["--11r"], ""),
+            (["--no11r"], ""),
+            (["--11ax"], ""),
+            (["--no11ax"], ""),
+            (["--noprep"], ""),
+            (["--files_path", "/fake/path/does/not/exist"], ""),
+            (["--clean"], ""),
+            (["--yes"], ""),
+            (["--oui_update"], ""),
+            (["--hostname_ssid"], ""),
+        ],
     )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-# @pytest.fixture()
-# def setup_interface():
-# this requires sudo. i'd rather not run tox as sudo right now. we need a better way to test this.
-# log.info("start interface prep...")
-# if not helpers.prep_interface("wlan0", "monitor", "6"):
-# if not helpers.prep_interface(interface, "monitor", channel):
-# log.error("failed to prep interface")
-# print("exiting...")
-# sys.exit(-1)
-# log.info("done prep interface...")
-
-
-# def test_no_prep(setup_interface):
-#    output = subprocess.Popen(
-#        [insertion, "--noprep"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-#    )
-#    try:
-#        output.wait(15)
-#    except subprocess.TimeoutExpired:
-#        output.send_signal(signal.SIGINT)
-#        output.wait()
-#    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-def test_config_input():
-    config_ini = pathlib.Path(__file__).parent / ".." / "profiler2" / "config.ini"
-    output = subprocess.Popen(
-        [insertion, "--config", config_ini],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-def test_clean_input():
-    command = f"{insertion} --clean --yes"
-    output = subprocess.Popen(
-        command,
-        shell=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-@pytest.mark.parametrize("flag", no_input_flags)
-def test_cli_no_args(flag):
-    output = subprocess.Popen(
-        [insertion, flag], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly with {flag}"
-
-
-def test_channel_flag():
-    output = subprocess.Popen(
-        [insertion, "-c 3"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-def test_ssid_flag():
-    output = subprocess.Popen(
-        [insertion, "-s", " pytest"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-@pytest.mark.parametrize("debug", debug_types)
-def test_logging_flag(debug):
-    output = subprocess.Popen(
-        [insertion, "--logging", debug], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
-
-
-def test_interface_flag():
-    output = subprocess.Popen(
-        [insertion, "-i", "wlan0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        output.wait(15)
-    except subprocess.TimeoutExpired:
-        output.send_signal(signal.SIGINT)
-        output.wait()
-    assert output.returncode == 0, "Program did not exit cleanly"
+    def test_valid_args(self, args, expected, parser, capsys):
+        parser.parse_args(args)
+        out, err = capsys.readouterr()
+        assert err == expected

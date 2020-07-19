@@ -5,6 +5,8 @@ Release 1.0.0-alpha2
 - remove menu mode code that is no longer used in WLAN Pi v2 builds
 - allow user to check help usage and version without root permissions
 - remove airmon-ng check kill from interface preparation when profiler is run
+- refactor and improve test coverage
+- fix error where argparse fails to allow profiler to run on channel 2
 - rename GH workflow
 
 Release 1.0.0-alpha1

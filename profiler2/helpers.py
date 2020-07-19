@@ -181,7 +181,7 @@ def setup_parser() -> argparse:
             a Wi-Fi client analyzer for identifying supported 802.11 capabilities
             """
         ),
-        fromfile_prefix_chars="2",
+        #fromfile_prefix_chars="2",
     )
     parser.add_argument(
         "-i",
@@ -298,9 +298,7 @@ def setup_parser() -> argparse:
         nargs="?",
         choices=("debug", "warning"),
     )
-    parser.add_argument(
-        "--version", "-V", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
 
 

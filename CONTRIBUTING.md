@@ -47,3 +47,17 @@ Please be aware of the following things when filing bug reports:
    If you do not provide all of these things, it can take us much longer to
    fix your problem. If we ask you to clarify these and you never respond, we
    will close your issue without fixing it.
+
+## Code Contributions
+
+### Pull Requests
+
+Before submitting a PR perform the following:
+
+1. Lint your code with `tox -e linters` and make sure it passes.
+
+2. Create a test that validates your changes. this test should go in `/tests`.
+
+3. Ensure your tests pass by running `tox`.
+
+Failure to do so means it will take longer to test, validate, and merge your PR into the repo.
