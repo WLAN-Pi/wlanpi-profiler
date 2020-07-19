@@ -1,8 +1,11 @@
 Release 1.0.0-alpha2
 
-- remove `airmon-ng check kill` from interface prep func
-- refactor
-- add --yes flag to support automatic yes to --clean y/n prompt
+- add --yes arg to support automatic yes to --clean y/n prompt
+- refactors; bump tox version in requirements
+- remove menu mode code that is no longer used in WLAN Pi v2 builds
+- allow user to check help usage and version without root permissions
+- remove airmon-ng check kill from interface preparation when profiler is run
+- rename GH workflow
 
 Release 1.0.0-alpha1
 
