@@ -88,8 +88,9 @@ except Exception:
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS, CLIENTS_DIR, REPORTS_DIR, ROOT_DIR
+from .constants import CHANNELS
 
+FILES_PATH = "/var/www/html/profiler"
 
 def setup_logger(args) -> logging.Logger:
     """ Configure and set logging levels """
@@ -277,11 +278,11 @@ def setup_parser() -> argparse:
         help="customize menu report file location for WLAN Pi FPMS",
     )
     parser.add_argument(
-        "--files_root",
+        "--files_path",
         metavar="<PATH>",
-        dest="files_root",
-        default="/var/www/html",
-        help="customize default root directory for reporting and pcaps",
+        dest="files_path",
+        default="/var/www/html/profiler",
+        help="customize default directory where analysis is saved on local system",
     )
     parser.add_argument(
         "--clean",
@@ -383,8 +384,10 @@ def setup_config(args) -> dict:
         config["GENERAL"]["listen_only"] = args.listen_only
     if args.pcap_analysis:
         config["GENERAL"]["pcap_analysis"] = args.pcap_analysis
-    if args.files_root:
-        config["GENERAL"]["files_root"] = args.files_root
+    if args.files_path:
+        config["GENERAL"]["files_path"] = args.files_path
+    else:
+        config["GENERAL"]["files_path"] = FILES_PATH
     if args.menu_file:
         config["GENERAL"]["menu_file"] = args.menu_file
 
@@ -522,21 +525,16 @@ def verify_reporting_directories(config: dict):
     log = logging.getLogger(inspect.stack()[0][3])
 
     if "GENERAL" in config:
-        files_root = config["GENERAL"].get("files_root")
-        if not os.path.isdir(files_root):
-            log.debug(os.makedirs(files_root))
+        files_path = config["GENERAL"].get("files_path")
+        if not os.path.isdir(files_path):
+            log.debug(os.makedirs(files_path))
 
-        root_dir = os.path.join(files_root, ROOT_DIR)
-
-        if not os.path.isdir(root_dir):
-            log.debug(os.makedirs(root_dir))
-
-        clients_dir = os.path.join(files_root, ROOT_DIR, CLIENTS_DIR)
+        clients_dir = os.path.join(files_path, "clients")
 
         if not os.path.isdir(clients_dir):
             log.debug(os.makedirs(clients_dir))
 
-        reports_dir = os.path.join(files_root, ROOT_DIR, REPORTS_DIR)
+        reports_dir = os.path.join(files_path, "reports")
 
         if not os.path.isdir(reports_dir):
             log.debug(os.makedirs(reports_dir))

@@ -36,10 +36,6 @@ profiler2.constants
 define constant values for app
 """
 
-ROOT_DIR = "profiler"
-CLIENTS_DIR = "clients"
-REPORTS_DIR = "reports"
-
 DOT11_TYPE_MANAGEMENT = 0
 DOT11_SUBTYPE_BEACON = 0x08
 DOT11_SUBTYPE_PROBE_REQ = 0x04
