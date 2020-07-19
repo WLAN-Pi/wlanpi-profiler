@@ -25,12 +25,12 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install tox
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        sudo python -m pip install --upgrade pip
+        sudo pip install tox
+        if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
     - name: run tox linters
       run: |
-        tox -e linters
+        sudo tox -e linters
     - name: Test with tox
       run: |
         sudo tox
