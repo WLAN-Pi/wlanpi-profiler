@@ -256,13 +256,6 @@ def setup_parser() -> argparse:
         default=False,
         help="disable interface preperation",
     )
-    # parser.add_argument(
-    #     "--menu_mode",
-    #     dest="menu_mode",
-    #     action="store_true",
-    #     default=False,
-    #     help="enable WLAN Pi FPMS menu reporting",
-    # )
     config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
     parser.add_argument(
         "--config",
@@ -270,13 +263,6 @@ def setup_parser() -> argparse:
         metavar="<FILE>",
         default=config,
         help="customize path for configuration file",
-    )
-    parser.add_argument(
-        "--menu_file",
-        metavar="<FILE>",
-        dest="menu_file",
-        default="/tmp/profiler_menu_report.txt",
-        help="customize menu report file location for WLAN Pi FPMS",
     )
     parser.add_argument(
         "--files_path",
@@ -360,10 +346,11 @@ def setup_config(args) -> dict:
     if "GENERAL" not in config:
         config["GENERAL"] = {}
 
-    # handle config settings
+    # handle special config.ini settings
     if config["GENERAL"]["hostname_ssid"]:
         config["GENERAL"]["ssid"] = socket.gethostname()
 
+    # handle args
     # did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
@@ -389,8 +376,6 @@ def setup_config(args) -> dict:
         config["GENERAL"]["files_path"] = args.files_path
     else:
         config["GENERAL"]["files_path"] = FILES_PATH
-    if args.menu_file:
-        config["GENERAL"]["menu_file"] = args.menu_file
 
     # run our validator function on the config.
     if validate(config):
@@ -687,28 +672,6 @@ def get_mac(interface: str) -> str:
     except Scapy_Exception:
         mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
     return mac
-
-
-def generate_menu_report(
-    config: dict, client_count: int, last_manuf: str, status: str
-) -> None:
-    """ Create report for WLAN Pi FPMS """
-    log = logging.getLogger(inspect.stack()[0][3])
-    menu_file = config.get("GENERAL").get("menu_file")
-    channel = int(config.get("GENERAL").get("channel"))
-    ft_disabled = config.get("GENERAL").get("ft_disabled")
-    he_disabled = config.get("GENERAL").get("he_disabled")
-    ssid = config.get("GENERAL").get("ssid")
-    report = [
-        f"Status: {status}\r",
-        f"Ch:{channel} 11r:{'No' if ft_disabled else 'Yes'} 11ax:{'No' if he_disabled else 'Yes'}\r",
-        f"SSID: {ssid}\r",
-        f"Clients:{client_count} ({last_manuf})",
-    ]
-    log.debug("report: %s", report)
-    with open(menu_file, "w") as file:
-        for _ in report:
-            file.write(_)
 
 
 def get_ssh_destination_ip() -> Union[str, bool]:

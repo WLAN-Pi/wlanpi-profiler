@@ -34,24 +34,6 @@ def load_pcap():
     return pcap
 
 
-# def test_menu_file(tmp_path, load_pcap):
-# f = tmp_path / "dummy.txt"
-# f.write_text("")
-# output = subprocess.Popen(
-#    [insertion, "--menu_file", f],
-#    stdout=subprocess.PIPE,
-#    stderr=subprocess.PIPE,
-# )
-# try:
-#    output.wait(15)
-# except subprocess.TimeoutExpired:
-#    output.send_signal(signal.SIGINT)
-#    output.wait()
-# print(f.read_text())
-# assert "Status" in f.read_text(), '"Status" not in file contents'
-# assert output.returncode == 0, "Program did not exit cleanly"
-
-
 # def test_files_root(tmp_path, load_pcap):
 #    output = subprocess.Popen(
 #        [insertion, "--pcap", load_pcap, "--files_root", tmp_path],
@@ -119,18 +101,20 @@ def test_config_input():
     assert output.returncode == 0, "Program did not exit cleanly"
 
 
-# def test_clean_input():
-#    """Please don't judge me for this...."""
-#    ugly = '( sleep 20; echo "y\n" ) | sudo profiler --clean'
-#    output = subprocess.Popen(
-#        ugly, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE
-#    )
-#    try:
-#        output.wait(22)
-#    except subprocess.TimeoutExpired:
-#        output.send_signal(signal.SIGINT)
-#        output.wait()
-#    assert output.returncode == 0, "Program did not exit cleanly"
+def test_clean_input():
+    command = f"{insertion} --clean --yes"
+    output = subprocess.Popen(
+        command,
+        shell=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    try:
+        output.wait(15)
+    except subprocess.TimeoutExpired:
+        output.send_signal(signal.SIGINT)
+        output.wait()
+    assert output.returncode == 0, "Program did not exit cleanly"
 
 
 @pytest.mark.parametrize("flag", no_input_flags)

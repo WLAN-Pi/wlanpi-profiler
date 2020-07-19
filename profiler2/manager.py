@@ -45,7 +45,7 @@ from datetime import datetime
 from scapy.all import rdpcap
 
 # app imports
-from . import constants, helpers
+from . import helpers
 from .__version__ import __version__
 
 
@@ -84,11 +84,7 @@ def start(args):
     config = helpers.setup_config(args)
 
     if args.clean:
-        reports_dir = os.path.join(
-            config["GENERAL"].get("files_root"),
-            constants.ROOT_DIR,
-            constants.REPORTS_DIR,
-        )
+        reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
         helpers.report_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
