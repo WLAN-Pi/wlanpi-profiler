@@ -1,6 +1,7 @@
 Release 1.0.0-alpha2
 
-- refactors
+- remove `airmon-ng check kill` from interface prep func
+- refactor
 - add --yes flag to support automatic yes to --clean y/n prompt
 
 Release 1.0.0-alpha1

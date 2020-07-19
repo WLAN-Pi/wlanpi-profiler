@@ -440,7 +440,6 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     if mode in ("managed", "monitor"):
         commands = [
-            ["airmon-ng", "check", "kill"],
             ["ip", "link", "set", f"{interface}", "down"],
             ["iw", "dev", f"{interface}", "set", "type", f"{mode}"],
             ["ip", "link", "set", f"{interface}", "up"],
