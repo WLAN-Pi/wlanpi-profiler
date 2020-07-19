@@ -1,5 +1,6 @@
 Release 1.0.0-alpha2
 
+- refactors
 - add --yes flag to support automatic yes to --clean y/n prompt
 
 Release 1.0.0-alpha1
