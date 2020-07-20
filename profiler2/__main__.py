@@ -51,6 +51,7 @@ def main() -> None:
 
 
 def init():
+    """ Handle main init """
     # hard set no support for non linux platforms
     if "linux" not in sys.platform:
         sys.exit(
