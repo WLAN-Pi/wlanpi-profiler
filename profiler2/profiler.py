@@ -48,20 +48,17 @@ from scapy.all import wrpcap
 
 # app imports
 from .constants import (
-    CLIENTS_DIR,
     EXT_CAPABILITIES_TAG,
     EXT_IE_TAG,
     FT_CAPABILITIES_TAG,
     HT_CAPABILITIES_TAG,
     POWER_MIN_MAX_TAG,
-    REPORTS_DIR,
     RM_CAPABILITIES_TAG,
-    ROOT_DIR,
     RSN_CAPABILITIES_TAG,
     SUPPORTED_CHANNELS_TAG,
     VHT_CAPABILITIES_TAG,
 )
-from .helpers import Capability, flag_last_object, generate_menu_report
+from .helpers import Capability, flag_last_object
 
 
 class Profiler(object):
@@ -74,19 +71,14 @@ class Profiler(object):
         self.config = config
         self.channel = int(config.get("GENERAL").get("channel"))
         self.ssid = config.get("GENERAL").get("ssid")
-        self.menu_mode = config.get("GENERAL").get("menu_mode")
-        self.files_root = config.get("GENERAL").get("files_root")
+        self.files_path = config.get("GENERAL").get("files_path")
         self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
         self.ft_disabled = config.get("GENERAL").get("ft_disabled")
         self.he_disabled = config.get("GENERAL").get("he_disabled")
-        self.reports_dir = os.path.join(self.files_root, ROOT_DIR, REPORTS_DIR)
-        self.clients_dir = os.path.join(self.files_root, ROOT_DIR, CLIENTS_DIR)
+        self.reports_dir = os.path.join(self.files_path, "reports")
+        self.clients_dir = os.path.join(self.files_path, "clients")
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
-        if self.menu_mode:
-            generate_menu_report(
-                self.config, self.client_profiled_count, self.last_manuf, "running"
-            )
         self.csv_file = os.path.join(
             self.reports_dir, f"db-{time.strftime('%Y-%m-%dt%H-%M-%S')}.csv"
         )
@@ -96,8 +88,7 @@ class Profiler(object):
 
     def __del__(self):
         """ Clean up while we shut down """
-        if self.menu_mode:
-            generate_menu_report(self.config, 0, "N/A", "stopped")
+        pass
 
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
@@ -141,10 +132,6 @@ class Profiler(object):
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
-            if self.menu_mode:
-                generate_menu_report(
-                    self.config, self.client_profiled_count, self.last_manuf, "running"
-                )
             if self.pcap_analysis:
                 self.log.info(
                     "exiting because we were told to only analyze %s",

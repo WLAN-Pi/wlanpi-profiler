@@ -1,4 +1,1 @@
-# MAJOR TODO
-import sys
-
-sys.path.insert(0, "../")
+# -*- coding: utf-8 -*-

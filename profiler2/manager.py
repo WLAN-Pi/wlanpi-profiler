@@ -45,7 +45,7 @@ from datetime import datetime
 from scapy.all import rdpcap
 
 # app imports
-from . import constants, helpers
+from . import helpers
 from .__version__ import __version__
 
 
@@ -55,9 +55,21 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
+def are_we_root() -> bool:
+    """ Do we have root permissions? """
+    if os.geteuid() == 0:
+        return True
+    else:
+        return False
+
+
 def start(args):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
+
+    if not are_we_root():
+        log.error("must run with root permissions... exiting...")
+        sys.exit(-1)
 
     signal.signal(signal.SIGINT, signal_handler)
     helpers.setup_logger(args)
@@ -72,11 +84,7 @@ def start(args):
     config = helpers.setup_config(args)
 
     if args.clean:
-        reports_dir = os.path.join(
-            config["GENERAL"].get("files_root"),
-            constants.ROOT_DIR,
-            constants.REPORTS_DIR,
-        )
+        reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
         helpers.report_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
