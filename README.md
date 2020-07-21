@@ -180,5 +180,8 @@ to change the default operation of the script (without passing in CLI args), a c
 
 ## thanks
 
-- Contributors (see AUTHORS.rst)
-- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler
+- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler.
+
+## contributing
+
+Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTING.md).
