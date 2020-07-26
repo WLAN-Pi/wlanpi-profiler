@@ -1,4 +1,4 @@
-![coverage-badge](coverage.svg) ![versions](docs/images/profiler2-pybadge-w-logo.svg) ![profiler2 package workflow](https://github.com/joshschmelzle/profiler2/workflows/profiler2%20package%20workflow/badge.svg?branch=main) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
+![versions](docs/images/profiler2-pybadge-w-logo.svg) ![tests](https://github.com/joshschmelzle/profiler2/workflows/tests/badge.svg) ![coverage-badge](coverage.svg) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 # profiler2
 
