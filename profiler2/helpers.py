@@ -343,10 +343,10 @@ def setup_config(args) -> dict:
 
     if "GENERAL" not in config:
         config["GENERAL"] = {}
-
-    # handle special config.ini settings
-    if config["GENERAL"]["hostname_ssid"]:
-        config["GENERAL"]["ssid"] = socket.gethostname()
+    else:
+        # handle special config.ini settings
+        if config["GENERAL"]["hostname_ssid"]:
+            config["GENERAL"]["ssid"] = socket.gethostname()
 
     # handle args
     # did user pass in options that over-ride defaults?
@@ -405,18 +405,11 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
     return _dict
 
 
-def load_config(config_file: str) -> Union[configparser.ConfigParser, bool]:
+def load_config(config_file: str) -> configparser.ConfigParser:
     """ Load in config from external file """
-    log = logging.getLogger(inspect.stack()[0][3])
-    try:
-        config = configparser.ConfigParser()
-        config.read(config_file)
-    except FileNotFoundError:
-        log.exception("could not find config file")
-    if config:
-        return config
-    else:
-        return None
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    return config
 
 
 def validate(config: dict) -> bool:

@@ -1,6 +1,10 @@
+Release 1.0.0-alpha3
+
+- improve test coverage
+- begin detecting and reporting on changed client capabilities
+
 Release 1.0.0-alpha2
 
-- begin detecting and reporting on changed client capabilities
 - add --yes arg to support automatic yes to --clean y/n prompt
 - refactors; bump tox version in requirements
 - remove menu mode code that is no longer used in WLAN Pi v2 builds
