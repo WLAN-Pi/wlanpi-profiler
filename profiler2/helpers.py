@@ -683,7 +683,7 @@ def get_ssh_destination_ip() -> Union[str, bool]:
         return False
 
 
-def generate_run_message(config: dict) -> Union[str, bool]:
+def generate_run_message(config: dict):
     """ Create message to display to users screen """
     ssh_dest_ip = get_ssh_destination_ip()
     if config["GENERAL"]["listen_only"] is True:

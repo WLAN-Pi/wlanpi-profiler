@@ -8,5 +8,9 @@ Keepers
 Patches and Suggestions
 ```````````````````````
 
-- Nigel Bowden `@wifinigel <https://github.com/wifinigel>`_.
+Alphabetical order:
+
+- Colin Vallance `@crvallance <https://github.com/crvallance>` _.
 - Keith Miller `@packetologist <https://github.com/kmillerusaf>`_.
+- Nigel Bowden `@wifinigel <https://github.com/wifinigel>`_.
+
