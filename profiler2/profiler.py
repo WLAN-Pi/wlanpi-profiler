@@ -40,6 +40,7 @@ profiler code goes here, separate from fake ap code.
 import csv, inspect, logging
 import os, sys
 import time
+from difflib import Differ
 
 # third party imports
 from manuf import manuf
@@ -80,7 +81,7 @@ class Profiler(object):
         self.client_profiled_count = 0
         self.last_manuf = "N/A"
         self.csv_file = os.path.join(
-            self.reports_dir, f"db-{time.strftime('%Y-%m-%dt%H-%M-%S')}.csv"
+            self.reports_dir, f"profiler-{time.strftime('%Y-%m-%d')}.csv"
         )
 
         while True:
@@ -93,27 +94,29 @@ class Profiler(object):
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
-        if frame.addr2 in self.analyzed_hash.keys():
-            self.log("already seen %s, ignoring...", frame.addr2)
+        capabilities = self.analyze_assoc_req(frame)
+        analysis_hash = hash(str(capabilities))
+        if analysis_hash in self.analyzed_hash.keys():
+            self.log.debug(
+                "already seen %s (capabilities hash=%s) this session, ignoring...",
+                frame.addr2,
+                analysis_hash,
+            )
         else:
+            self.analyzed_hash[analysis_hash] = frame
             # self.log.debug(
             #    f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
             # )
-            self.analyzed_hash[frame.addr2] = frame
-
             self.log.debug("starting oui lookup for %s", frame.addr2)
             lookup = manuf.MacParser(update=False)
             oui_manuf = lookup.get_manuf(frame.addr2)
             self.last_manuf = oui_manuf
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
-
-            capabilities = self.analyze_assoc_req(frame)
-
             text_report = self.generate_text_report(
                 oui_manuf, capabilities, frame.addr2, self.channel
             )
 
-            self.log.info(text_report)
+            self.log.info("text report\n%s", text_report)
 
             if self.channel < 15:
                 band = "2.4GHz"
@@ -122,16 +125,15 @@ class Profiler(object):
             else:
                 band = "unknown"
 
-            self.log.debug("writing assoc req from %s to file", frame.addr2)
-            self.write_assoc_req_pcap(frame, band)
-
             self.log.debug("writing text and csv report for %s", frame.addr2)
             self.write_analysis_to_file_system(
-                text_report, capabilities, frame.addr2, oui_manuf, band
+                text_report, capabilities, frame, oui_manuf, band
             )
 
             self.client_profiled_count += 1
             self.log.debug("%s clients profiled", self.client_profiled_count)
+
+            # if we end up sending multiple frames from pcap for profiling - this will need changed
             if self.pcap_analysis:
                 self.log.info(
                     "exiting because we were told to only analyze %s",
@@ -161,12 +163,12 @@ class Profiler(object):
         return text_report
 
     def write_analysis_to_file_system(
-        self, text_report, capabilities, client_mac, oui_manuf, band
+        self, text_report, capabilities, frame, oui_manuf, band
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
-        client_mac = client_mac.replace(":", "-", 5)
+        client_mac = frame.addr2.replace(":", "-", 5)
         dest = os.path.join(self.clients_dir, client_mac)
 
         if not os.path.isdir(dest):
@@ -177,11 +179,29 @@ class Profiler(object):
                 sys.exit(-1)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+
         try:
+            if os.path.exists(filename):
+
+                existing = open(filename, "r").readlines()
+                temp = []
+                for line in existing:
+                    temp.append(line.replace("\n", ""))
+                existing = temp
+                new = text_report.split("\n")
+                # strip header when comparing existing file from newly profiled
+                if existing[5:] == new[5:]:
+                    pass
+                else:
+                    text_report = list(
+                        Differ().compare(existing, text_report.split("\n"))
+                    )
+                    filename = filename.replace(".txt", "_changed.txt")
+                    text_report = "\n".join(text_report)
             with open(filename, "w") as writer:
                 writer.write(text_report)
         except Exception:
-            log.error("error creating flat file to dump client info (%s)", filename)
+            log.exception("error creating flat file to dump client info (%s)", filename)
             sys.exit(-1)
 
         out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
@@ -193,7 +213,11 @@ class Profiler(object):
                 out_fieldnames.append(capability.name)
                 out_row[capability.name] = capability.value
 
-        # Check if csv file exists
+        # dump out the frame to a file
+        filename = os.path.splitext(filename)[0] + ".pcap"
+        wrpcap(filename, [frame])
+
+        # check if csv file exists
         if not os.path.exists(self.csv_file):
 
             # create file with csv headers
@@ -205,23 +229,6 @@ class Profiler(object):
         with open(self.csv_file, mode="a") as file_obj:
             writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
             writer.writerow(out_row)
-
-    def write_assoc_req_pcap(self, frame, band):
-        """ Write client association request to pcap file on WLAN Pi """
-        log = logging.getLogger(inspect.stack()[0][3])
-        mac = frame.addr2.replace(":", "-", 5)
-        dest = os.path.join(self.clients_dir, mac)
-
-        if not os.path.isdir(dest):
-            try:
-                os.mkdir(dest)
-            except Exception:
-                log.error("problem creating %s directory", dest)
-                sys.exit(-1)
-
-        # dump out the frame to a file
-        filename = os.path.join(dest, f"{mac}_{band}.pcap")
-        wrpcap(filename, [frame])
 
     @staticmethod
     def process_information_elements(buffer: bytes) -> dict:
@@ -524,7 +531,7 @@ class Profiler(object):
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
-        log.debug("processing information elements for client MAC %s", frame.addr2)
+        # log.debug("processing information elements for client MAC %s", frame.addr2)
 
         # strip radiotap
         ie_buffer = bytes(frame.payload)

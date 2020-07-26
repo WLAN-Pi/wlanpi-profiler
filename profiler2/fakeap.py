@@ -238,14 +238,14 @@ class Sniffer(object):
 
     def assoc_req(self, frame):
         """ Put association request on queue for the Profiler """
-        if frame.addr2 in self.assoc_reqs.keys():
-            self.log.info(
-                "ignoring already seen assoc req from client mac %s", frame.addr2
-            )
-        else:
-            self.assoc_reqs[frame.addr2] = frame
-            self.log.debug("adding assoc req from %s to queue", frame.addr2)
-            self.queue.put(frame)
+        # if frame.addr2 in self.assoc_reqs.keys():
+        #    self.log.info(
+        #        "ignoring already seen assoc req from client mac %s", frame.addr2
+        #    )
+        # else:
+        self.assoc_reqs[frame.addr2] = frame
+        self.log.debug("adding assoc req from %s to queue", frame.addr2)
+        self.queue.put(frame)
 
     def auth(self, receiver):
         """ Send authentication frame to get the station to prompt an assoc request """
