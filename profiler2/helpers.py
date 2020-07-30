@@ -128,17 +128,17 @@ def check_channel(value: str) -> int:
     channel = int(value)
     error_msg = "%s is not a valid channel value" % channel
     if channel <= 0:
-        raise argparse.ArgumentTypeError(error_msg)
+        raise ValueError(error_msg)
     if channel in CHANNELS:
         return channel
     else:
-        raise argparse.ArgumentTypeError(error_msg)
+        raise ValueError(error_msg)
 
 
 def check_ssid(ssid: str) -> str:
     """ Check if SSID is valid """
     if len(ssid) > 32:
-        raise argparse.ArgumentTypeError("%s length is greater than 32" % ssid)
+        raise ValueError("%s length is greater than 32" % ssid)
     return ssid
 
 
@@ -152,22 +152,15 @@ def check_interface(interface: str) -> str:
             if "phy80211" in os.listdir(iface_path):
                 discovered_interfaces.append(iface)
     if interface not in discovered_interfaces:
-        log.info(
-            "{interface} interface not found in not phy80211 interfaces: {discovered_interfaces}",
-            extra=dict(
-                interface=interface, discovered_interfaces=discovered_interfaces
-            ),
+        log.warning(
+            "%s interface not found in phy80211 interfaces: %s",
+            interface,
+            discovered_interfaces,
         )
-        raise argparse.ArgumentTypeError(
-            "{interface} is not a valid interface", extra=dict(interface=interface)
-        )
+        raise ValueError(f"{interface} is not a valid interface")
     else:
         log.debug(
-            "{interface} is in discovered interfaces: [{discovered_interfaces}]",
-            extra=dict(
-                interface=interface,
-                discovered_interfaces=", ".join(discovered_interfaces),
-            ),
+            "%s is in discovered interfaces: [%s]", interface, discovered_interfaces
         )
         return interface
 
@@ -187,32 +180,30 @@ def setup_parser() -> argparse:
         "-i",
         dest="interface",
         type=check_interface,
-        help="set network interface for profiler",
+        help="set network interface for profiler (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--noprep",
+        dest="no_interface_prep",
+        action="store_true",
+        default=False,
+        help="disable interface preperation (default: %(default)s)",
     )
     parser.add_argument(
         "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
     )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
-        "-s",
-        dest="ssid",
-        type=check_ssid,
-        help="set network identifier for profiler SSID",
+        "-s", dest="ssid", type=check_ssid, help="set profiler SSID",
     )
     ssid_group.add_argument(
         "--hostname_ssid",
         dest="hostname_ssid",
         action="store_true",
         default=False,
-        help="use the WLAN Pi's hostname for the SSID",
+        help="use the WLAN Pi's hostname as SSID name",
     )
-    parser.add_argument(
-        "--pcap",
-        metavar="<FILE>",
-        dest="pcap_analysis",
-        help="analyze first packet of pcap (expecting an association request frame)",
-    )
-    parser.add_argument(
+    ssid_group.add_argument(
         "--noAP",
         dest="listen_only",
         action="store_true",
@@ -250,26 +241,25 @@ def setup_parser() -> argparse:
         help="turn off 802.11ax High Efficiency (HE) reporting",
     )
     parser.add_argument(
-        "--noprep",
-        dest="no_interface_prep",
-        action="store_true",
-        default=False,
-        help="disable interface preperation",
+        "--pcap",
+        metavar="<FILE>",
+        dest="pcap_analysis",
+        help="analyze first packet of pcap (expecting an association request frame)",
     )
-    config = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.ini")
+    config = "/etc/profiler2/config.ini"
     parser.add_argument(
         "--config",
         type=str,
         metavar="<FILE>",
         default=config,
-        help="customize path for configuration file",
+        help="customize path for configuration file (default: %(default)s)",
     )
     parser.add_argument(
         "--files_path",
         metavar="<PATH>",
         dest="files_path",
         default="/var/www/html/profiler",
-        help="customize default directory where analysis is saved on local system",
+        help="customize default directory where analysis is saved on local system (default: %(default)s)",
     )
     parser.add_argument(
         "--clean",
@@ -325,31 +315,35 @@ def setup_config(args) -> dict:
     """ Create the configuration (SSID, channel, interface, etc) for the Profiler """
     log = logging.getLogger(inspect.stack()[0][3])
 
-    # load in config (a: from default location "/config.ini" or b: from provided)
+    config_found = False
+
+    # load in config (a: from default location "/etc/profiler2/config.ini" or b: from provided)
     if os.path.isfile(args.config):
+        config_found = True
         parser = load_config(args.config)
+        # we want to work with a dict whether we have config.ini or not
+        config = convert_configparser_to_dict(parser)
     else:
         parser = None
-
-    # handle if we can not find default config.ini file or user provided config
-    if not parser:
         log.warning("can not find config at %s", args.config)
-
-    config = {}
-
-    # we want to work with a dict whether we have config.ini or not.
-    if parser:
-        config = convert_configparser_to_dict(parser)
+        config = {}
 
     if "GENERAL" not in config:
         config["GENERAL"] = {}
-    else:
-        # handle special config.ini settings
-        if config["GENERAL"]["hostname_ssid"]:
-            config["GENERAL"]["ssid"] = socket.gethostname()
+
+    # set defaults if configuration file was not found
+    if not config_found:
+        config["GENERAL"]["ssid"] = "WLAN Pi"
+        config["GENERAL"]["channel"] = 36
+        config["GENERAL"]["interface"] = "wlan0"
+
+    # handle special config.ini settings
+    if config["GENERAL"].get("hostname_ssid"):
+        config["GENERAL"]["ssid"] = socket.gethostname()
 
     # handle args
-    # did user pass in options that over-ride defaults?
+    #  - args passed in take precedent over config.ini values
+    #  - did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
     if args.interface:
@@ -414,14 +408,22 @@ def load_config(config_file: str) -> configparser.ConfigParser:
 
 def validate(config: dict) -> bool:
     """ Validate minimum config to run is OK """
+    log = logging.getLogger(inspect.stack()[0][3])
+
     if not check_config_missing(config):
         return False
 
-    check_ssid(config.get("GENERAL").get("ssid"))
+    try:
+        check_ssid(config.get("GENERAL").get("ssid"))
 
-    check_channel(config.get("GENERAL").get("channel"))
+        check_channel(config.get("GENERAL").get("channel"))
 
-    verify_reporting_directories(config)
+        check_interface(config.get("GENERAL").get("interface"))
+
+        verify_reporting_directories(config)
+    except ValueError:
+        log.error("%s", sys.exc_info()[1])
+        sys.exit(-1)
 
     return True
 
@@ -686,7 +688,7 @@ def get_ssh_destination_ip() -> Union[str, bool]:
 def generate_run_message(config: dict):
     """ Create message to display to users screen """
     ssh_dest_ip = get_ssh_destination_ip()
-    if config["GENERAL"]["listen_only"] is True:
+    if config["GENERAL"].get("listen_only") is True:
         print(f"\n{'-' * 44}")
         print("Listening for association frames...")
         print(f"SSID: {config['GENERAL']['ssid']}")

@@ -2,6 +2,7 @@ Release 1.0.0-alpha3
 
 - improve test coverage
 - begin detecting and reporting on changed client capabilities
+- app looks for config.ini in /etc/profiler2/
 
 Release 1.0.0-alpha2
 

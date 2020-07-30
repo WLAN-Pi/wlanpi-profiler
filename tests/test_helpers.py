@@ -64,7 +64,7 @@ class TestHelpers:
     )
     def test_channel(self, channel, expected):
         if channel == "0":
-            with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            with pytest.raises(ValueError) as exc_info:
                 channel = helpers.check_channel(channel)
                 print(exc_info)
                 assert "not a valid channel" in exc_info
@@ -91,7 +91,14 @@ class TestHelpers:
             assert _ in config["GENERAL"].keys()
 
     def test_config_not_present(self):
+        """ test the default values which are set when no config is present """
         parser = helpers.setup_parser()
-        with pytest.raises(SystemExit) as pytest_wrapped_exit:
-            config = helpers.setup_config(parser.parse_args(["--config", "fake.ini"]))
-        assert pytest_wrapped_exit.type == SystemExit
+        config = helpers.setup_config(parser.parse_args(["--config", "fake.ini"]))
+        assert config == dict(
+            GENERAL=dict(
+                channel=36,
+                files_path="/var/www/html/profiler",
+                interface="wlan0",
+                ssid="WLAN Pi",
+            )
+        )
