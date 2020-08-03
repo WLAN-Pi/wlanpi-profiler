@@ -46,6 +46,7 @@ requirements:
 
 - minimum Python version required is 3.7 or higher
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
+- adapter+driver that supports monitor mode + packet injection
 
 installation with pip (recommended method): 
 
