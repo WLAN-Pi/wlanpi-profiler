@@ -179,7 +179,6 @@ def setup_parser() -> argparse:
     parser.add_argument(
         "-i",
         dest="interface",
-        type=check_interface,
         help="set network interface for profiler (default: %(default)s)",
     )
     parser.add_argument(
@@ -369,13 +368,7 @@ def setup_config(args) -> dict:
     else:
         config["GENERAL"]["files_path"] = FILES_PATH
 
-    # run our validator function on the config.
-    if validate(config):
-        log.debug("config: %s", config)
-        return config
-    else:
-        log.error("configuration validation failed... exiting...")
-        sys.exit(-1)
+    return config
 
 
 def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:

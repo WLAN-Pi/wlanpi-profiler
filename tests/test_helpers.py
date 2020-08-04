@@ -12,7 +12,7 @@ from profiler2 import helpers
 class TestHelpers:
     @pytest.mark.parametrize(
         "args,expected",
-        [(["--logging", "debug"], 10), (["--logging", "warning"], 30), ([], 20),],
+        [(["--logging", "debug"], 10), (["--logging", "warning"], 30), ([], 20)],
     )
     def test_logger(self, args, expected):
         parser = helpers.setup_parser()
@@ -90,7 +90,7 @@ class TestHelpers:
         ):
             assert _ in config["GENERAL"].keys()
 
-    def test_config_not_present(self):
+    def test_defaults_no_config_found(self):
         """ test the default values which are set when no config is present """
         parser = helpers.setup_parser()
         config = helpers.setup_config(parser.parse_args(["--config", "fake.ini"]))
@@ -100,5 +100,33 @@ class TestHelpers:
                 files_path="/var/www/html/profiler",
                 interface="wlan0",
                 ssid="WLAN Pi",
+            )
+        )
+
+    def test_no_config_found(self):
+        """ test the default values which are set when no config is present """
+        parser = helpers.setup_parser()
+        config = helpers.setup_config(
+            parser.parse_args(
+                [
+                    "--config",
+                    "fake.ini",
+                    "-c",
+                    "1",
+                    "--files_path",
+                    "/nope/profiler",
+                    "-i",
+                    "wlan999",
+                    "-s",
+                    "Jerry Can You Hear Me",
+                ]
+            )
+        )
+        assert config == dict(
+            GENERAL=dict(
+                channel=1,
+                files_path="/nope/profiler",
+                interface="wlan999",
+                ssid="Jerry Can You Hear Me",
             )
         )

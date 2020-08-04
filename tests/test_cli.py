@@ -67,9 +67,10 @@ class TestArgParsing:
 
     def test_invalid_interface(self, parser, capsys):
         with pytest.raises(SystemExit):
-            parser.parse_args(["", "-i", "fakest_interface_ever"])
-        err = capsys.readouterr().err
-        assert "invalid check_interface value:" in err
+            config = helpers.setup_config(parser.parse_args(["-i", "fakest_interface_ever"]))
+            helpers.validate(config)
+        out, err = capsys.readouterr()
+        assert err == ""
 
     @pytest.mark.parametrize(
         "args,expected",

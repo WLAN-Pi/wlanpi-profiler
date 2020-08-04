@@ -83,6 +83,12 @@ def start(args):
 
     config = helpers.setup_config(args)
 
+    if helpers.validate(config):
+        log.debug("config %s", config)
+    else:
+        log.error("configuration validation failed... exiting...")
+        sys.exit(-1)
+
     if args.clean:
         reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
         helpers.report_cleanup(reports_dir, args.yes)
