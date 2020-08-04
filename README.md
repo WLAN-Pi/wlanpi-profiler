@@ -23,32 +23,27 @@ each client includes its capability details in the 802.11 association frame sent
 
 please note that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
-## profiling (*WARNING* subject to change in future versions)
+## profiling results (*WARNING* subject to change in future versions)
 
 the client's capabilities are analyzed based on the client's association frame. the client will send an association frame when it attempts to associate to the profiler's fake AP. 
 
 once profiled, a textual report prints in real-time to the screen, and results write to a directory on the WLAN Pi server. results include a copy of the report and also the association frame in PCAP format. 
 
-note that further association requests by a profiled client are ignored until the profiler script/service is restarted.
+when profiled, a hash of the capabilities is calculated. if a subsequent association requests is seen, the hash is compared to what is in memory. if the hash is the same, it is ignored. if the hash is different, the request is profiled.
 
-## reports (*WARNING* subject to change in future versions)
+## viewing reports (*WARNING* subject to change in future versions)
 
-report files are dumped in the following web directories for browsing:
-
-- `http://<wlanpi_ip_address>/profiler/clients`
-    - one directory per client MAC containing text report and PCAP
-- `http://<wlanpi_ip_address>/profiler/reports`
-    - contains a CSV report of all clients for each session
+report files are can be viewed and downloaded from the WebUI of the WLAN PI by browsing to `http://<wlanpi_ip_address>/profiler`.
 
 # installation
 
 requirements:
 
 - minimum Python version required is 3.7 or higher
-- `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
-- adapter+driver that supports monitor mode + packet injection
+- `netstat`, and `tcpdump` tools installed on host
+- adapter + driver that supports both monitor mode and packet injection
 
-installation with pip (recommended method): 
+installation with pip (recommended): 
 
 ```
 # get code:
@@ -62,10 +57,9 @@ sudo python3 -m pip install .
 sudo profiler
 ```
 
-running the profiler without pip install (development/optional):
+### running the profiler without pip install (development/optional):
 
-- first make sure `scapy`, and `manuf` Py3 modules are installed (`python3 -m pip install -r requirements.txt`)
-- note that this method requires you to use the package name `profiler2`
+- first make sure `scapy`, and `manuf` py3 modules are installed (`cd <repo> && python3 -m pip install -r requirements.txt`)
 
 ```
 # get code
@@ -77,26 +71,26 @@ sudo python3 -m profiler2 <optional params>
 sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
 ```
 
+- note that the development method requires you to use the package name `profiler2` to launch profiler, rather than `profiler` when installed. this is because `profiler` is the console_scripts entry point while the package name is `profiler2`.
+
 # usage
 
 ```
-usage: profiler [-h] [-i INTERFACE] [-c CHANNEL]
-                [-s SSID | --hostname_ssid] [--pcap <FILE>] [--noAP]
-                [--11r | --no11r] [--11ax | --no11ax] [--noprep]
-                [--config <FILE>] [--menu_file <FILE>]
-                [--files_root <PATH>] [--clean] [--oui_update]
+usage: profiler [-h] [-i INTERFACE] [--noprep] [-c CHANNEL]
+                [-s SSID | --hostname_ssid | --noAP] [--11r | --no11r]
+                [--11ax | --no11ax] [--pcap <FILE>] [--config <FILE>]
+                [--files_path <PATH>] [--clean] [--yes] [--oui_update]
                 [--logging [{debug,warning}]] [--version]
 
 a Wi-Fi client analyzer for identifying supported 802.11 capabilities
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INTERFACE          set network interface for profiler
+  -i INTERFACE          set network interface for profiler (default: None)
+  --noprep              disable interface preperation (default: False)
   -c CHANNEL            802.11 channel to broadcast on
-  -s SSID               set network identifier for profiler SSID
-  --hostname_ssid       use the WLAN Pi's hostname for the SSID
-  --pcap <FILE>         analyze first packet of pcap (expecting an association
-                        request frame)
+  -s SSID               set profiler SSID
+  --hostname_ssid       use the WLAN Pi's hostname as SSID name
   --noAP                enable listen only mode (Rx only)
   --11r                 turn on 802.11r Fast Transition (FT) reporting
                         (override --config file)
@@ -104,19 +98,21 @@ optional arguments:
   --11ax                turn on 802.11ax High Efficiency (HE) reporting
                         (override --config file)
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
-  --noprep              disable interface preperation
-  --config <FILE>       customize path for configuration file
-  --menu_file <FILE>    customize menu report file location for WLAN Pi FPMS
-  --files_root <PATH>   customize default root directory for reporting and
-                        pcaps
+  --pcap <FILE>         analyze first packet of pcap (expecting an association
+                        request frame)
+  --config <FILE>       customize path for configuration file (default:
+                        /etc/profiler2/config.ini)
+  --files_path <PATH>   customize default directory where analysis is saved on
+                        local system (default: /var/www/html/profiler)
   --clean               deletes CSV reports
+  --yes                 automatic yes to prompts
   --oui_update          initiates Internet update of OUI database
   --logging [{debug,warning}]
                         change logging output
   --version, -V         show program's version number and exit
 ```
 
-## examples
+## usage examples
 
 ```
 # capture frames on channel 48 using the default SSID
