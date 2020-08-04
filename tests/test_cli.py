@@ -48,7 +48,7 @@ class TestArgParsing:
         with pytest.raises(SystemExit):
             parser.parse_args(["-s", "this_is_a_really_long_string_really_too_long!!!"])
         err = capsys.readouterr().err
-        assert "length is greater than 32" in err
+        assert "invalid check_ssid value" in err
 
     @pytest.mark.parametrize(
         "channel,expected",
@@ -63,13 +63,14 @@ class TestArgParsing:
         with pytest.raises(SystemExit):
             parser.parse_args(["", "-c", "15"])
         err = capsys.readouterr().err
-        assert "is not a valid channel value" in err
+        assert "invalid check_channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
         with pytest.raises(SystemExit):
-            parser.parse_args(["", "-i", "fakest_interface_ever"])
-        err = capsys.readouterr().err
-        assert "invalid check_interface value:" in err
+            config = helpers.setup_config(parser.parse_args(["-i", "fakest_interface_ever"]))
+            helpers.validate(config)
+        out, err = capsys.readouterr()
+        assert err == ""
 
     @pytest.mark.parametrize(
         "args,expected",

@@ -46,6 +46,7 @@ requirements:
 
 - minimum Python version required is 3.7 or higher
 - `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
+- adapter+driver that supports monitor mode + packet injection
 
 installation with pip (recommended method): 
 
@@ -180,5 +181,8 @@ to change the default operation of the script (without passing in CLI args), a c
 
 ## thanks
 
-- Contributors (see AUTHORS.rst)
-- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler
+- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler.
+
+## contributing
+
+Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTING.md).

@@ -50,7 +50,7 @@ def main() -> None:
     manager.start(args)
 
 
-def init():
+def init() -> None:
     """ Handle main init """
     # hard set no support for non linux platforms
     if "linux" not in sys.platform:
