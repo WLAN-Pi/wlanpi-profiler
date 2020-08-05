@@ -43,7 +43,15 @@ from time import sleep, time
 # third party imports
 
 try:
-    import scapy
+    from scapy.all import (
+        Dot11,
+        Dot11Auth,
+        Dot11Beacon,
+        Dot11Elt,
+        Dot11ProbeResp,
+        conf as scapyconf,
+        sniff,
+    )
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print(
@@ -51,15 +59,6 @@ except ModuleNotFoundError as error:
         )
         sys.exit(-1)
 
-from scapy.all import (
-    Dot11,
-    Dot11Auth,
-    Dot11Beacon,
-    Dot11Elt,
-    Dot11ProbeResp,
-    conf as scapyconf,
-    sniff,
-)
 
 # app imports
 from .constants import (

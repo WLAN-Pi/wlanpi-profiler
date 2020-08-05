@@ -42,6 +42,7 @@ import inspect, logging, multiprocessing as mp, os, platform, signal, sys
 from datetime import datetime
 
 # third party imports
+import scapy
 from scapy.all import rdpcap
 
 # app imports
