@@ -2,18 +2,20 @@
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
+profiler2 is a Wi-Fi client capability analyzer for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
 it performs two primary functions:
 
-1. creates a "fake" Access Point (default SSID is `WLAN Pi`)
-2. analyze attempted client association requests 
+1. creates a "fake" Access Point
+2. analyze and profile attempted client association requests (containing claimed capabilities) 
 
-the association request is a Layer 2 frame containing reported capabilities of the Wi-Fi client. profiler automates collection and analysis of these capabilities.
+this package automates collection and analysis of association requests.
 
 ## why?
 
-understanding client capabilities is an important part of the Wireless LAN design process. the designer can optimize their design output based on capabilities of expected clients. 
+understanding client capabilities is an important part of Wireless LAN design.
+
+the WLAN designer may use the capabilities of expected clients in their design output.
 
 ## capabilities vary
 
@@ -23,32 +25,41 @@ each client includes its capability details in the 802.11 association frame sent
 
 please note that the client will match the capabilities advertised by an access point. for instance, a 3 spatial stream client will tell a 2 spatial stream AP that it only supports 2 spatial streams. the profiler attempts to address this issue by advertising the highest feature sets.  
 
-## profiling (*WARNING* subject to change in future versions)
+## viewing client results and reports (*WARNING* how to view results are subject to change in future versions)
 
-the client's capabilities are analyzed based on the client's association frame. the client will send an association frame when it attempts to associate to the profiler's fake AP. 
+the clients capabilities are determined based on analyzing the clients association frame. 
 
-once profiled, a textual report prints in real-time to the screen, and results write to a directory on the WLAN Pi server. results include a copy of the report and also the association frame in PCAP format. 
+the client will send an association frame when it attempts to associate to the profilers fake AP. 
 
-note that further association requests by a profiled client are ignored until the profiler script/service is restarted.
+once profiled, a text report prints in real-time to the screen, and results write to a local directory on the WLAN Pi host. 
 
-## reports (*WARNING* subject to change in future versions)
+results include a copy of the text report and the association frame in PCAP format. the result is also saved to a `.csv` report.
 
-report files are dumped in the following web directories for browsing:
+results and reports can be retrieved from the WebUI of the WLAN PI by browsing to `http://<wlanpi_ip_addr>/profiler`.
 
-- `http://<wlanpi_ip_address>/profiler/clients`
-    - one directory per client MAC containing text report and PCAP
-- `http://<wlanpi_ip_address>/profiler/reports`
-    - contains a CSV report of all clients for each session
+## client capabilities diff (*experimental*)
+
+when a client is profiled (during runtime) a hash of the capabilities is calculated and stored in memory. 
+
+if subsequent association requests are seen from the same client, the hash is calculated and compared to what is in memory. 
+
+if the hash is the same, the additional association request is ignored. 
+
+if the hash is different, capabilities are profiled and a text diff of the client report is saved.
 
 # installation
 
-requirements:
+general requirements:
+
+- adapter and driver that supports both monitor mode and packet injection
+- rtl88XXau and mt76x2u tested regularly (everything else is experimental and not officially supported)
+
+package requirements:
 
 - minimum Python version required is 3.7 or higher
-- `netstat`, `tcpdump`, and `airmon-ng` tools installed on host
-- adapter+driver that supports monitor mode + packet injection
+- `iw`, `netstat`, and `tcpdump` tools installed on host
 
-installation with pip (recommended method): 
+installation with pip (recommended): 
 
 ```
 # get code:
@@ -62,41 +73,41 @@ sudo python3 -m pip install .
 sudo profiler
 ```
 
-running the profiler without pip install (development/optional):
-
-- first make sure `scapy`, and `manuf` Py3 modules are installed (`python3 -m pip install -r requirements.txt`)
-- note that this method requires you to use the package name `profiler2`
+### running the profiler in development (without pip install):
 
 ```
-# get code
 git clone <repo>
 cd <repo>
-
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
 sudo python3 -m profiler2 
 sudo python3 -m profiler2 <optional params>
-sudo python3 -m profiler2 -c 40 -s "Jerry Pi" -i wlan2 --no11r --logging debug
+sudo python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
 ```
+
+- note that package name is `profiler2` while the console_scripts entry point is `profiler`.
 
 # usage
 
+root permissions are required to prep the interface in monitor mode and for scapy to open a raw native socket for frame injection.
+
 ```
-usage: profiler [-h] [-i INTERFACE] [-c CHANNEL]
-                [-s SSID | --hostname_ssid] [--pcap <FILE>] [--noAP]
-                [--11r | --no11r] [--11ax | --no11ax] [--noprep]
-                [--config <FILE>] [--menu_file <FILE>]
-                [--files_root <PATH>] [--clean] [--oui_update]
+usage: profiler [-h] [-i INTERFACE] [--noprep] [-c CHANNEL]
+                [-s SSID | --hostname_ssid | --noAP] [--11r | --no11r]
+                [--11ax | --no11ax] [--pcap <FILE>] [--config <FILE>]
+                [--files_path <PATH>] [--clean] [--yes] [--oui_update]
                 [--logging [{debug,warning}]] [--version]
 
 a Wi-Fi client analyzer for identifying supported 802.11 capabilities
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INTERFACE          set network interface for profiler
+  -i INTERFACE          set network interface for profiler (default: None)
+  --noprep              disable interface preperation (default: False)
   -c CHANNEL            802.11 channel to broadcast on
-  -s SSID               set network identifier for profiler SSID
-  --hostname_ssid       use the WLAN Pi's hostname for the SSID
-  --pcap <FILE>         analyze first packet of pcap (expecting an association
-                        request frame)
+  -s SSID               set profiler SSID
+  --hostname_ssid       use the WLAN Pi's hostname as SSID name
   --noAP                enable listen only mode (Rx only)
   --11r                 turn on 802.11r Fast Transition (FT) reporting
                         (override --config file)
@@ -104,19 +115,21 @@ optional arguments:
   --11ax                turn on 802.11ax High Efficiency (HE) reporting
                         (override --config file)
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
-  --noprep              disable interface preperation
-  --config <FILE>       customize path for configuration file
-  --menu_file <FILE>    customize menu report file location for WLAN Pi FPMS
-  --files_root <PATH>   customize default root directory for reporting and
-                        pcaps
+  --pcap <FILE>         analyze first packet of pcap (expecting an association
+                        request frame)
+  --config <FILE>       customize path for configuration file (default:
+                        /etc/profiler2/config.ini)
+  --files_path <PATH>   customize default directory where analysis is saved on
+                        local system (default: /var/www/html/profiler)
   --clean               deletes CSV reports
+  --yes                 automatic yes to prompts
   --oui_update          initiates Internet update of OUI database
   --logging [{debug,warning}]
                         change logging output
   --version, -V         show program's version number and exit
 ```
 
-## examples
+## usage examples
 
 ```
 # capture frames on channel 48 using the default SSID
@@ -153,23 +166,25 @@ sudo profiler --pcap assoc_frame.pcap
 sudo profiler --logging debug
 ```
 
+## configuration file support
+
+to change the default operation of the script (without passing in CLI args), on the WLAN Pi, a configuration file can be found at `/etc/profiler2/config.ini`. 
+
+this can be used as a way to modify settings loaded at runtime such as channel, SSID, and interface. 
+
 ## MAC OUI database update
 
-A lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. This is enabled by a wrapper around a Python module called `manuf`. 
+a lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. this is a wrapper around a Python module called `manuf` which uses a local flat file for OUI lookup. 
 
-`manuf` uses a local flat file for OUI lookup. If you find that some clients are not identified in the results, the OUI file may need to be updated.
+if you find that some clients are not identified in the results, the flat file may need updated.
 
-With connectivity to the Internet, this can be done from the CLI of the WLAN Pi:
+with connectivity to the internet, this can be done from the CLI of the WLAN Pi:
 
 ```
 sudo profiler --oui_update
 ```
 
-## configuration
-
-to change the default operation of the script (without passing in CLI args), a configuration file called `config.ini` can be found in the script directory. this can be used as a way to modify the channel, SSID, and interface used by the script. note that the profiler must be restarted to use updated values from the config file. 
-
-## caveats
+## caveats and warnings
 
 - a client will generally only report the capabilities it has that match the network it associates to.
     - if you want the client to report all of its capabilities, it must associate with a network that supports those capabilities (e.g, a 3 spatial stream client will not report it supports 3 streams if the AP it associates with supports only 1 or 2 streams).
@@ -179,10 +194,10 @@ to change the default operation of the script (without passing in CLI args), a c
     - gather and analyze a packet capture for action frames containing neighbor report.
 - while we try our best to make this as accurate as possible, we do not guarantee this reports accurate info. trust, but verify.
 
-## thanks
+# thanks
 
-- Nigel Bowden and the WLAN Pi Community for all their input and effort on the first versions of the profiler.
+- Jerry Olla, Nigel Bowden, and the WLAN Pi Community for all their input and effort on the first versions of the profiler. without them this project would not exist.
 
 ## contributing
 
-Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTING.md).
+want to contribute? thanks! please take a few moments to [read this](CONTRIBUTING.md).

@@ -432,13 +432,44 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
             ["iw", f"{interface}", "set", "channel", f"{channel}"],
         ]
         try:
-            [
-                subprocess.run(c, shell=False, check=True, capture_output=True)
-                for c in commands
-            ]
+            for cmd in commands:
+                cp = subprocess.run(
+                    cmd, encoding="utf-8", shell=False, check=True, capture_output=True
+                )
+
+            driver = subprocess.run(
+                ["readlink", "-f", f"/sys/class/net/{interface}/device/driver"],
+                encoding="utf-8",
+                shell=False,
+                check=True,
+                capture_output=True,
+            )
+            mac = subprocess.run(
+                ["cat", f"/sys/class/net/{interface}/address"],
+                encoding="utf-8",
+                shell=False,
+                check=True,
+                capture_output=True,
+            )
+            log.debug(
+                "driver: %s, mac: %s",
+                driver.stdout.split("/")[-1].replace("\n", ""),
+                mac.stdout.replace("\n", ""),
+            )
+            regdomain = subprocess.run(
+                ["iw", "reg", "get"],
+                encoding="utf-8",
+                shell=False,
+                check=True,
+                capture_output=True,
+            )
+            log.debug(
+                "reg domain: %s",
+                [line for line in regdomain.stdout.split("\n") if "country" in line],
+            )
             return True
         except Exception:
-            log.exception("error setting wlan interface config")
+            log.exception("error setting wlan interface config %s", cp.stderr)
     else:
         log.error("failed to prep interface config...")
         return False
@@ -476,10 +507,14 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
         log.debug("running 'sudo manuf --update'")
-        sp = subprocess.run(
-            ["sudo", "manuf", "--update"], shell=False, check=True, capture_output=True
+        cp = subprocess.run(
+            ["sudo", "manuf", "--update"],
+            encoding="utf-8",
+            shell=False,
+            check=True,
+            capture_output=True,
         )
-        log.info("%s", str(sp))
+        log.info("%s", str(cp))
         log.debug(
             "manuf last modified time: %s",
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),

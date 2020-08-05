@@ -43,7 +43,15 @@ from time import sleep, time
 # third party imports
 
 try:
-    import scapy
+    from scapy.all import (
+        Dot11,
+        Dot11Auth,
+        Dot11Beacon,
+        Dot11Elt,
+        Dot11ProbeResp,
+        conf as scapyconf,
+        sniff,
+    )
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print(
@@ -51,15 +59,6 @@ except ModuleNotFoundError as error:
         )
         sys.exit(-1)
 
-from scapy.all import (
-    Dot11,
-    Dot11Auth,
-    Dot11Beacon,
-    Dot11Elt,
-    Dot11ProbeResp,
-    conf as scapyconf,
-    sniff,
-)
 
 # app imports
 from .constants import (
@@ -85,7 +84,6 @@ class TxBeacons(object):
 
     def __init__(self, config, boot_time, lock, sequence_number):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.info("scapy version: %s", scapy.__version__)
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
         self.config = config
