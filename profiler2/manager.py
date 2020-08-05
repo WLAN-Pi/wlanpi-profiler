@@ -76,6 +76,7 @@ def start(args):
 
     log.debug("%s version %s", __name__.split(".")[0], __version__)
     log.debug("python platform version is %s", platform.python_version())
+    log.debug("scapy version is %s", scapy.__version__)
     log.debug("args: %s", args)
 
     if args.oui_update:
