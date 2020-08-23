@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -* coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
 # Copyright 2020 Josh Schmelzle
@@ -193,7 +193,7 @@ def setup_parser() -> argparse:
     )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
-        "-s", dest="ssid", type=check_ssid, help="set profiler SSID",
+        "-s", dest="ssid", type=check_ssid, help="set profiler SSID"
     )
     ssid_group.add_argument(
         "--hostname_ssid",
@@ -432,11 +432,6 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
             ["iw", f"{interface}", "set", "channel", f"{channel}"],
         ]
         try:
-            for cmd in commands:
-                cp = subprocess.run(
-                    cmd, encoding="utf-8", shell=False, check=True, capture_output=True
-                )
-
             driver = subprocess.run(
                 ["readlink", "-f", f"/sys/class/net/{interface}/device/driver"],
                 encoding="utf-8",
@@ -467,6 +462,13 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 "reg domain: %s",
                 [line for line in regdomain.stdout.split("\n") if "country" in line],
             )
+            for cmd in commands:
+                cp = subprocess.run(
+                    cmd, encoding="utf-8", shell=False, capture_output=True
+                )
+                if cp.stderr:
+                    raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
+
             return True
         except Exception:
             log.exception("error setting wlan interface config %s", cp.stderr)
