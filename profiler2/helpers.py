@@ -471,7 +471,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
 
             return True
         except Exception:
-            log.exception("error setting wlan interface config")
+            log.exception("error setting wlan interface config %s", cp.stderr)
     else:
         log.error("failed to prep interface config...")
         return False
