@@ -50,6 +50,7 @@ try:
         Dot11Elt,
         Dot11ProbeResp,
         conf as scapyconf,
+        RadioTap,
         sniff,
     )
 except ModuleNotFoundError as error:
@@ -70,13 +71,7 @@ from .constants import (
     DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_TYPE_MANAGEMENT,
 )
-from .helpers import (
-    build_fake_frame_ies,
-    # convert_timestamp_to_uptime,
-    get_mac,
-    get_radiotap_header,
-    next_sequence_number,
-)
+from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
 
 class TxBeacons(object):
@@ -107,12 +102,7 @@ class TxBeacons(object):
             )
             dot11beacon = Dot11Beacon(beacon_interval=1, cap=0x1111)
             beacon_frame_ies = build_fake_frame_ies(self.config)
-            self.beacon_frame = (
-                get_radiotap_header(self.channel)
-                / dot11
-                / dot11beacon
-                / beacon_frame_ies
-            )
+            self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
         # self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
         self.log.info("starting beacon transmissions")
@@ -188,7 +178,7 @@ class Sniffer(object):
             probe_resp_ies = build_fake_frame_ies(self.config)
             self.mac = get_mac(self.interface)
             self.probe_response_frame = (
-                get_radiotap_header(self.channel)
+                RadioTap()
                 / Dot11(
                     subtype=DOT11_SUBTYPE_PROBE_RESP, addr2=self.mac, addr3=self.mac
                 )
@@ -196,7 +186,7 @@ class Sniffer(object):
                 / probe_resp_ies
             )
             self.auth_frame = (
-                get_radiotap_header(self.channel)
+                RadioTap()
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )

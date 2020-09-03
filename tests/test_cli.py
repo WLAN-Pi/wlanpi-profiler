@@ -67,7 +67,9 @@ class TestArgParsing:
 
     def test_invalid_interface(self, parser, capsys):
         with pytest.raises(SystemExit):
-            config = helpers.setup_config(parser.parse_args(["-i", "fakest_interface_ever"]))
+            config = helpers.setup_config(
+                parser.parse_args(["-i", "fakest_interface_ever"])
+            )
             helpers.validate(config)
         out, err = capsys.readouterr()
         assert err == ""

@@ -48,13 +48,7 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import (
-        RadioTap,
-        Dot11Elt,
-        get_if_hwaddr,
-        get_if_raw_hwaddr,
-        Scapy_Exception,
-    )
+    from scapy.all import Dot11Elt, get_if_hwaddr, get_if_raw_hwaddr, Scapy_Exception
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"{error}. please install manuf... exiting...")
@@ -674,17 +668,6 @@ def next_sequence_number(sequence_number: Value):
     """ Update a sequence number of type multiprocessing Value """
     sequence_number.value = (sequence_number.value + 1) % 4096
     return sequence_number.value
-
-
-def get_radiotap_header(channel: int):
-    """ Build a pseudo radio tap header """
-    radiotap_packet = RadioTap(
-        present="Flags+Rate+Channel+dBm_AntSignal+Antenna",
-        notdecoded=b"\x8c\00"
-        + get_frequency_bytes(channel)
-        + b"\xc0\x00\xc0\x01\x00\x00",
-    )
-    return radiotap_packet
 
 
 def get_mac(interface: str) -> str:
