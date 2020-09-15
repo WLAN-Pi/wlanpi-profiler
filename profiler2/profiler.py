@@ -91,6 +91,10 @@ class Profiler(object):
         """ Clean up while we shut down """
         pass
 
+    def is_randomized(self, mac) -> bool:
+        """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
+        return any(local == mac[1] for local in ["2", "6", "a", "e"])
+
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
@@ -110,6 +114,9 @@ class Profiler(object):
             self.log.debug("starting oui lookup for %s", frame.addr2)
             lookup = manuf.MacParser(update=False)
             oui_manuf = lookup.get_manuf(frame.addr2)
+            if oui_manuf is None:
+                if self.is_randomized(frame.addr2):
+                    oui_manuf = "Randomized MAC"
             self.last_manuf = oui_manuf
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
             text_report = self.generate_text_report(

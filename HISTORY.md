@@ -1,3 +1,11 @@
+Release 1.0.2
+
+- add basic detection for randomized mac addresses
+
+Release 1.0.1
+
+- bump scapy version from 2.4.3 to 2.4.4
+
 Release 1.0.0-alpha3
 
 - improve test coverage
