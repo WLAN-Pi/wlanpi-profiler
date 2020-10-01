@@ -89,7 +89,7 @@ class TxBeacons(object):
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
-        self.beacon_interval = 0.102_400
+        self.beacon_interval = 0.102400
 
         with lock:
             self.mac = get_mac(self.interface)
@@ -100,7 +100,7 @@ class TxBeacons(object):
                 addr2=self.mac,
                 addr3=self.mac,
             )
-            dot11beacon = Dot11Beacon(beacon_interval=1, cap=0x1111)
+            dot11beacon = Dot11Beacon(cap=0x1111)
             beacon_frame_ies = build_fake_frame_ies(self.config)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
