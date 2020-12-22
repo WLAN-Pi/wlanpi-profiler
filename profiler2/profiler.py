@@ -320,6 +320,8 @@ class Profiler(object):
                     )
                     oui_manuf_vendor = lookup.get_manuf(vendor_mac)
                     if oui_manuf_vendor is not None:
+                        # Apple vendor specific IEs can only be found in Apple devices
+                        # (no other OUIs are considered at the moment)
                         if oui_manuf_vendor.startswith("Apple"):
                             oui_manuf = oui_manuf_vendor
 
