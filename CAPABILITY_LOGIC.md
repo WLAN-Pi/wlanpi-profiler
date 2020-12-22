@@ -53,3 +53,18 @@ values to determine client capabilities.
 7. Supported channels - inspect tagged parameter 6 (Supported Channels)
     - a. Step through each channel set octet-pair provided reporting start channel and other channels in range
         - Note: use step of 4 if start channel above number 14 (must be 5GHz channels), use step of 1 otherwise
+
+8. Randomized MAC address - inspect OUI of 24-bit MAC address
+    - a. check if any of these digits `2`, `6`, `a`, or `e` is located in the second hex position from the left
+        - N - MAC is not unicast local address
+        - Y - MAC is a unicast local address (private mac/randomized mac)
+
+9. MAC address manufacturer detection through heuristics 
+    - a. can MAC address be resolved by lookup of OUI in manuf db?
+        - Y - Return match
+        - N - investigate tagged parameter 221 (vendor specific)
+            - is vendor MAC in manuf database?
+                - N - Unable to match
+                - Y - Check OUI matches our heurstic
+                    - Y - Return match
+                    - N - Unable to match

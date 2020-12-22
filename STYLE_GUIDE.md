@@ -31,16 +31,22 @@ $ python<version> -m pip install tox
 
 You can now invoke tox in the directory where tox.ini resides.
 
-To initiate testing. You should run:
+These are some things you should before submitting a PR:
+
+To initiate testing:
 
 ```
 tox
 ```
 
-We should lint our code. You should run:
+We should lint our code. Example:
 
 ```
-tox -e linters
+tox -e lint
 ```
 
-After making changes and before pushing them.
+We should format our code. Example:
+
+```
+tox -e format
+```

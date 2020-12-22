@@ -1,34 +1,39 @@
+Release 1.0.3
+
+- Add heuristics to resolve the manufacturer when a client is using a randomized mac address
+- Fix forged beacon interval
+
 Release 1.0.2
 
-- add basic detection for randomized mac addresses
+- Add basic detection for randomized mac addresses
 
 Release 1.0.1
 
-- bump scapy version from 2.4.3 to 2.4.4
+- Bump scapy version from 2.4.3 to 2.4.4
 
 Release 1.0.0-alpha3
 
-- improve test coverage
-- begin detecting and reporting on changed client capabilities
-- app looks for config.ini in /etc/profiler2/
+- Improve test coverage
+- Begin detecting and reporting on changed client capabilities
+- App now looks for config.ini in /etc/profiler2/
 
 Release 1.0.0-alpha2
 
-- add --yes arg to support automatic yes to --clean y/n prompt
-- refactors; bump tox version in requirements
-- remove menu mode code that is no longer used in WLAN Pi v2 builds
-- allow user to check help usage and version without root permissions
-- remove airmon-ng check kill from interface preparation when profiler is run
-- refactor and improve test coverage
-- fix error where argparse fails to allow profiler to run on channel 2
-- rename GH workflow
+- Add --yes arg to support automatic yes to --clean y/n prompt
+- Refactors; bump tox version in requirements
+- Remove menu mode code that is no longer used in WLAN Pi v2 builds
+- Allow user to check help usage and version without root permissions
+- Remove airmon-ng check kill from interface preparation when profiler is run
+- Refactor and improve test coverage
+- Fix error where argparse fails to allow profiler to run on channel 2
+- Rename GH workflow
 
 Release 1.0.0-alpha1
 
-- create and change default branch from master to main
-- fix handling of `--no11r` and `--no11ax` modes from either CLI args or config file
-- menu mode tweaks and is now enabled by default
-- minor changes to flat file output such as including the capture channel
+- Create and change default branch from master to main
+- Fix handling of `--no11r` and `--no11ax` modes from either CLI args or config file
+- Menu mode tweaks and is now enabled by default
+- Minor changes to flat file output such as including the capture channel
 - `manuf` is no longer abandoned: replaced it's fork `manuf-ng` and updated `manuf` to working version
 
 Release 0.1.dev6:
