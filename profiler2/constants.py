@@ -53,6 +53,7 @@ FT_CAPABILITIES_TAG = 54  # 802.11r - mobility domain (MDE) IE
 RM_CAPABILITIES_TAG = 70  # 802.11k
 EXT_CAPABILITIES_TAG = 127  # 802.11v - Extended Capabilities
 VHT_CAPABILITIES_TAG = 191  # 802.11ac
+VENDOR_SPECIFIC_IE_TAG = 221  # Vendor Specific IE
 EXT_IE_TAG = 255  # Element ID Extension field
 
 CHANNELS = [

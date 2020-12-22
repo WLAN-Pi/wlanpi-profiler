@@ -57,6 +57,7 @@ from .constants import (
     RM_CAPABILITIES_TAG,
     RSN_CAPABILITIES_TAG,
     SUPPORTED_CHANNELS_TAG,
+    VENDOR_SPECIFIC_IE_TAG,
     VHT_CAPABILITIES_TAG,
 )
 from .helpers import Capability, flag_last_object
@@ -98,7 +99,7 @@ class Profiler(object):
     def profile(self, queue):
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
-        capabilities = self.analyze_assoc_req(frame)
+        oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(str(capabilities))
         if analysis_hash in self.analyzed_hash.keys():
             self.log.debug(
@@ -107,18 +108,16 @@ class Profiler(object):
                 analysis_hash,
             )
         else:
-            self.analyzed_hash[analysis_hash] = frame
-            # self.log.debug(
-            #    f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
-            # )
-            self.log.debug("starting oui lookup for %s", frame.addr2)
-            lookup = manuf.MacParser(update=False)
-            oui_manuf = lookup.get_manuf(frame.addr2)
-            if oui_manuf is None:
-                if self.is_randomized(frame.addr2):
+
+            if self.is_randomized(frame.addr2):
+                if oui_manuf is None:
                     oui_manuf = "Randomized MAC"
+                else:
+                    oui_manuf = "{0} (Randomized MAC)".format(oui_manuf)
+
             self.last_manuf = oui_manuf
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
+            self.analyzed_hash[analysis_hash] = frame
             text_report = self.generate_text_report(
                 oui_manuf, capabilities, frame.addr2, self.channel
             )
@@ -268,7 +267,16 @@ class Profiler(object):
                 index += 1
                 element_data.append(byte)
             else:
-                information_elements[element_id] = element_data
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                    # map a list of data items to the key
+                    if element_id in information_elements:
+                        information_elements[element_id].append(element_data)
+                    else:
+                        information_elements[element_id] = [element_data]
+                else:
+                    # map the data to the key
+                    information_elements[element_id] = element_data
+
                 # reset vars to decode next information element
                 index = 0
                 is_index_byte = True
@@ -281,8 +289,41 @@ class Profiler(object):
                 is_index_byte = False
                 continue
             if last:
-                information_elements[element_id] = element_data
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                    # map a list of data items to the key
+                    if element_id in information_elements:
+                        information_elements[element_id].append(element_data)
+                    else:
+                        information_elements[element_id] = [element_data]
+                else:
+                    # map the data to the key
+                    information_elements[element_id] = element_data
+
         return information_elements
+
+    @staticmethod
+    def resolve_oui_manuf(mac: str, dot11_elt_dict: dict) -> str:
+        """ Resolve client's manuf using manuf database and other heuristics """
+        log = logging.getLogger(inspect.stack()[0][3])
+
+        log.debug("starting oui lookup for %s", mac)
+        lookup = manuf.MacParser(update=False)
+        oui_manuf = lookup.get_manuf(mac)
+        if oui_manuf is None:
+            # inspect vendor specific IEs and see if there's an IE with
+            # an OUI that we know can only be included if the manuf
+            # of the client is the vendor that maps to that OUI
+            if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
+                    vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                        element_data[0], element_data[1], element_data[2]
+                    )
+                    oui_manuf_vendor = lookup.get_manuf(vendor_mac)
+                    if oui_manuf_vendor is not None:
+                        if oui_manuf_vendor.startswith("Apple"):
+                            oui_manuf = oui_manuf_vendor
+
+        return oui_manuf
 
     @staticmethod
     def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> []:
@@ -522,19 +563,20 @@ class Profiler(object):
             dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
         else:
             if EXT_IE_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[EXT_IE_TAG]:
 
-                ext_ie_id = str(dot11_elt_dict[EXT_IE_TAG][0])
+                    ext_ie_id = str(element_data[0])
 
-                dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
+                    dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
 
-                # check for 802.11ax support
-                if ext_ie_id in dot11ax_draft_ids.keys():
-                    dot11ax_draft.value = "Supported (Draft)"
-                    dot11ax_draft.db_value = 1
+                    # check for 802.11ax support
+                    if ext_ie_id in dot11ax_draft_ids.keys():
+                        dot11ax_draft.value = "Supported (Draft)"
+                        dot11ax_draft.db_value = 1
 
         return [dot11ax_draft]
 
-    def analyze_assoc_req(self, frame) -> []:
+    def analyze_assoc_req(self, frame):
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -561,6 +603,9 @@ class Profiler(object):
             frame.addr2,
             dot11_elt_dict.keys(),
         )
+
+        #  resolve manufacturer
+        oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
         # dictionary to store capabilities as we decode them
         capabilities = []
@@ -594,4 +639,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
 
-        return capabilities
+        return oui_manuf, capabilities
