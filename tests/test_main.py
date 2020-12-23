@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import mock, pytest
+import mock
 
 
 def test_init():

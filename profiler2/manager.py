@@ -38,7 +38,13 @@ handle profiler
 """
 
 # standard library imports
-import inspect, logging, multiprocessing as mp, os, platform, signal, sys
+import inspect
+import logging
+import multiprocessing as mp
+import os
+import platform
+import signal
+import sys
 from datetime import datetime
 
 # third party imports
@@ -121,7 +127,7 @@ def start(args):
     else:
         helpers.generate_run_message(config)
 
-        from .fakeap import TxBeacons, Sniffer
+        from .fakeap import Sniffer, TxBeacons
 
         boot_time = datetime.now().timestamp()
 

@@ -37,7 +37,10 @@ fake ap code handling beaconing and sniffing for the profiler
 """
 
 # standard library imports
-import inspect, logging, os, sys
+import inspect
+import logging
+import os
+import sys
 from time import sleep, time
 
 # third party imports
@@ -49,10 +52,10 @@ try:
         Dot11Beacon,
         Dot11Elt,
         Dot11ProbeResp,
-        conf as scapyconf,
         RadioTap,
-        sniff,
     )
+    from scapy.all import conf as scapyconf
+    from scapy.all import sniff
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print(

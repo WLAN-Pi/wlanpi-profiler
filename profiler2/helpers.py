@@ -37,7 +37,17 @@ provides init functions that are used to help setup the app.
 """
 
 # standard library imports
-import argparse, configparser, inspect, logging, logging.config, os, re, socket, subprocess, sys, textwrap
+import argparse
+import configparser
+import inspect
+import logging
+import logging.config
+import os
+import re
+import socket
+import subprocess
+import sys
+import textwrap
 from dataclasses import dataclass
 from datetime import timedelta
 from distutils.util import strtobool
@@ -48,7 +58,7 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import Dot11Elt, get_if_hwaddr, get_if_raw_hwaddr, Scapy_Exception
+    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"{error}. please install manuf... exiting...")

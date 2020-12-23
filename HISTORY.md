@@ -1,3 +1,10 @@
+Release 1.0.4 
+
+- Fix issue preventing a client from being profiled again in the same session when switching between Private MAC and Device MAC
+- Fix problem with oui lookups sometimes failing
+- Add Samsung to the client heuristics detection
+- Add unit tests for client heuristics detection
+
 Release 1.0.3
 
 - Add heuristics to resolve the manufacturer when a client is using a randomized mac address
