@@ -40,17 +40,17 @@ import os
 import platform
 import sys
 
-from . import helpers, manager
 
-
-def main() -> None:
+def main():
     """ Set up args and start the profiler manager """
+    from . import helpers, manager
+
     parser = helpers.setup_parser()
     args = parser.parse_args()
     manager.start(args)
 
 
-def init() -> None:
+def init():
     """ Handle main init """
     # hard set no support for non linux platforms
     if "linux" not in sys.platform:

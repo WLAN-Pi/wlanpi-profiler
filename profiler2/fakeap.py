@@ -89,7 +89,7 @@ class TxBeacons(object):
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
-        self.beacon_interval = 0.102400
+        self.beacon_interval = 0.102_400
 
         with lock:
             self.mac = get_mac(self.interface)
