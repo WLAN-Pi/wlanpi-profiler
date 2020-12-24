@@ -2,9 +2,7 @@
 
 import logging
 
-
 import pytest
-
 from profiler2 import helpers
 
 

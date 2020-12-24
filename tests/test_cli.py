@@ -2,7 +2,6 @@
 
 
 import pytest
-
 from profiler2 import helpers
 from profiler2.__version__ import __version__
 

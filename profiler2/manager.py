@@ -74,6 +74,9 @@ def start(args):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
 
+    if args.pytest:
+        sys.exit("pytest")
+
     if not are_we_root():
         log.error("must run with root permissions... exiting...")
         sys.exit(-1)

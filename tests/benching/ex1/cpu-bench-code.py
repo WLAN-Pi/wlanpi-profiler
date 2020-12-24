@@ -1,5 +1,4 @@
-from multiprocessing import Pool
-from multiprocessing import cpu_count
+from multiprocessing import Pool, cpu_count
 
 
 def f(x):

@@ -1,3 +1,7 @@
+Release 1.0.5 (work in progress)
+
+- Improve test coverage
+
 Release 1.0.4 
 
 - Fix issue preventing a client from being profiled again in the same session when switching between Private MAC and Device MAC

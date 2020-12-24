@@ -193,6 +193,13 @@ def setup_parser() -> argparse:
         help="disable interface preperation (default: %(default)s)",
     )
     parser.add_argument(
+        "--pytest",
+        dest="pytest",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
     )
     ssid_group = parser.add_mutually_exclusive_group()
