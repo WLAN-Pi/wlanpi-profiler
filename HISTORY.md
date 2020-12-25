@@ -1,5 +1,6 @@
 Release 1.0.5 (work in progress)
 
+- Add support for deleting profiled files (.txt and .pcap) in addition to reports
 - Improve test coverage
 
 Release 1.0.4 

@@ -100,9 +100,14 @@ def start(args):
         log.error("configuration validation failed... exiting...")
         sys.exit(-1)
 
+    if args.clean and args.files:
+        clients_dir = os.path.join(config["GENERAL"].get("files_path"), "clients")
+        helpers.files_cleanup(clients_dir, args.yes)
+        sys.exit(0)
+
     if args.clean:
         reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
-        helpers.report_cleanup(reports_dir, args.yes)
+        helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
     interface = config.get("GENERAL").get("interface")

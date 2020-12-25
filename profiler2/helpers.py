@@ -44,6 +44,7 @@ import logging
 import logging.config
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -58,7 +59,8 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
+    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
+                           get_if_raw_hwaddr)
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"{error}. please install manuf... exiting...")
@@ -178,7 +180,6 @@ def setup_parser() -> argparse:
             a Wi-Fi client analyzer for identifying supported 802.11 capabilities
             """
         ),
-        # fromfile_prefix_chars="2",
     )
     parser.add_argument(
         "-i",
@@ -276,14 +277,17 @@ def setup_parser() -> argparse:
         dest="clean",
         action="store_true",
         default=False,
-        help="deletes CSV reports",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "--yes",
-        dest="yes",
+        "--files",
+        dest="files",
         action="store_true",
         default=False,
-        help="automatic yes to prompts",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--yes", dest="yes", action="store_true", default=False, help=argparse.SUPPRESS
     )
     parser.add_argument(
         "--oui_update",
@@ -302,23 +306,31 @@ def setup_parser() -> argparse:
     return parser
 
 
-def report_cleanup(_dir, yes) -> None:
-    """ Purge reports """
+def files_cleanup(directory, yes) -> None:
+    """ Purge files recursively """
     log = logging.getLogger(inspect.stack()[0][3])
 
-    print(f"Delete the following files: {os.listdir(_dir)}")
+    from pathlib import Path
+
+    result = list(Path(directory).rglob("*"))
+    print(f"Delete the following files: {', '.join([str(x) for x in result])}")
 
     if yes:
         pass
     elif not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
         sys.exit(1)
 
-    for _file in os.listdir(_dir):
-        try:
-            log.info("removing report: %s", f"{_file}")
-            os.unlink(os.path.join(_dir, _file))
-        except Exception:
-            log.exception("issue removing files")
+    try:
+        for p in os.listdir(Path(directory)):
+            p = Path(directory) / Path(p)
+            if p.is_file():
+                print(f"Removing file: {p}")
+                p.unlink()
+            if p.is_dir():
+                print(f"Removing directory: {p}")
+                shutil.rmtree(p)
+    except Exception:
+        log.exception("issue removing files")
 
 
 def setup_config(args) -> dict:
