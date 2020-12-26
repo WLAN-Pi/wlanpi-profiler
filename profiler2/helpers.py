@@ -306,7 +306,7 @@ def setup_parser() -> argparse:
     return parser
 
 
-def files_cleanup(directory, yes) -> None:
+def files_cleanup(directory: str, acknowledged: bool) -> None:
     """ Purge files recursively """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -315,7 +315,7 @@ def files_cleanup(directory, yes) -> None:
     result = list(Path(directory).rglob("*"))
     print(f"Delete the following files: {', '.join([str(x) for x in result])}")
 
-    if yes:
+    if acknowledged:
         pass
     elif not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
         sys.exit(1)
@@ -701,9 +701,11 @@ def next_sequence_number(sequence_number: Value):
 
 def get_mac(interface: str) -> str:
     """ Get the mac address for a specified interface """
+    log = logging.getLogger(inspect.stack()[0][3])
     try:
         mac = get_if_hwaddr(interface)
     except Scapy_Exception:
+        log.error("get_if_hwaddr(interface) failed on %s", interface)
         mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
     return mac
 
@@ -717,7 +719,8 @@ def get_ssh_destination_ip() -> Union[str, bool]:
             socket = str(line)
             if "22" in socket and "ESTABLISHED" in socket:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
-                return dest_ip_re.group(1)
+                if dest_ip_re:
+                    return dest_ip_re.group(1)
     except Exception:
         log.warning(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
