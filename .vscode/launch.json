@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "clean profiles",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": ["--clean", "--files", "--yes"]
+        },
+        {
+            "name": "-i wlan0",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": ["-i", "wlan0", "--logging", "debug"]
+        },
+        {
+            "name": "-i wlan1",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": ["-i", "wlan1", "--logging", "debug"]
+        }
+    ]
+}
