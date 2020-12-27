@@ -701,11 +701,9 @@ def next_sequence_number(sequence_number: Value):
 
 def get_mac(interface: str) -> str:
     """ Get the mac address for a specified interface """
-    log = logging.getLogger(inspect.stack()[0][3])
     try:
         mac = get_if_hwaddr(interface)
     except Scapy_Exception:
-        log.error("get_if_hwaddr(interface) failed on %s", interface)
         mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
     return mac
 
