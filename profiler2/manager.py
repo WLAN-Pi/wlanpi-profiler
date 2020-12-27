@@ -70,7 +70,7 @@ def are_we_root() -> bool:
         return False
 
 
-def start(args):
+def start(args: dict):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
 

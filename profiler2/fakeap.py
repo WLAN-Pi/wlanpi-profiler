@@ -37,23 +37,20 @@ fake ap code handling beaconing and sniffing for the profiler
 """
 
 # standard library imports
+import datetime
 import inspect
 import logging
 import os
 import sys
+from multiprocessing import Lock, Value
+from multiprocessing.queues import Queue
 from time import sleep, time
 
 # third party imports
 
 try:
-    from scapy.all import (
-        Dot11,
-        Dot11Auth,
-        Dot11Beacon,
-        Dot11Elt,
-        Dot11ProbeResp,
-        RadioTap,
-    )
+    from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt,
+                           Dot11ProbeResp, RadioTap)
     from scapy.all import conf as scapyconf
     from scapy.all import sniff
 except ModuleNotFoundError as error:
@@ -65,22 +62,23 @@ except ModuleNotFoundError as error:
 
 
 # app imports
-from .constants import (
-    DOT11_SUBTYPE_ASSOC_REQ,
-    DOT11_SUBTYPE_AUTH_REQ,
-    DOT11_SUBTYPE_BEACON,
-    DOT11_SUBTYPE_PROBE_REQ,
-    DOT11_SUBTYPE_PROBE_RESP,
-    DOT11_SUBTYPE_REASSOC_REQ,
-    DOT11_TYPE_MANAGEMENT,
-)
+from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
+                        DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
+                        DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
+                        DOT11_TYPE_MANAGEMENT)
 from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
 
 class TxBeacons(object):
     """ Handle Tx of fake AP frames """
 
-    def __init__(self, config, boot_time, lock, sequence_number):
+    def __init__(
+        self,
+        config: dict,
+        boot_time: datetime.datetime,
+        lock: Lock,
+        sequence_number: Value,
+    ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
@@ -111,7 +109,7 @@ class TxBeacons(object):
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
-    def every(self, interval, task):
+    def every(self, interval: int, task):
         """ Attempt to address beacon drift """
         start_time = time()
         while True:
@@ -153,7 +151,14 @@ class TxBeacons(object):
 class Sniffer(object):
     """ Handle sniffing probes and association requests """
 
-    def __init__(self, config, boot_time, lock, sequence_number, queue):
+    def __init__(
+        self,
+        config: dict,
+        boot_time: datetime.datetime,
+        lock: Lock,
+        sequence_number: Value,
+        queue: Queue,
+    ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer %s; parent pid: %s", os.getpid(), os.getppid())
 

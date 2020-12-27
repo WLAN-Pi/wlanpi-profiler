@@ -44,24 +44,19 @@ import os
 import sys
 import time
 from difflib import Differ
+from multiprocessing.queues import Queue
+from typing import Tuple
 
 # third party imports
 from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (
-    EXT_CAPABILITIES_IE_TAG,
-    EXT_IE_TAG,
-    FT_CAPABILITIES_IE_TAG,
-    HT_CAPABILITIES_IE_TAG,
-    POWER_MIN_MAX_IE_TAG,
-    RM_CAPABILITIES_IE_TAG,
-    RSN_CAPABILITIES_IE_TAG,
-    SUPPORTED_CHANNELS_IE_TAG,
-    VENDOR_SPECIFIC_IE_TAG,
-    VHT_CAPABILITIES_IE_TAG,
-)
+from .constants import (EXT_CAPABILITIES_IE_TAG, EXT_IE_TAG,
+                        FT_CAPABILITIES_IE_TAG, HT_CAPABILITIES_IE_TAG,
+                        POWER_MIN_MAX_IE_TAG, RM_CAPABILITIES_IE_TAG,
+                        RSN_CAPABILITIES_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
+                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
 from .helpers import Capability, flag_last_object
 
 
@@ -100,7 +95,7 @@ class Profiler(object):
         """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
         return any(local == mac[1] for local in ["2", "6", "a", "e"])
 
-    def profile(self, queue):
+    def profile(self, queue: Queue) -> None:
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
         oui_manuf, capabilities = self.analyze_assoc_req(frame)
@@ -592,7 +587,7 @@ class Profiler(object):
 
         return [dot11ax_draft]
 
-    def analyze_assoc_req(self, frame):
+    def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 

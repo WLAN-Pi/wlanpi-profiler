@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import multiprocessing as mp
 
 import pytest
+
 from profiler2 import helpers
 
 
@@ -15,6 +17,70 @@ class TestHelpers:
         parser = helpers.setup_parser()
         helpers.setup_logger(parser.parse_args(args))
         assert logging.root.level == expected
+
+    def test_flag_last_object(self):
+        ls = ["a", "b", "c"]
+        for obj, last in helpers.flag_last_object(ls):
+            if last:
+                assert obj == "c"
+
+    @pytest.mark.parametrize(
+        "seq,expected",
+        [(mp.Value("i", 1), 2), (mp.Value("i", 1969), 1970), (mp.Value("i", 4096), 1)],
+    )
+    def test_next_sequence_number(self, seq, expected):
+        assert helpers.next_sequence_number(seq) == expected
+
+    def test_generate_run_message(self):
+        conf1 = {
+            "GENERAL": {
+                "ssid": "WLAN Pi",
+                "channel": 36,
+                "interface": "wlan1",
+                "files_path": "/var/www/html/profiler",
+            }
+        }
+        conf2 = {
+            "GENERAL": {
+                "ssid": "WLAN Pi",
+                "channel": 36,
+                "interface": "wlan1",
+                "listen_only": True,
+                "files_path": "/var/www/html/profiler",
+            }
+        }
+        assert helpers.generate_run_message(conf1) == None
+        assert helpers.generate_run_message(conf2) == None
+
+    @pytest.mark.parametrize(
+        "channel,expected",
+        [
+            (1, b"l\t"),
+            (6, b"\x85\t"),
+            (11, b"\x9e\t"),
+            (14, b"\xb4\t"),
+            (36, b"<\x14"),
+            (100, b"|\x15"),
+            (165, b"\xc1\x16"),
+        ],
+    )
+    def test_get_frequency_bytes(self, channel, expected):
+        resp = helpers.get_frequency_bytes(channel)
+        assert resp == expected
+
+    def test_build_fake_frame_ies(self):
+        conf = {
+            "GENERAL": {
+                "ssid": "WLAN Pi",
+                "channel": 36,
+                "interface": "wlan1",
+                "files_path": "/var/www/html/profiler",
+            }
+        }
+        frame = helpers.build_fake_frame_ies(conf)
+        frame_bytes = bytes(frame)
+        known = b"\x00\x07WLAN Pi\x01\x08\x8c\x12\x98$\xb0H`l\x03\x01$\x05\x06\x05\x04\x00\x03\x00\x00-\x1a\xef\x19\x1b\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x000\x18\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00=\x16$\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x006\x03E\xc2\x00F\x05\x02\x00\x00\x00\x00\x7f\x08\x00\x00\x08\x00\x00\x00\x00@\xbf\x0c2\x00\x80\x03\xaa\xff\x00\x00\xaa\xff\x00\x00\xc0\x05\x00$\x00\x00\x00\xff##\t\x01\x00\x02@\x00\x04p\x0c\x80\x02\x03\x80\x04\x00\x00\x00\xaa\xff\xaa\xff{\x1c\xc7q\x1c\xc7q\x1c\xc7q\x1c\xc7q\xff\x07$\xf4?\x00\x19\xfc\xff\xdd\x18\x00P\xf2\x02\x01\x01\x8a\x00\x03\xa4\x00\x00'\xa4\x00\x00BC^\x00b2/\x00"
+        assert frame_bytes == known
 
     @pytest.mark.parametrize(
         "channel,expected",

@@ -19,6 +19,7 @@ from scapy.all import Dot11, Dot11Elt, PcapReader, PcapWriter, RadioTap, scapy
 
 __version__ = "1"
 
+
 def setup_logger(args) -> logging.Logger:
     """ Configure and set logging levels """
     if args.logging:
@@ -59,9 +60,7 @@ def setup_parser() -> argparse:
         ),
     )
     parser.add_argument(
-        metavar="<INPUT_FILE>",
-        dest="input_file",
-        help="pcap to anonymize",
+        metavar="<INPUT_FILE>", dest="input_file", help="pcap to anonymize"
     )
     parser.add_argument(
         "--logging",
@@ -78,6 +77,7 @@ def setup_parser() -> argparse:
     )
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
+
 
 def anonymize_mac(address: str, hash: dict) -> str:
     """
@@ -127,7 +127,7 @@ def anonymize_file(input_file: str, output_file: str) -> None:
                 # matches frame.fcs
 
                 crc_bytes = struct.pack(
-                    "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFFFFFF
+                    "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
                 )
                 crc_int = int.from_bytes(crc_bytes, byteorder="little")
                 logger.info("crc_int: %s", hex(crc_int))
@@ -144,15 +144,14 @@ def anonymize_file(input_file: str, output_file: str) -> None:
                 if args.skip:
                     logger.info("skipping anonymizing SSID: %s", args.skip)
                 else:
-                    ie = frame
-                    while Dot11Elt in ie:
-                        ie = ie[Dot11Elt]
-                        logger.info("ie: %s", ie.ID)
-                        if ie.ID == 0:
-                            ssid = anonymize_ssid(ie.info, ssid_number, ssid_hash)
-                            ie.len = len(ssid)
-                            ie.info = ssid
-                        ie = ie.payload
+                    dot11elt = frame.getlayer(Dot11Elt)
+                    while dot11elt:
+                        logger.info("ie: %s", dot11elt.ID)
+                        if dot11elt.ID == 0:
+                            ssid = anonymize_ssid(dot11elt.info, ssid_number, ssid_hash)
+                            dot11elt.len = len(ssid)
+                            dot11elt.info = ssid
+                        dot11elt = dot11elt.payload.getlayer(Dot11Elt)
 
                 if fcs_match:
                     # if fcs and crc originally matched, recompute new valid fcs:

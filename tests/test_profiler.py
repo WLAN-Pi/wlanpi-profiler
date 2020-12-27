@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from profiler2 import profiler
 from scapy.all import rdpcap
+
+from profiler2 import profiler
 
 
 class TestProfiler:

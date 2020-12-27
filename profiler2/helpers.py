@@ -50,7 +50,6 @@ import subprocess
 import sys
 import textwrap
 from dataclasses import dataclass
-from datetime import timedelta
 from distutils.util import strtobool
 from multiprocessing import Value
 from time import ctime
@@ -551,7 +550,7 @@ def update_manuf() -> bool:
     return True
 
 
-def verify_reporting_directories(config: dict):
+def verify_reporting_directories(config: dict) -> None:
     """ Check reporting directories exist and create if not """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -675,12 +674,17 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     else:
         frame = frame / he_capabilities / he_operation / wmm
 
+    # for gathering data to validate tests:
+    #
+    # frame_bytes = bytes(frame)
+    # print(frame_bytes)
+    # sys.exit()
     return frame
 
 
-def flag_last_object(seq):
+def flag_last_object(seq: iter):
     """ Treat the last object in an iterable differently """
-    seq = iter(seq)  # ensure this is an iterator
+    seq = iter(seq)  # ensure seq is an iterator
     _a = next(seq)
     for _b in seq:
         yield _a, False
@@ -688,12 +692,7 @@ def flag_last_object(seq):
     yield _a, True
 
 
-def bytes_to_int(x_bytes: bytes) -> int:
-    """ Convert bytes to integer """
-    return int.from_bytes(x_bytes, "big")
-
-
-def next_sequence_number(sequence_number: Value):
+def next_sequence_number(sequence_number: Value) -> int:
     """ Update a sequence number of type multiprocessing Value """
     sequence_number.value = (sequence_number.value + 1) % 4096
     return sequence_number.value
@@ -728,7 +727,7 @@ def get_ssh_destination_ip() -> Union[str, bool]:
         return False
 
 
-def generate_run_message(config: dict):
+def generate_run_message(config: dict) -> None:
     """ Create message to display to users screen """
     ssh_dest_ip = get_ssh_destination_ip()
     if config["GENERAL"].get("listen_only") is True:
@@ -755,21 +754,6 @@ def generate_run_message(config: dict):
         print(" - Enter any random 8 characters for the PSK")
         print(" - Goal is to get the client to send an association request")
         print(f"{'#' * 100}\n")
-
-
-def convert_timestamp_to_uptime(timestamp) -> str:
-    """
-    Convert timestamp field from the 802.11 beacon or probe response frame to a
-    human readable format. This frame is received by the WLAN interface.
-    :param timestamp: unix integer representing an uptime timestamp
-    :return: human readable uptime string
-    """
-    timestamp = timedelta(microseconds=timestamp)
-    timestamp = timestamp - timedelta(microseconds=timestamp.microseconds)
-    return (
-        f"{str(timestamp.days).strip().zfill(2)}d "
-        f"{str(timestamp).rpartition(',')[2].strip()}"
-    )
 
 
 @dataclass
