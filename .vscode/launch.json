@@ -10,7 +10,11 @@
             "request": "launch",
             "sudo": true,
             "module": "profiler2",
-            "args": ["--clean", "--files", "--yes"]
+            "args": [
+                "--clean",
+                "--files",
+                "--yes"
+            ]
         },
         {
             "name": "-i wlan0",
@@ -18,7 +22,12 @@
             "request": "launch",
             "sudo": true,
             "module": "profiler2",
-            "args": ["-i", "wlan0", "--logging", "debug"]
+            "args": [
+                "-i",
+                "wlan0",
+                "--logging",
+                "debug"
+            ]
         },
         {
             "name": "-i wlan1",
@@ -26,7 +35,12 @@
             "request": "launch",
             "sudo": true,
             "module": "profiler2",
-            "args": ["-i", "wlan1", "--logging", "debug"]
+            "args": [
+                "-i",
+                "wlan1",
+                "--logging",
+                "debug"
+            ]
         }
     ]
 }
