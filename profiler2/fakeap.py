@@ -109,14 +109,14 @@ class TxBeacons(object):
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
-    def every(self, interval: int, task):
+    def every(self, interval: int, task) -> None:
         """ Attempt to address beacon drift """
         start_time = time()
         while True:
             task()
             sleep(interval - ((time() - start_time) % interval))
 
-    def beacon(self):
+    def beacon(self) -> None:
         """ Update and Tx Beacon Frame """
         frame = self.beacon_frame
         with self.sequence_number.get_lock():
@@ -141,11 +141,7 @@ class TxBeacons(object):
         # self.log.debug("frame timestamp: %s", convert_timestamp_to_uptime(ts))
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
-        try:
-            self.l2socket.send(frame)
-        except OSError as error:
-            print(f"{error}; exiting...")
-            sys.exit(-1)
+        self.l2socket.send(frame)
 
 
 class Sniffer(object):
@@ -206,7 +202,7 @@ class Sniffer(object):
             filter=self.bpf_filter,
         )
 
-    def received_frame(self, packet):
+    def received_frame(self, packet) -> None:
         """ Handle incoming packets for profiling """
         if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
             if packet.addr1 == self.mac:  # if we are the receiver
@@ -223,7 +219,7 @@ class Sniffer(object):
             if packet.addr1 == self.mac:  # if we are the receiver
                 self.dot11_assoc_request_cb(packet)
 
-    def probe_response(self, probe_request):
+    def probe_response(self, probe_request) -> None:
         """ Send probe resp to assist with profiler discovery """
         frame = self.probe_response_frame
         with self.sequence_number.get_lock():
@@ -232,18 +228,13 @@ class Sniffer(object):
         self.l2socket.send(frame)
         # self.log.debug("sent probe resp to %s", probe_request.addr2)
 
-    def assoc_req(self, frame):
+    def assoc_req(self, frame) -> None:
         """ Put association request on queue for the Profiler """
-        # if frame.addr2 in self.assoc_reqs.keys():
-        #    self.log.info(
-        #        "ignoring already seen assoc req from client mac %s", frame.addr2
-        #    )
-        # else:
         self.assoc_reqs[frame.addr2] = frame
         self.log.debug("adding assoc req from %s to queue", frame.addr2)
         self.queue.put(frame)
 
-    def auth(self, receiver):
+    def auth(self, receiver) -> None:
         """ Send authentication frame to get the station to prompt an assoc request """
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
