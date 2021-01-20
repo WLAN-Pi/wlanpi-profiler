@@ -1,7 +1,7 @@
 Client Capability Logic
 =======================
 
-This logic operates on an 802.11 association request frame, looking at various tagged parameter
+The following logic operates on an 802.11 association request frame, looking at various tagged parameter
 values to determine client capabilities.
 
 1. 802.11n: inspect tagged parameter number 45 (HT Capabilities)
@@ -67,3 +67,18 @@ values to determine client capabilities.
     - c. (TBA) BSS coloring
     - d. (TBA) UL/DL OFMDA
     - e. (TBA) UL/DL MU-MIMO
+
+10. Randomized MAC address - inspect OUI of 24-bit MAC address
+    - a. check if any of these digits `2`, `6`, `a`, or `e` is located in the second hex position from the left
+        - N - MAC is not unicast local address
+        - Y - MAC is a unicast local address (private mac/randomized mac)
+
+11. MAC address manufacturer detection through heuristics 
+    - a. can MAC address be resolved by lookup of OUI in manuf db?
+        - Y - Return match
+        - N - investigate tagged parameter 221 (vendor specific)
+            - is vendor MAC in manuf database?
+                - N - Unable to match
+                - Y - Check OUI matches our heurstic
+                    - Y - Return match
+                    - N - Unable to match

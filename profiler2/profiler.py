@@ -37,69 +37,69 @@ profiler code goes here, separate from fake ap code.
 """
 
 # standard library imports
-import csv, inspect, logging
-import os, sys
+import csv
+import inspect
+import logging
+import os
+import sys
 import time
 from difflib import Differ
+from multiprocessing.queues import Queue
+from typing import Tuple
 
 # third party imports
 from manuf import manuf
-
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (
-    EXT_CAPABILITIES_TAG,
-    EXT_IE_TAG,
-    FT_CAPABILITIES_TAG,
-    HT_CAPABILITIES_TAG,
-    POWER_MIN_MAX_TAG,
-    RM_CAPABILITIES_TAG,
-    RSN_CAPABILITIES_TAG,
-    SUPPORTED_CHANNELS_TAG,
-    VHT_CAPABILITIES_TAG,
-)
+from .constants import (EXT_CAPABILITIES_IE_TAG, EXT_IE_TAG,
+                        FT_CAPABILITIES_IE_TAG, HT_CAPABILITIES_IE_TAG,
+                        POWER_MIN_MAX_IE_TAG, RM_CAPABILITIES_IE_TAG,
+                        RSN_CAPABILITIES_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
+                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
 from .helpers import Capability, flag_last_object
 
 
 class Profiler(object):
     """ Code handling analysis of client capablities """
 
-    def __init__(self, config, queue):
+    def __init__(self, config=None, queue=None):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("profiler pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.analyzed_hash = {}
         self.config = config
-        self.channel = int(config.get("GENERAL").get("channel"))
-        self.ssid = config.get("GENERAL").get("ssid")
-        self.files_path = config.get("GENERAL").get("files_path")
-        self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
-        self.ft_disabled = config.get("GENERAL").get("ft_disabled")
-        self.he_disabled = config.get("GENERAL").get("he_disabled")
-        self.reports_dir = os.path.join(self.files_path, "reports")
-        self.clients_dir = os.path.join(self.files_path, "clients")
+        if config:
+            self.channel = int(config.get("GENERAL").get("channel"))
+            self.ssid = config.get("GENERAL").get("ssid")
+            self.files_path = config.get("GENERAL").get("files_path")
+            self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+            self.ft_disabled = config.get("GENERAL").get("ft_disabled")
+            self.he_disabled = config.get("GENERAL").get("he_disabled")
+            self.reports_dir = os.path.join(self.files_path, "reports")
+            self.clients_dir = os.path.join(self.files_path, "clients")
+            self.csv_file = os.path.join(
+                self.reports_dir, f"profiler-{time.strftime('%Y-%m-%d')}.csv"
+            )
         self.client_profiled_count = 0
+        self.lookup = manuf.MacParser(update=False)
         self.last_manuf = "N/A"
-        self.csv_file = os.path.join(
-            self.reports_dir, f"profiler-{time.strftime('%Y-%m-%d')}.csv"
-        )
 
-        while True:
-            self.profile(queue)
+        if queue:
+            while True:
+                self.profile(queue)
 
     def __del__(self):
         """ Clean up while we shut down """
-        pass
 
     def is_randomized(self, mac) -> bool:
         """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
         return any(local == mac[1] for local in ["2", "6", "a", "e"])
 
-    def profile(self, queue):
+    def profile(self, queue: Queue) -> None:
         """ Handle profiling clients as they come into the queue """
         frame = queue.get()
-        capabilities = self.analyze_assoc_req(frame)
-        analysis_hash = hash(str(capabilities))
+        oui_manuf, capabilities = self.analyze_assoc_req(frame)
+        analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.debug(
                 "already seen %s (capabilities hash=%s) this session, ignoring...",
@@ -107,18 +107,16 @@ class Profiler(object):
                 analysis_hash,
             )
         else:
-            self.analyzed_hash[analysis_hash] = frame
-            # self.log.debug(
-            #    f"addr1 (TA): {frame.addr1} addr2 (RA): {frame.addr2} addr3 (SA): {frame.addr3} addr4 (DA): {frame.addr4}"
-            # )
-            self.log.debug("starting oui lookup for %s", frame.addr2)
-            lookup = manuf.MacParser(update=False)
-            oui_manuf = lookup.get_manuf(frame.addr2)
-            if oui_manuf is None:
-                if self.is_randomized(frame.addr2):
+
+            if self.is_randomized(frame.addr2):
+                if oui_manuf is None:
                     oui_manuf = "Randomized MAC"
+                else:
+                    oui_manuf = "{0} (Randomized MAC)".format(oui_manuf)
+
             self.last_manuf = oui_manuf
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
+            self.analyzed_hash[analysis_hash] = frame
             text_report = self.generate_text_report(
                 oui_manuf, capabilities, frame.addr2, self.channel
             )
@@ -132,7 +130,11 @@ class Profiler(object):
             else:
                 band = "unknown"
 
-            self.log.debug("writing text and csv report for %s", frame.addr2)
+            self.log.debug(
+                "writing text and csv report for %s (capabilities hash=%s)",
+                frame.addr2,
+                analysis_hash,
+            )
             self.write_analysis_to_file_system(
                 text_report, capabilities, frame, oui_manuf, band
             )
@@ -167,6 +169,7 @@ class Profiler(object):
                 )
 
         text_report += "\n* Reported client capabilities are dependent on available features at time of client association."
+        text_report += "\n** Reported channels do not factor local regulatory domain."
         return text_report
 
     def write_analysis_to_file_system(
@@ -268,7 +271,16 @@ class Profiler(object):
                 index += 1
                 element_data.append(byte)
             else:
-                information_elements[element_id] = element_data
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                    # map a list of data items to the key
+                    if element_id in information_elements:
+                        information_elements[element_id].append(element_data)
+                    else:
+                        information_elements[element_id] = [element_data]
+                else:
+                    # map the data to the key
+                    information_elements[element_id] = element_data
+
                 # reset vars to decode next information element
                 index = 0
                 is_index_byte = True
@@ -281,8 +293,48 @@ class Profiler(object):
                 is_index_byte = False
                 continue
             if last:
-                information_elements[element_id] = element_data
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                    # map a list of data items to the key
+                    if element_id in information_elements:
+                        information_elements[element_id].append(element_data)
+                    else:
+                        information_elements[element_id] = [element_data]
+                else:
+                    # map the data to the key
+                    information_elements[element_id] = element_data
+
         return information_elements
+
+    def resolve_oui_manuf(self, mac: str, dot11_elt_dict: dict) -> str:
+        """ Resolve client's manuf using manuf database and other heuristics """
+        log = logging.getLogger(inspect.stack()[0][3])
+
+        # log.debug("starting oui lookup for %s", mac)
+        oui_manuf = self.lookup.get_manuf(mac)
+
+        # vendor OUI that we possibly want to check for a more clear OUI match
+        low_quality = "muratama"
+
+        if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
+            # inspect vendor specific IEs and see if there's an IE with
+            # an OUI that we know can only be included if the manuf
+            # of the client is the vendor that maps to that OUI
+            if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
+                    vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                        element_data[0], element_data[1], element_data[2]
+                    )
+                    oui_manuf_vendor = self.lookup.get_manuf(vendor_mac)
+                    if oui_manuf_vendor is not None:
+                        # Matches are vendor specific IEs we know are client specific
+                        # e.g. Apple vendor specific IEs can only be found in Apple devices
+                        # Samsung may follow similar logic based on S10 5G testing, but unsure
+                        matches = ("apple", "samsung")
+                        if oui_manuf_vendor.lower().startswith(matches):
+                            oui_manuf = oui_manuf_vendor
+
+        log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
+        return oui_manuf
 
     @staticmethod
     def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> []:
@@ -292,14 +344,14 @@ class Profiler(object):
         )
         dot11n_ss = Capability(db_key="802.11n_ss", db_value=0)
 
-        if HT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
 
             spatial_streams = 0
 
             # mcs octets 1 - 4 indicate # streams supported (up to 4 streams only)
             for mcs_octet in range(3, 7):
 
-                mcs_octet_value = dot11_elt_dict[HT_CAPABILITIES_TAG][mcs_octet]
+                mcs_octet_value = dot11_elt_dict[HT_CAPABILITIES_IE_TAG][mcs_octet]
 
                 if mcs_octet_value & 255:
                     spatial_streams += 1
@@ -320,10 +372,10 @@ class Profiler(object):
         dot11ac_su_bf = Capability(db_key="802.11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="802.11ac_mu_bf", db_value=0)
 
-        if VHT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             # Check for number streams supported
-            mcs_upper_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][5]
-            mcs_lower_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][4]
+            mcs_upper_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][5]
+            mcs_lower_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][4]
             mcs_rx_map = (mcs_upper_octet * 256) + mcs_lower_octet
 
             # define the bit pair we need to look at
@@ -346,8 +398,8 @@ class Profiler(object):
             dot11ac_ss.db_value = spatial_streams
 
             # check for SU & MU beam formee support
-            mu_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][2]
-            su_octet = dot11_elt_dict[VHT_CAPABILITIES_TAG][1]
+            mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
+            su_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
 
             beam_form_mask = 16
 
@@ -375,7 +427,7 @@ class Profiler(object):
             db_key="802.11k",
             db_value=0,
         )
-        if RM_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        if RM_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             dot11k.value = "Supported"
             dot11k.db_value = 1
 
@@ -389,7 +441,7 @@ class Profiler(object):
         )
         if ft_disabled:
             dot11r.value = "Reporting disabled (--no11r option used)"
-        elif FT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        elif FT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             dot11r.value = "Supported"
             dot11r.db_value = 1
         else:
@@ -404,9 +456,9 @@ class Profiler(object):
             name="802.11v", value="Not reported*", db_key="802.11v", db_value=0
         )
 
-        if EXT_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
 
-            ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_TAG]
+            ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG]
 
             # check octet 3 exists
             if 3 <= len(ext_cap_list):
@@ -429,9 +481,9 @@ class Profiler(object):
             name="802.11w", value="Not reported", db_key="802.11w", db_value=0
         )
 
-        if RSN_CAPABILITIES_TAG in dot11_elt_dict.keys():
+        if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
 
-            rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_TAG]
+            rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG]
             rsn_len = len(rsn_cap_list) - 2
             pmf_oct = rsn_cap_list[rsn_len]
 
@@ -458,11 +510,11 @@ class Profiler(object):
             db_value="Not reported",
         )
 
-        if POWER_MIN_MAX_TAG in dot11_elt_dict.keys():
+        if POWER_MIN_MAX_IE_TAG in dot11_elt_dict.keys():
 
             # octet 3 of power capabilites
-            max_power = dot11_elt_dict[POWER_MIN_MAX_TAG][1]
-            min_power = dot11_elt_dict[POWER_MIN_MAX_TAG][0]
+            max_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][1]
+            min_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][0]
 
             # check if signed
             if min_power > 127:
@@ -486,8 +538,8 @@ class Profiler(object):
             db_key="SupportedChannels",
             db_value=None,
         )
-        if SUPPORTED_CHANNELS_TAG in dot11_elt_dict.keys():
-            channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_TAG]
+        if SUPPORTED_CHANNELS_IE_TAG in dot11_elt_dict.keys():
+            channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
             channel_list = []
 
             while channel_sets_list:
@@ -522,19 +574,20 @@ class Profiler(object):
             dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
         else:
             if EXT_IE_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[EXT_IE_TAG]:
 
-                ext_ie_id = str(dot11_elt_dict[EXT_IE_TAG][0])
+                    ext_ie_id = str(element_data[0])
 
-                dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
+                    dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
 
-                # check for 802.11ax support
-                if ext_ie_id in dot11ax_draft_ids.keys():
-                    dot11ax_draft.value = "Supported (Draft)"
-                    dot11ax_draft.db_value = 1
+                    # check for 802.11ax support
+                    if ext_ie_id in dot11ax_draft_ids.keys():
+                        dot11ax_draft.value = "Supported (Draft)"
+                        dot11ax_draft.db_value = 1
 
         return [dot11ax_draft]
 
-    def analyze_assoc_req(self, frame) -> []:
+    def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -561,6 +614,9 @@ class Profiler(object):
             frame.addr2,
             dot11_elt_dict.keys(),
         )
+
+        #  resolve manufacturer
+        oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
         # dictionary to store capabilities as we decode them
         capabilities = []
@@ -594,4 +650,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
 
-        return capabilities
+        return oui_manuf, capabilities

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import argparse, itertools, pathlib, sys
 
 import pytest
 

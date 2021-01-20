@@ -50,11 +50,17 @@ Please be aware of the following things when filing bug reports:
 
 ## Code Contributions
 
+### Before You Start
+
+To increase the chances of PR approval, first, talk to one of the core team members. Aligning your ideas with the project team will save everybody's time. 
+
 ### Pull Requests
 
 Before submitting a PR perform the following:
 
-1. Lint your code with `tox -e linters` and make sure it passes.
+1. Lint your code with `tox -e lint` and make sure it passes.
+
+1. Format your code with `tox -e format` (this basically just runs black for now).
 
 2. Create a test that validates your changes. this test should go in `/tests`.
 

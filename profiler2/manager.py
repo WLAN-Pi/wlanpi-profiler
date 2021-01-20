@@ -38,7 +38,13 @@ handle profiler
 """
 
 # standard library imports
-import inspect, logging, multiprocessing as mp, os, platform, signal, sys
+import inspect
+import logging
+import multiprocessing as mp
+import os
+import platform
+import signal
+import sys
 from datetime import datetime
 
 # third party imports
@@ -64,9 +70,12 @@ def are_we_root() -> bool:
         return False
 
 
-def start(args):
+def start(args: dict):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
+
+    if args.pytest:
+        sys.exit("pytest")
 
     if not are_we_root():
         log.error("must run with root permissions... exiting...")
@@ -91,9 +100,14 @@ def start(args):
         log.error("configuration validation failed... exiting...")
         sys.exit(-1)
 
+    if args.clean and args.files:
+        clients_dir = os.path.join(config["GENERAL"].get("files_path"), "clients")
+        helpers.files_cleanup(clients_dir, args.yes)
+        sys.exit(0)
+
     if args.clean:
         reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
-        helpers.report_cleanup(reports_dir, args.yes)
+        helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
     interface = config.get("GENERAL").get("interface")
@@ -121,7 +135,7 @@ def start(args):
     else:
         helpers.generate_run_message(config)
 
-        from .fakeap import TxBeacons, Sniffer
+        from .fakeap import Sniffer, TxBeacons
 
         boot_time = datetime.now().timestamp()
 
