@@ -1,7 +1,7 @@
 Client Capability Logic
 =======================
 
-This logic operates on an 802.11 asocuation request frame, looking at various tagged parameter
+This logic operates on an 802.11 association request frame, looking at various tagged parameter
 values to determine client capabilities.
 
 1. 802.11n: inspect tagged parameter number 45 (HT Capabilities)
@@ -53,3 +53,17 @@ values to determine client capabilities.
 7. Supported channels - inspect tagged parameter 6 (Supported Channels)
     - a. Step through each channel set octet-pair provided reporting start channel and other channels in range
         - Note: use step of 4 if start channel above number 14 (must be 5GHz channels), use step of 1 otherwise
+
+8. 802.11w: inspect tagged parameter 48 (RSN capabilities) 
+    - a. is bit 8 of 2nd last octet in the rsn capabilities field set?
+        - Y - 11w supported
+        - N - 11w not supported
+
+9. 802.11ax inspect extended tag number 35 (HE Capabilities)
+    - a. is HE capabilities tagged parameter present? 
+        - Y - 802.11ax supported
+        - N - 802.11ax not supported
+    - b. (TBA) number of spatial streams
+    - c. (TBA) BSS coloring
+    - d. (TBA) UL/DL OFMDA
+    - e. (TBA) UL/DL MU-MIMO
