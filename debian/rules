@@ -1,4 +1,4 @@
 #!/usr/bin/make -f
-
+export DH_VIRTUALENV_ARGUMENTS := --python python3
 %:
-		dh $@ --with python-virtualenv
+	dh $@ --buildsystem dh_virtualenv
