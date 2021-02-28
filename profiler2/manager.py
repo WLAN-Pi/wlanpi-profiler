@@ -86,8 +86,13 @@ def start(args: dict):
 
     log.debug("%s version %s", __name__.split(".")[0], __version__)
     log.debug("python platform version is %s", platform.python_version())
-    log.debug("scapy version is %s", scapy.__version__)
-    log.debug("args: %s", args)
+    scapy_version = ""
+    try:
+        scapy_version = scapy.__version__
+        log.debug("scapy version is %s", scapy_version)
+    except:
+        log.warn("could not get version information from scapy.__version__")
+        log.debug("args: %s", args)
 
     if args.oui_update:
         sys.exit(0) if helpers.update_manuf() else sys.exit(-1)
@@ -166,7 +171,7 @@ def start(args: dict):
         mp.Process(
             name="sniffer",
             target=Sniffer,
-            args=(config, boot_time, lock, sequence_number, queue),
+            args=(config, boot_time, lock, sequence_number, queue, args),
         ).start()
 
     from .profiler import Profiler

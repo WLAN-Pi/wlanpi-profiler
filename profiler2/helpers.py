@@ -58,8 +58,7 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
-                           get_if_raw_hwaddr)
+    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"{error}. please install manuf... exiting...")
@@ -270,6 +269,13 @@ def setup_parser() -> argparse:
         dest="files_path",
         default="/var/www/html/profiler",
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--no_sniffer_filter",
+        dest="no_sniffer_filter",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--clean",
