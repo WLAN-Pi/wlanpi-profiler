@@ -27,6 +27,11 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+debian/.debhelper/
+debian/files
+debian/wlanpi-profiler.postinst.debhelper
+debian/wlanpi-profiler.substvars
+debian/wlanpi-profiler/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
