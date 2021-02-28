@@ -27,6 +27,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# dh-virtualenv
+.pybuild/
 debian/.debhelper/
 debian/files
 debian/wlanpi-profiler.postinst.debhelper

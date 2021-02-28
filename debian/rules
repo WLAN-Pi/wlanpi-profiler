@@ -1,8 +1,9 @@
 #!/usr/bin/make -f
 export DH_VIRTUALENV_ARGUMENTS := --python python3
+export PYBUILD_NAME=wlanpi-profiler
 
 %:
-	dh $@ --with python-virtualenv 
+	dh $@ --with python-virtualenv --buildsystem=pybuild 
 
 override_dh_virtualenv:
 	dh_virtualenv --builtin-venv --python python3

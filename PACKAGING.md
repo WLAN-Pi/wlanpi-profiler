@@ -4,12 +4,10 @@ Exploratory use of dh-virtualenv for packaging, links, and services.
 
 ## Getting Started
 
-Follow the [Getting Started](https://dh-virtualenv.readthedocs.io/en/latest/tutorial.html) from dh-virtualenv docs to setup your build host.
-
 On your _build host_, install the build tools:
 
 ```
-sudo apt-get install build-essential debhelper devscripts equivs
+sudo apt-get install build-essential debhelper devscripts equivs python3-all
 ```
 
 ## Install dh-virtualenv
