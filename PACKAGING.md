@@ -10,6 +10,12 @@ On your _build host_, install the build tools:
 sudo apt-get install build-essential debhelper devscripts equivs python3-all
 ```
 
+Install mock:
+
+```
+python3 -m pip install mock
+```
+
 ## Install dh-virtualenv
 
 Some OS repositories have packages already. 
@@ -40,17 +46,11 @@ dpkg-buildpackage -us -uc -b
 sudo dpkg -i ../dh-virtualenv_<version>.deb
 ```
 
-## install mock
-
-```
-python3 -m pip install mock
-```
-
 ## build our project
 
 From the root directory of this repository run `dpkg-buildpackage -us -uc -b`. 
 
-If all is well, you should see the `deb` file at `../profiler2`:
+If all is well, you should see some output files at `../profiler2`:
 
 ```
 josh@DESKTOP-KU8SJRV:[~/profiler2]: ls ../ | grep wlanpi-
