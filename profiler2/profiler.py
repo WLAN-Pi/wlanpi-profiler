@@ -41,6 +41,7 @@ import csv
 import inspect
 import logging
 import os
+import signal
 import sys
 import time
 from difflib import Differ
@@ -74,7 +75,8 @@ class Profiler(object):
 
     def __init__(self, config=None, queue=None):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug("profiler pid: %s; parent pid: %s", os.getpid(), os.getppid())
+        self.parent_pid = os.getppid()
+        self.log.debug("profiler pid: %s; parent pid: %s", os.getpid(), self.parent_pid)
         self.analyzed_hash = {}
         self.config = config
         if config:
@@ -157,7 +159,7 @@ class Profiler(object):
                     "exiting because we were told to only analyze %s",
                     self.pcap_analysis,
                 )
-                sys.exit()
+                sys.exit(signal.SIGCHLD)
 
     @staticmethod
     def generate_text_report(
@@ -195,7 +197,7 @@ class Profiler(object):
                 os.mkdir(dest)
             except Exception:
                 log.error("problem creating %s directory", dest)
-                sys.exit(-1)
+                sys.exit(signal.SIGHUP)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
 
@@ -221,7 +223,7 @@ class Profiler(object):
                 writer.write(text_report)
         except Exception:
             log.exception("error creating flat file to dump client info (%s)", filename)
-            sys.exit(-1)
+            sys.exit(signal.SIGHUP)
 
         out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
 

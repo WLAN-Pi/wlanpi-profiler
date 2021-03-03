@@ -41,6 +41,7 @@ import datetime
 import inspect
 import logging
 import os
+import signal
 import sys
 from multiprocessing import Lock, Value
 from multiprocessing.queues import Queue
@@ -59,13 +60,6 @@ try:
     )
     from scapy.all import conf as scapyconf
     from scapy.all import sniff
-except ModuleNotFoundError as error:
-    if error.name == "scapy":
-        print(
-            "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
-        )
-        sys.exit(-1)
-
 
 # app imports
 from .constants import (
@@ -156,7 +150,7 @@ class TxBeacons(object):
             self.l2socket.send(frame)
         except OSError as error:
             print(f"{error}; exiting...")
-            sys.exit(-1)
+            sys.exit(signal.SIGHUP)
 
 
 class Sniffer(object):

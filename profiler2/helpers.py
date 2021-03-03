@@ -45,6 +45,7 @@ import logging.config
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -61,12 +62,14 @@ try:
     from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "manuf":
-        print(f"{error}. please install manuf... exiting...")
+        print(f"required module manuf not found. try installing manuf.")
     elif error.name == "scapy":
-        print(f"{error}. please install scapy... exiting...")
+        print(
+            "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
+        )
     else:
         print(f"{error}")
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # is tcpdump installed?
 try:
@@ -77,7 +80,7 @@ except Exception:
     print(
         "problem checking tcpdump version. is tcpdump installed and functioning? exiting..."
     )
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # is netstat installed?
 try:
@@ -88,7 +91,7 @@ except Exception:
     print(
         "problem checking netstat version. is netstat installed and functioning? exiting..."
     )
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # app imports
 from .__version__ import __version__
@@ -159,12 +162,14 @@ def check_interface(interface: str) -> str:
         log.warning(
             "%s interface not found in phy80211 interfaces: %s",
             interface,
-            discovered_interfaces,
+            ", ".join(discovered_interfaces),
         )
         raise ValueError(f"{interface} is not a valid interface")
     else:
         log.debug(
-            "%s is in discovered interfaces: [%s]", interface, discovered_interfaces
+            "%s is in discovered phy80211 interfaces: %s",
+            interface,
+            ", ".join(discovered_interfaces),
         )
         return interface
 
@@ -322,7 +327,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
     if acknowledged:
         pass
     elif not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
-        sys.exit(1)
+        sys.exit(signal.SIGTERM)
 
     try:
         for p in os.listdir(Path(directory)):
@@ -443,7 +448,7 @@ def validate(config: dict) -> bool:
         verify_reporting_directories(config)
     except ValueError:
         log.error("%s", sys.exc_info()[1])
-        sys.exit(-1)
+        sys.exit(signal.SIGABRT)
 
     return True
 
@@ -688,7 +693,6 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     #
     # frame_bytes = bytes(frame)
     # print(frame_bytes)
-    # sys.exit()
     return frame
 
 
