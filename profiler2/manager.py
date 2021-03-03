@@ -58,7 +58,7 @@ from .__version__ import __version__
 
 def signal_handler(sig, frame):
     """ Suppress stack traces when intentionally closed """
-    print("SIGINT or Control-C detected... exiting...")
+    print(f"SIGINT or Control-C detected... process {os.getpid()} is exiting...")
     sys.exit(0)
 
 
@@ -78,7 +78,7 @@ def start(args: dict):
         sys.exit("pytest")
 
     if not are_we_root():
-        log.error("must run with root permissions... exiting...")
+        log.error("profiler must be run with root permissions... exiting...")
         sys.exit(-1)
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -95,6 +95,7 @@ def start(args: dict):
         log.debug("args: %s", args)
 
     if args.oui_update:
+        # run manuf oui update and exit
         sys.exit(0) if helpers.update_manuf() else sys.exit(-1)
 
     config = helpers.setup_config(args)
@@ -150,24 +151,24 @@ def start(args: dict):
         if args.no_interface_prep:
             log.warning("skipping interface prep...")
         else:
-            log.info("start interface prep...")
+            log.debug("interface prep...")
             if not helpers.prep_interface(interface, "monitor", channel):
                 log.error("failed to prep interface")
                 print("exiting...")
                 sys.exit(-1)
-            log.info("done prep interface...")
+            log.debug("finish interface prep...")
 
         if listen_only:
             log.info("beacon process not started due to listen only mode")
         else:
-            log.info("starting beacon process")
+            log.debug("beacon process")
             mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
                 args=(config, boot_time, lock, sequence_number),
             ).start()
 
-        log.info("starting sniffer process")
+        log.debug("sniffer process")
         mp.Process(
             name="sniffer",
             target=Sniffer,
@@ -176,5 +177,5 @@ def start(args: dict):
 
     from .profiler import Profiler
 
-    log.info("starting profiler process")
+    log.debug("profiler process")
     mp.Process(name="profiler", target=Profiler, args=(config, queue)).start()
