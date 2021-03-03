@@ -92,7 +92,7 @@ except Exception:
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS
+from .constants import CHANNELS, CONFIG_FILE
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -255,12 +255,11 @@ def setup_parser() -> argparse:
         dest="pcap_analysis",
         help="analyze first packet of pcap (expecting an association request frame)",
     )
-    config = "/etc/profiler2/config.ini"
     parser.add_argument(
         "--config",
         type=str,
         metavar="<FILE>",
-        default=config,
+        default=CONFIG_FILE,
         help="customize path for configuration file (default: %(default)s)",
     )
     parser.add_argument(
@@ -474,10 +473,10 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 check=True,
                 capture_output=True,
             )
-            log.debug(
-                "driver: %s, mac: %s",
-                driver.stdout.split("/")[-1].replace("\n", ""),
+            log.info(
+                "mac: %s, driver: %s",
                 mac.stdout.replace("\n", ""),
+                driver.stdout.split("/")[-1].replace("\n", ""),
             )
             regdomain = subprocess.run(
                 ["iw", "reg", "get"],
@@ -486,10 +485,15 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 check=True,
                 capture_output=True,
             )
-            log.debug(
-                "reg domain: %s",
-                [line for line in regdomain.stdout.split("\n") if "country" in line],
-            )
+            regdomain = [
+                line for line in regdomain.stdout.split("\n") if "country" in line
+            ]
+
+            if "UNSET" in "".join(regdomain):
+                log.warn("UNSET REG DOMAIN DETECTED!")
+            else:
+                log.debug("reg domain: %s", regdomain)
+
             for cmd in commands:
                 cp = subprocess.run(
                     cmd, encoding="utf-8", shell=False, capture_output=True

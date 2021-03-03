@@ -54,7 +54,6 @@ from scapy.all import wrpcap
 # app imports
 from .constants import (
     EXT_CAPABILITIES_IE_TAG,
-    EXT_IE_TAG,
     FT_CAPABILITIES_IE_TAG,
     HT_CAPABILITIES_IE_TAG,
     POWER_MIN_MAX_IE_TAG,
@@ -63,6 +62,9 @@ from .constants import (
     SUPPORTED_CHANNELS_IE_TAG,
     VENDOR_SPECIFIC_IE_TAG,
     VHT_CAPABILITIES_IE_TAG,
+    IE_EXT_TAG,
+    HE_CAPABILITIES_IE_EXT_TAG,
+    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
 )
 from .helpers import Capability, flag_last_object
 
@@ -278,7 +280,7 @@ class Profiler(object):
                 index += 1
                 element_data.append(byte)
             else:
-                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, IE_EXT_TAG]:
                     # map a list of data items to the key
                     if element_id in information_elements:
                         information_elements[element_id].append(element_data)
@@ -300,7 +302,7 @@ class Profiler(object):
                 is_index_byte = False
                 continue
             if last:
-                if element_id in [VENDOR_SPECIFIC_IE_TAG, EXT_IE_TAG]:
+                if element_id in [VENDOR_SPECIFIC_IE_TAG, IE_EXT_TAG]:
                     # map a list of data items to the key
                     if element_id in information_elements:
                         information_elements[element_id].append(element_data)
@@ -571,28 +573,36 @@ class Profiler(object):
     @staticmethod
     def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
         """ Check for 802.11ax support """
-        dot11ax_draft = Capability(
-            name="802.11ax_draft",
+        dot11ax = Capability(
+            name="802.11ax",
             value="Not supported",
-            db_key="802.11ax_draft",
+            db_key="802.11ax",
             db_value="0",
         )
+        six_ghz = Capability(
+            name="6 GHz",
+            value="Not supported",
+            db_key="six_ghz",
+            db_value="0",
+        )
+
         if he_disabled:
-            dot11ax_draft.value = "Reporting disabled (--no11ax option used)"
+            dot11ax.value = "Reporting disabled (--no11ax option used)"
         else:
-            if EXT_IE_TAG in dot11_elt_dict.keys():
-                for element_data in dot11_elt_dict[EXT_IE_TAG]:
+            if IE_EXT_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[IE_EXT_TAG]:
 
-                    ext_ie_id = str(element_data[0])
+                    ext_ie_id = int(str(element_data[0]))
 
-                    dot11ax_draft_ids = {"35": "802.11ax (Draft)"}
+                    if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
+                        dot11ax.value = "Supported"
+                        dot11ax.db_value = 1
+                        continue
+                    if ext_ie_id == HE_6_GHZ_BAND_CAP_IE_EXT_TAG:
+                        six_ghz.value = "Supported"
+                        six_ghz.db_value = 1
 
-                    # check for 802.11ax support
-                    if ext_ie_id in dot11ax_draft_ids.keys():
-                        dot11ax_draft.value = "Supported (Draft)"
-                        dot11ax_draft.db_value = 1
-
-        return [dot11ax_draft]
+        return [dot11ax]  # , six_ghz]
 
     def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """

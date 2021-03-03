@@ -172,7 +172,7 @@ class Sniffer(object):
         args,
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug("sniffer %s; parent pid: %s", os.getpid(), os.getppid())
+        self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
 
         self.queue = queue
         self.boot_time = boot_time
