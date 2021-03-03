@@ -37,6 +37,17 @@
             "module": "profiler2",
             "args": [
                 "-i",
+                "wlan1"
+            ]
+        },
+        {
+            "name": "-i wlan1 verbose",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "-i",
                 "wlan1",
                 "--logging",
                 "debug"
