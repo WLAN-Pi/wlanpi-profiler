@@ -52,6 +52,21 @@
                 "--logging",
                 "debug"
             ]
+        },
+        {
+            "name": "--pcap",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "--pcap",
+                "~/dev/profiler2/tests/pcaps/iPhone11ProMax.pcap_randomized.pcap",
+                "--logging",
+                "debug",
+                "-i",
+                "wlan99",
+            ]
         }
     ]
 }

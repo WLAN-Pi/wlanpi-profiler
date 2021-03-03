@@ -32,6 +32,7 @@ MANIFEST
 .pybuild/
 debian/.debhelper/
 debian/files
+debian/wlanpi-profiler.postrm.debhelper
 debian/wlanpi-profiler.postinst.debhelper
 debian/wlanpi-profiler.substvars
 debian/wlanpi-profiler/

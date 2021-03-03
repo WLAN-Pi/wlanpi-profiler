@@ -327,7 +327,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
     if acknowledged:
         pass
     elif not input("Are you sure? (y/n): ").lower().strip()[:1] == "y":
-        sys.exit(signal.SIGTERM)
+        sys.exit(1)
 
     try:
         for p in os.listdir(Path(directory)):
@@ -508,7 +508,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
 
             return True
         except Exception:
-            log.exception("error setting wlan interface config %s", cp.stderr)
+            log.error("error setting wlan interface config %s", cp.stderr)
     else:
         log.error("failed to prep interface config...")
         return False

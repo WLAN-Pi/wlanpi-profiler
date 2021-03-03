@@ -49,17 +49,16 @@ from time import sleep, time
 
 # third party imports
 
-try:
-    from scapy.all import (
-        Dot11,
-        Dot11Auth,
-        Dot11Beacon,
-        Dot11Elt,
-        Dot11ProbeResp,
-        RadioTap,
-    )
-    from scapy.all import conf as scapyconf
-    from scapy.all import sniff
+from scapy.all import (
+    Dot11,
+    Dot11Auth,
+    Dot11Beacon,
+    Dot11Elt,
+    Dot11ProbeResp,
+    RadioTap,
+)
+from scapy.all import conf as scapyconf
+from scapy.all import sniff
 
 # app imports
 from .constants import (
@@ -69,7 +68,7 @@ from .constants import (
     DOT11_SUBTYPE_PROBE_REQ,
     DOT11_SUBTYPE_PROBE_RESP,
     DOT11_SUBTYPE_REASSOC_REQ,
-    DOT11_TYPE_MANAGEMENT,
+    DOT11_TYPE_MANAGEMENT
 )
 from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 

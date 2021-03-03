@@ -13,10 +13,10 @@ Our goal is to use dh-virtualenv for packaging, PATH links, systemd service inst
 On your _build host_, install the build tools (these are only needed on your build host):
 
 ```
-sudo apt-get install build-essential debhelper devscripts equivs python3-all
+sudo apt-get install build-essential debhelper devscripts equivs python3-pip python3-all python3-dev python3-setuptools dh-virtualenv
 ```
 
-Install mock:
+Install Python depends:
 
 ```
 python3 -m pip install mock
@@ -24,7 +24,22 @@ python3 -m pip install mock
 
 This appears to be required, otherwise the tooling will fail when tries to evaluate whether it needs to run tests or not.
 
-## Install dh-virtualenv
+## Build our project
+
+From the root directory of this repository run `dpkg-buildpackage -us -uc -b`. 
+
+If you are found favorable by the packaging gods, you should see some output files at `../profiler2` like this:
+
+```
+josh@DESKTOP-KU8SJRV:[~/profiler2]: ls ../ | grep wlanpi-
+wlanpi-profiler_0.1-1_amd64.buildinfo
+wlanpi-profiler_0.1-1_amd64.changes
+wlanpi-profiler_0.1-1_amd64.deb
+```
+
+## APPENDIX
+
+### Installing dh-virtualenv
 
 Some OS repositories have packages already. 
 
@@ -32,7 +47,7 @@ Some OS repositories have packages already.
 sudo apt install dh-virtualenv
 ```
 
-If not available, build it:
+If not available, you can build it from source:
 
 ```
 cd ~
@@ -53,17 +68,3 @@ dpkg-buildpackage -us -uc -b
 # dependencies when doing this)
 sudo dpkg -i ../dh-virtualenv_<version>.deb
 ```
-
-## build our project
-
-From the root directory of this repository run `dpkg-buildpackage -us -uc -b`. 
-
-If you are found favorable and all goes well, you should see some output files at `../profiler2` like this:
-
-```
-josh@DESKTOP-KU8SJRV:[~/profiler2]: ls ../ | grep wlanpi-
-wlanpi-profiler_0.1-1_amd64.buildinfo
-wlanpi-profiler_0.1-1_amd64.changes
-wlanpi-profiler_0.1-1_amd64.deb
-```
-

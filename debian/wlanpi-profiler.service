@@ -1,0 +1,13 @@
+# wlanpi-profiler.service
+
+[Unit]
+Description=client capabilities profiler
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/usr/sbin/profiler
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes

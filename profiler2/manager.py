@@ -82,7 +82,6 @@ def start(args: dict):
         sys.exit(-1)
 
     signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGCHLD, signal_handler)
     signal.signal(signal.SIGHUP, signal_handler)
     helpers.setup_logger(args)
 
@@ -158,8 +157,7 @@ def start(args: dict):
         else:
             log.debug("interface prep...")
             if not helpers.prep_interface(interface, "monitor", channel):
-                log.error("failed to prep interface")
-                print("exiting...")
+                log.error("failed to prep interface... exiting...")
                 sys.exit(-1)
             log.debug("finish interface prep...")
 
