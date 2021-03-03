@@ -1,10 +1,16 @@
-# profiler packaging with dh-virtualenv
+# Debian Packaging Instructions for Profiler
 
-Exploratory use of dh-virtualenv for packaging, links, and services.
+We're using spotify's dh-virtualenv to provide debian packaging and deployment of our Python code inside a virtualenv.
+
+dh-virtualenv is like a wrapper or extension around existing debian tooling.
+
+You can find the official page [here](https://github.com/spotify/dh-virtualenv).
+
+Our goal is to use dh-virtualenv for packaging, PATH links, systemd service installation, and deployment virtualization.
 
 ## Getting Started
 
-On your _build host_, install the build tools:
+On your _build host_, install the build tools (these are only needed on your build host):
 
 ```
 sudo apt-get install build-essential debhelper devscripts equivs python3-all
@@ -15,6 +21,8 @@ Install mock:
 ```
 python3 -m pip install mock
 ```
+
+This appears to be required, otherwise the tooling will fail when tries to evaluate whether it needs to run tests or not.
 
 ## Install dh-virtualenv
 
@@ -50,7 +58,7 @@ sudo dpkg -i ../dh-virtualenv_<version>.deb
 
 From the root directory of this repository run `dpkg-buildpackage -us -uc -b`. 
 
-If all is well, you should see some output files at `../profiler2`:
+If you are found favorable and all goes well, you should see some output files at `../profiler2` like this:
 
 ```
 josh@DESKTOP-KU8SJRV:[~/profiler2]: ls ../ | grep wlanpi-

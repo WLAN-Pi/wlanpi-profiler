@@ -1,7 +1,18 @@
 [Unit]
-Description=profiler2 wlan client analyzer service
+Description=service for a wlan client capabilities analyzer
 After=multi-user.target
+
+# hardening
+PrivateTmp=yes
+ReadWritePaths=/var/www/html
+ProtectSystem=strict
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=true
 
 [Service]
 Type=idle
-ExecStart=/opt/wlanpi/pipx/bin/profiler
+ExecStart=/usr/sbin/profiler
