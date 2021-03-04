@@ -59,7 +59,8 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
+    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
+                           get_if_raw_hwaddr)
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"required module manuf not found. try installing manuf.")

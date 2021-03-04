@@ -1,4 +1,12 @@
-Release 1.0.5 (work in progress)
+Release 1.0.6 (WIP)
+
+- Debian packaging
+- Output to screen less noisy by default
+- Allow pcap file to be analyzed when no WLAN NICs are detected
+- Remove draft label from 802.11ax detection
+- Update documentation
+
+Release 1.0.5
 
 - Add support for deleting profiled files (.txt and .pcap) in addition to reports
 - Improve test coverage
@@ -42,6 +50,7 @@ Release 1.0.0-alpha2
 
 Release 1.0.0-alpha1
 
+- Bump major to 1 because package is in production WLAN Pi image.
 - Create and change default branch from master to main
 - Fix handling of `--no11r` and `--no11ax` modes from either CLI args or config file
 - Menu mode tweaks and is now enabled by default

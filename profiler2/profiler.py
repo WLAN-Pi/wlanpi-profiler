@@ -53,20 +53,13 @@ from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (
-    EXT_CAPABILITIES_IE_TAG,
-    FT_CAPABILITIES_IE_TAG,
-    HT_CAPABILITIES_IE_TAG,
-    POWER_MIN_MAX_IE_TAG,
-    RM_CAPABILITIES_IE_TAG,
-    RSN_CAPABILITIES_IE_TAG,
-    SUPPORTED_CHANNELS_IE_TAG,
-    VENDOR_SPECIFIC_IE_TAG,
-    VHT_CAPABILITIES_IE_TAG,
-    IE_EXT_TAG,
-    HE_CAPABILITIES_IE_EXT_TAG,
-    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-)
+from .constants import (EXT_CAPABILITIES_IE_TAG, FT_CAPABILITIES_IE_TAG,
+                        HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+                        HE_CAPABILITIES_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
+                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
+                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
+                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
+                        VHT_CAPABILITIES_IE_TAG)
 from .helpers import Capability, flag_last_object
 
 
