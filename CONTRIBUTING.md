@@ -50,6 +50,21 @@ Please be aware of the following things when filing bug reports:
 
 ## Code Contributions
 
+### Development Setup  ('without pip install or pipx', 'may be recommended for development work'):
+
+```
+git clone <repo>
+cd <repo>
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
+sudo python3 -m profiler2 
+sudo python3 -m profiler2 <optional params>
+sudo python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
+```
+
+- note that package name is `profiler2` while the console_scripts entry point is `profiler`.
+
 ### Before You Start
 
 To increase the chances of PR approval, first, talk to one of the core team members. Aligning your ideas with the project team will save everybody's time. 

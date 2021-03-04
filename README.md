@@ -2,14 +2,14 @@
 
 # profiler2
 
-profiler2 is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
+profiler is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
 The primary purpose is to automate the collection and analysis of association request frames.
 
 It performs two primary functions:
 
-1. creates a "fake" Access Point
-2. "profiles" attempted client association requests (which contain claimed capabilities) 
+1. advertises a "fake" Access Point
+2. "profiles" any attempted client association requests (which contain the client's claimed capabilities) 
 
 ## why?
 
@@ -17,7 +17,7 @@ Understanding the various client capabilities found in a particular environment 
 
 The WLAN designer may desire to factor the capabilities of expected clients in their design output.
 
-The WLAN troubleshooter may understand better what they are looking for when knowing the capabilities of the client.
+The WLAN troubleshooter may understand better issues they are uncovering when knowing the capabilities of the client.
 
 ## this matters because capabilities vary
 
@@ -29,36 +29,50 @@ However, please note that the client will match the capabilities advertised by a
 
 The profiler attempts to address this problem by advertising the highest-level feature sets.   
 
-## viewing client results and reports (*WARNING* how/where to view results will change in future versions)
+## how to get started?
 
 When the client attempts association to the profilers fake AP, it will send an association frame. 
 
-The capabilities of a client are determined based on analyzing the association frame. 
+The capabilities of a client are determined based on the tool analyzing the association frame. 
 
 If running directly from a terminal, once profiled, a text report prints in real-time to the screen and results write to a local directory on the WLAN Pi host. 
 
-Results include a copy of the text report and the association frame in PCAP format. The result is also saved to a `.csv` report.
+Saved results include a copy of the text report and the association frame in PCAP format, and the result is appended to a rotating `.csv` report.
 
-Results and reports can be retrieved from the WebUI of the WLAN PI by browsing to `http://<wlanpi_ip_addr>/profiler`.
+1. Start the profiler:
 
-## client capabilities diff (*experimental*)
+- ensure a supported WLAN NIC is plugged into the WLAN Pi
 
-When a client is profiled, a hash of the capabilities is calculated and stored in memory. 
+1a. Starting the profiler service using the Front Panel Menu System (FPMS):
 
-If subsequent association requests are seen from the same client, the previously calculated hash is compared to what is already in memory.
+- Navigate to `Menu` > `Apps` > `Profiler` > `Start`
 
-If the hash is the same, the additional association request is ignored. 
+1b. Starting the service manually:
 
-If the hash is different, capabilities are profiled and a text diff of the client report is saved.
+- `sudo service wlanpi-profiler start|stop|status`
 
-# installation (TODO: change for Debian package)
+1c. Starting from the terminal:
 
-profiler2 is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image, but if you want to install it yourself, here is what you need.
+- `sudo profiler`
+
+2. Profile the client:
+
+- once profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
+- connect a client and enter any random 8 characters for the PSK
+- note the client will expectedly fail authentication but we should receive the association request
+
+3. Viewing the results:
+
+You can look on the WebUI (http://<IPv4_of_WLANPi>/profiler) or on the filesystem at `/var/www/html/profiler`.
+
+## installation
+
+profiler is already included in the [WLAN Pi](https://github.com/WLAN-Pi/) image, but if you want to install it yourself, here is what you need.
 
 General requirements:
 
 - adapter (and driver) which supports both monitor mode and packet injection
-  - rtl88XXau and mt76x2u are tested regularly (everything else is experimental and not officially supported)
+  - mt76x2u (recommended) and rtl88XXau are tested regularly (everything else is experimental and not officially supported)
 - elevated permissions
 
 Package requirements:
@@ -66,7 +80,7 @@ Package requirements:
 - Python version 3.7 or higher
 - `iw`, `netstat`, and `tcpdump` tools installed on the host
 
-### manual installation example with pipx (recommended)
+### manual installation example with pipx (this will change in the near future)
 
 ```
 sudo -i
@@ -81,7 +95,7 @@ python3 -m pipx ensurepath
 # install profiler from github
 pipx install git+https://github.com/WLAN-Pi/profiler2.git
 
-# set reg domain (some adapters/drivers require this for Tx in 5 GHz)
+# set reg domain (some adapters/drivers require this in order to Tx in 5 GHz bands)
 iw reg set US
 ```
 
@@ -90,21 +104,6 @@ And run the profiler2 console script like this:
 ```
 sudo profiler
 ```
-
-### development installation ('without pip install or pipx', 'recommended for development work'):
-
-```
-git clone <repo>
-cd <repo>
-virtualenv venv
-source venv/bin/activate
-pip install -r requirements.txt
-sudo python3 -m profiler2 
-sudo python3 -m profiler2 <optional params>
-sudo python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
-```
-
-- note that package name is `profiler2` while the console_scripts entry point is `profiler`.
 
 # usage
 
@@ -127,18 +126,13 @@ optional arguments:
   -s SSID               set profiler SSID
   --hostname_ssid       use the WLAN Pi's hostname as SSID name
   --noAP                enable listen only mode (Rx only)
-  --11r                 turn on 802.11r Fast Transition (FT) reporting
-                        (override --config file)
+  --11r                 turn on 802.11r Fast Transition (FT) reporting (override --config file)
   --no11r               turn off 802.11r Fast Transition (FT) reporting
-  --11ax                turn on 802.11ax High Efficiency (HE) reporting
-                        (override --config file)
-  --no11ax              turn off 802.11ax High Efficiency (HE) reporting                                                                       
-  --pcap <FILE>         analyze first packet of pcap (expecting an association                                                                 
-                        request frame)
-  --config <FILE>       customize path for configuration file (default:
-                        /etc/wlanpi-profiler/config.ini)
-  --files_path <PATH>   customize default directory where analysis is saved on                                                                 
-                        local system (default: /var/www/html/profiler)
+  --11ax                turn on 802.11ax High Efficiency (HE) reporting (override --config file)
+  --no11ax              turn off 802.11ax High Efficiency (HE) reporting   
+  --pcap <FILE>         analyze first packet of pcap (expecting an association request frame)
+  --config <FILE>       customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
+  --files_path <PATH>   customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
   --oui_update          initiates Internet update of OUI database
   --logging [{debug,warning}]
                         change logging output
@@ -182,13 +176,23 @@ sudo profiler --pcap assoc_frame.pcap
 sudo profiler --logging debug
 ```
 
-## configuration file support (todo: change)
+## feature: overriding defaults with configuration file support
 
-To change the default operation of the script (without passing in CLI args), on the WLAN Pi, a configuration file can be found at `/etc/profiler2/config.ini`. 
+To change the default operation of the script (without passing in CLI args), on the WLAN Pi, a configuration file can be found at `/etc/wlanpi-profiler/config.ini`. 
 
 This can be used as a way to modify settings loaded at runtime such as channel, SSID, and interface. 
 
-## MAC OUI database update
+## feature: client capabilities diff
+
+When a client is profiled, a hash of the capabilities is calculated and stored in memory. 
+
+If subsequent association requests are seen from the same client, the previously calculated hash is compared to what is already in memory.
+
+If the hash is the same, the additional association request is ignored. 
+
+If the hash is different, capabilities are profiled and a text diff of the client report is saved.
+
+## feature: MAC OUI database update
 
 A lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. this is a wrapper around a Python module called `manuf` which uses a local flat file for OUI lookup. 
 
