@@ -2,3 +2,5 @@ tox==3.17.1
 coverage-badge==1.0.1
 scapy==2.4.4
 manuf==1.1.1
+isort==5.7.0
+autoflake==1.4
