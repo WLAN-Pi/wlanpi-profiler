@@ -179,7 +179,7 @@ class Profiler(object):
                     "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
                 )
 
-        text_report += "\n* Reported client capabilities are dependent on available features at time of client association."
+        text_report += "\n* Reported client capabilities are dependent on available features at the time of client association."
         text_report += "\n** Reported channels do not factor local regulatory domain."
         return text_report
 
