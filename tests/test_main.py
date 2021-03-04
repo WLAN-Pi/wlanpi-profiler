@@ -14,8 +14,7 @@ fake_version_info = (3, 6)
 def test_version():
     with pytest.raises(SystemExit) as pytest_wrapped_exit:
         from profiler2 import __main__
-
-        assert pytest_wrapped_exit.type == SystemExit
+    assert pytest_wrapped_exit.type == SystemExit
 
 
 @patch("sys.platform", "win32")
@@ -42,4 +41,4 @@ def test_init():
             with patch.object(__main__.sys, "exit") as mock_exit:
                 __main__.init()
 
-                assert mock_exit.call_args[0][0] == 42
+    assert mock_exit.call_args[0][0] == 42
