@@ -40,6 +40,7 @@ fake ap code handling beaconing and sniffing for the profiler
 import datetime
 import inspect
 import logging
+import multiprocessing
 import os
 import signal
 import sys
@@ -47,26 +48,22 @@ from multiprocessing import Lock, Value
 from multiprocessing.queues import Queue
 from time import sleep, time
 
-from scapy.all import Dot11, Dot11Auth, Dot11Beacon, Dot11Elt, Dot11ProbeResp, RadioTap
+from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt, Dot11ProbeResp,
+                       RadioTap)
 from scapy.all import conf as scapyconf
 from scapy.all import sniff
 
 # app imports
-from .constants import (
-    DOT11_SUBTYPE_ASSOC_REQ,
-    DOT11_SUBTYPE_AUTH_REQ,
-    DOT11_SUBTYPE_BEACON,
-    DOT11_SUBTYPE_PROBE_REQ,
-    DOT11_SUBTYPE_PROBE_RESP,
-    DOT11_SUBTYPE_REASSOC_REQ,
-    DOT11_TYPE_MANAGEMENT,
-)
+from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
+                        DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
+                        DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
+                        DOT11_TYPE_MANAGEMENT)
 from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
 # third party imports
 
 
-class TxBeacons(object):
+class TxBeacons(multiprocessing.Process):
     """ Handle Tx of fake AP frames """
 
     def __init__(
@@ -76,6 +73,7 @@ class TxBeacons(object):
         lock: Lock,
         sequence_number: Value,
     ):
+        super(TxBeacons, self).__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
@@ -141,11 +139,13 @@ class TxBeacons(object):
         try:
             self.l2socket.send(frame)
         except OSError as error:
-            print(f"{error}; exiting...")
-            sys.exit(signal.SIGHUP)
+            for event in ("Network is down", "No such device"):
+                if event in error.strerror:
+                    self.log.error(f"{error}; exiting...")
+                    sys.exit(signal.SIGTERM)
 
 
-class Sniffer(object):
+class Sniffer(multiprocessing.Process):
     """ Handle sniffing probes and association requests """
 
     def __init__(
@@ -157,6 +157,7 @@ class Sniffer(object):
         queue: Queue,
         args,
     ):
+        super(Sniffer, self).__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
 

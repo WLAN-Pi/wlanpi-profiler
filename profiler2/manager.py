@@ -43,9 +43,9 @@ import logging
 import multiprocessing as mp
 import os
 import platform
-import signal
 import sys
 from datetime import datetime
+from signal import SIGINT, signal
 
 # third party imports
 import scapy
@@ -56,10 +56,11 @@ from . import helpers
 from .__version__ import __version__
 
 
-def signal_handler(signum, stack):
-    """ Suppress stack traces when intentionally closed """
-    print(f"{signal.Signals(signum).name} detected... exiting...")
-    sys.exit(0)
+def signal_handler(signum, frame):
+    """ handle noisy keyboardinterrupt """
+    if signum == 2:
+        print(f"profiler PID {os.getpid()} detected SIGINT or Control-C... exiting...")
+        sys.exit(2)
 
 
 def are_we_root() -> bool:
@@ -81,8 +82,6 @@ def start(args: dict):
         log.error("profiler must be run with root permissions... exiting...")
         sys.exit(-1)
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGHUP, signal_handler)
     helpers.setup_logger(args)
 
     log.debug("%s version %s", __name__.split(".")[0], __version__)
@@ -111,6 +110,10 @@ def start(args: dict):
         helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
+    signal(SIGINT, signal_handler)
+
+    processes = []
+    finished_processes = []
     queue = mp.Queue()
     pcap_analysis = config.get("GENERAL").get("pcap_analysis")
     parent_pid = os.getpid()
@@ -143,8 +146,6 @@ def start(args: dict):
         channel = int(config.get("GENERAL").get("channel"))
         listen_only = config.get("GENERAL").get("listen_only")
 
-        helpers.generate_run_message(config)
-
         from .fakeap import Sniffer, TxBeacons
 
         boot_time = datetime.now().timestamp()
@@ -161,24 +162,45 @@ def start(args: dict):
                 sys.exit(-1)
             log.debug("finish interface prep...")
 
+        helpers.generate_run_message(config)
+
         if listen_only:
             log.info("beacon process not started due to listen only mode")
         else:
             log.debug("beacon process")
-            mp.Process(
+            txbeacons = mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
                 args=(config, boot_time, lock, sequence_number),
-            ).start()
+            )
+            processes.append(txbeacons)
+            txbeacons.start()
 
         log.debug("sniffer process")
-        mp.Process(
+        sniffer = mp.Process(
             name="sniffer",
             target=Sniffer,
             args=(config, boot_time, lock, sequence_number, queue, args),
-        ).start()
+        )
+        processes.append(sniffer)
+        sniffer.start()
 
     from .profiler import Profiler
 
     log.debug("profiler process")
-    mp.Process(name="profiler", target=Profiler, args=(config, queue)).start()
+    profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
+    processes.append(profiler)
+    profiler.start()
+
+    shutdown = False
+
+    while processes:
+        for process in processes:
+            if shutdown:
+                process.kill()
+            if process.exitcode is not None:
+                log.debug(process)
+                processes.remove(process)
+                finished_processes.append(process)
+                if process.exitcode == 15:
+                    shutdown = True

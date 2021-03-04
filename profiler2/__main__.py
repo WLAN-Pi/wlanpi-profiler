@@ -47,15 +47,8 @@ def main():
 
     parser = helpers.setup_parser()
     args = parser.parse_args()
+
     manager.start(args)
-
-    import asyncio
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_forever()
-    finally:
-        loop.close()
 
 
 def init():
