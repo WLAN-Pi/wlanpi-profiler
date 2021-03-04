@@ -779,3 +779,8 @@ class Capability:
     value: str = None
     db_key: str = None
     db_value: int = 0
+
+
+def get_bit(byteval, index) -> bool:
+    """ retrieve bit value from byte at provided index """
+    return (byteval & (1 << index)) != 0

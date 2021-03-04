@@ -41,29 +41,27 @@ Saved results include a copy of the text report and the association frame in PCA
 
 1. Start the profiler:
 
-- ensure a supported WLAN NIC is plugged into the WLAN Pi
+    - Ensure a supported WLAN NIC is plugged into the WLAN Pi
 
-1a. Starting the profiler service using the Front Panel Menu System (FPMS):
+    1. Starting the profiler service using the Front Panel Menu System (FPMS):
+        - Navigate to `Menu` > `Apps` > `Profiler` > `Start`
 
-- Navigate to `Menu` > `Apps` > `Profiler` > `Start`
-
-1b. Starting the service manually:
-
-- `sudo service wlanpi-profiler start|stop|status`
-
-1c. Starting from the terminal:
-
-- `sudo profiler`
+    2. Starting the service manually:
+        - `sudo service wlanpi-profiler start|stop|status`
+    3. Starting from the terminal:
+        - `sudo profiler`
 
 2. Profile the client:
 
-- once profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
-- connect a client and enter any random 8 characters for the PSK
-- note the client will expectedly fail authentication but we should receive the association request
+    - once profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
+
+    - connect a client and enter any random 8 characters for the PSK
+
+    - note the client will expectedly fail authentication but we should receive the association request
 
 3. Viewing the results:
 
-You can look on the WebUI (http://<IPv4_of_WLANPi>/profiler) or on the filesystem at `/var/www/html/profiler`.
+    - You can look on the WebUI (http://<IPv4_of_WLANPi>/profiler) or on the filesystem at `/var/www/html/profiler`.
 
 ## installation
 

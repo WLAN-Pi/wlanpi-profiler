@@ -67,7 +67,7 @@ from .constants import (
     VENDOR_SPECIFIC_IE_TAG,
     VHT_CAPABILITIES_IE_TAG,
 )
-from .helpers import Capability, flag_last_object
+from .helpers import Capability, flag_last_object, get_bit
 
 
 class Profiler(object):
@@ -588,6 +588,10 @@ class Profiler(object):
             db_value="0",
         )
 
+        twt = Capability(name="TWT", value="Not supported", db_key="twt", db_value=0)
+        dot11ax_ss = Capability(db_key="802.11ax_ss", db_value=0)
+        dot11ax_su_bf = Capability(db_key="802.11ax_su_bf", db_value=0)
+
         if he_disabled:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
         else:
@@ -599,12 +603,53 @@ class Profiler(object):
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
+
+                        twt_octet = element_data[1]
+
+                        if get_bit(twt_octet, 1):
+                            twt.value = "Supported"
+                            twt.db_value = 1
+
+                        # Check for number streams supported
+                        mcs_upper_octet = element_data[19]
+                        mcs_lower_octet = element_data[18]
+                        mcs_rx_map = (mcs_upper_octet * 256) + mcs_lower_octet
+
+                        # define the bit pair we need to look at
+                        spatial_streams = 0
+                        stream_mask = 3
+
+                        # move through each bit pair & test for '10' (stream supported)
+                        for _mcs_bits in range(1, 9):
+
+                            if (mcs_rx_map & stream_mask) != stream_mask:
+
+                                # stream mask bits both '1' when mcs map range not supported
+                                spatial_streams += 1
+
+                            # shift to next mcs range bit pair (stream)
+                            stream_mask = stream_mask * 4
+
+                        dot11ax.value = f"Supported ({spatial_streams}ss)"
+                        dot11ax_ss.db_value = spatial_streams
+
+                        # check for SU beam formee support
+                        su_octet = element_data[11]
+
+                        # bit 0 indicates support for SU BF (1 = supported, 0 = not supported)
+                        if get_bit(su_octet, 0):
+                            dot11ax.value += ", SU BF supported"
+                            dot11ax_su_bf.db_value = 1
+                        else:
+                            dot11ax.value += ", SU BF not supported"
+
                         continue
+
                     if ext_ie_id == HE_6_GHZ_BAND_CAP_IE_EXT_TAG:
                         six_ghz.value = "Supported"
                         six_ghz.db_value = 1
 
-        return [dot11ax]  # , six_ghz]
+        return [dot11ax, twt, dot11ax_su_bf]  # , six_ghz]
 
     def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """
