@@ -132,7 +132,7 @@ class Profiler(object):
                 oui_manuf, capabilities, frame.addr2, self.channel
             )
 
-            self.log.info("text report\n%s", text_report)
+            self.log.info("text report for %s\n%s", frame.addr2, text_report)
 
             if self.channel < 15:
                 band = "2.4GHz"

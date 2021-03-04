@@ -58,7 +58,7 @@ from .__version__ import __version__
 
 def signal_handler(signum, stack):
     """ Suppress stack traces when intentionally closed """
-    print(f"Exit signal ({signum}) detected... exiting...")
+    print(f"{signal.Signals(signum).name} detected... exiting...")
     sys.exit(0)
 
 
