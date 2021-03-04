@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler2: a Wi-Fi client capability analyzer
-# Copyright 2020 Josh Schmelzle
+# Copyright 2021 Josh Schmelzle
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
