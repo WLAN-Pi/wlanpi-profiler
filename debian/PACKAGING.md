@@ -24,9 +24,19 @@ python3 -m pip install mock
 
 This appears to be required, otherwise the tooling will fail when tries to evaluate whether it needs to run tests or not.
 
-## Build our project
+## Building our project
 
-From the root directory of this repository run `dpkg-buildpackage -us -uc -b`. 
+From the root directory of this repository run:
+
+```
+dpkg-buildpackage -us -uc -b
+```
+
+If you don't want to satisfy build dependencies:
+
+```
+dpkg-buildpackage -us -uc -b -d
+```
 
 If you are found favorable by the packaging gods, you should see some output files at `../profiler2` like this:
 
@@ -38,6 +48,36 @@ wlanpi-profiler_0.1-1_amd64.deb
 ```
 
 ## APPENDIX
+
+### Breakdown
+
+#### changelog
+
+Contains changelog information and sets the version of the package
+
+#### control
+
+provides dependencies, package name, and other package meta data.
+
+#### compat
+
+sets compatibility level for debhelper
+
+#### rules
+
+this is the build recipe for make
+
+#### wlanpi-profiler.links
+
+handles symlinks
+
+#### wlanpi-profiler.service
+
+`dh` automatically picks up and installs this systemd service
+
+#### wlanpi-profiler.triggers
+
+tells dpkg what packages we're interested in
 
 ### Installing dh-virtualenv
 
