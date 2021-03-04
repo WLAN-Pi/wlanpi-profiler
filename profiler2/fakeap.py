@@ -41,6 +41,7 @@ import datetime
 import inspect
 import logging
 import os
+import signal
 import sys
 from multiprocessing import Lock, Value
 from multiprocessing.queues import Queue
@@ -48,24 +49,27 @@ from time import sleep, time
 
 # third party imports
 
-try:
-    from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt,
-                           Dot11ProbeResp, RadioTap)
-    from scapy.all import conf as scapyconf
-    from scapy.all import sniff
-except ModuleNotFoundError as error:
-    if error.name == "scapy":
-        print(
-            "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
-        )
-        sys.exit(-1)
-
+from scapy.all import (
+    Dot11,
+    Dot11Auth,
+    Dot11Beacon,
+    Dot11Elt,
+    Dot11ProbeResp,
+    RadioTap,
+)
+from scapy.all import conf as scapyconf
+from scapy.all import sniff
 
 # app imports
-from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
-                        DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
-                        DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
-                        DOT11_TYPE_MANAGEMENT)
+from .constants import (
+    DOT11_SUBTYPE_ASSOC_REQ,
+    DOT11_SUBTYPE_AUTH_REQ,
+    DOT11_SUBTYPE_BEACON,
+    DOT11_SUBTYPE_PROBE_REQ,
+    DOT11_SUBTYPE_PROBE_RESP,
+    DOT11_SUBTYPE_REASSOC_REQ,
+    DOT11_TYPE_MANAGEMENT
+)
 from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
 
@@ -141,7 +145,11 @@ class TxBeacons(object):
         # self.log.debug("frame timestamp: %s", convert_timestamp_to_uptime(ts))
         # scapy is doing something werid with our timestamps.
         # pcap shows wrong timestamp values
-        self.l2socket.send(frame)
+        try:
+            self.l2socket.send(frame)
+        except OSError as error:
+            print(f"{error}; exiting...")
+            sys.exit(signal.SIGHUP)
 
 
 class Sniffer(object):
@@ -154,9 +162,10 @@ class Sniffer(object):
         lock: Lock,
         sequence_number: Value,
         queue: Queue,
+        args,
     ):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        self.log.debug("sniffer %s; parent pid: %s", os.getpid(), os.getppid())
+        self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
 
         self.queue = queue
         self.boot_time = boot_time
@@ -168,6 +177,8 @@ class Sniffer(object):
         self.assoc_reqs = {}
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
+        if args.no_sniffer_filter:
+            self.bpf_filter = ""
         # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
@@ -204,20 +215,21 @@ class Sniffer(object):
 
     def received_frame(self, packet) -> None:
         """ Handle incoming packets for profiling """
-        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-            if packet.addr1 == self.mac:  # if we are the receiver
-                self.dot11_auth_cb(packet.addr2)
-        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-            ssid = packet[Dot11Elt].info.decode()
-            # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
-            if ssid == self.ssid or packet[Dot11Elt].len == 0:
-                self.dot11_probe_request_cb(packet)
-        elif (
-            packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
-            or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
-        ):
-            if packet.addr1 == self.mac:  # if we are the receiver
-                self.dot11_assoc_request_cb(packet)
+        if packet.haslayer(Dot11Elt):
+            if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
+                if packet.addr1 == self.mac:  # if we are the receiver
+                    self.dot11_auth_cb(packet.addr2)
+            elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+                ssid = packet[Dot11Elt].info.decode()
+                # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
+                if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                    self.dot11_probe_request_cb(packet)
+            elif (
+                packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
+                or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
+            ):
+                if packet.addr1 == self.mac:  # if we are the receiver
+                    self.dot11_assoc_request_cb(packet)
 
     def probe_response(self, probe_request) -> None:
         """ Send probe resp to assist with profiler discovery """

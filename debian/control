@@ -1,0 +1,15 @@
+Source: wlanpi-profiler
+Section: python
+Priority: extra
+Maintainer: Josh Schmelzle <josh@joshschmelzle.com>
+Build-Depends: debhelper (>= 9), python3, dh-virtualenv (>= 1.0), python3-distutils, libffi-dev
+Standards-Version: 3.9.5
+X-Python3-Version: >= 3.7
+Homepage: https://github.com/WLAN-Pi/profiler2
+
+Package: wlanpi-profiler
+Architecture: any
+Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.7), python3-distutils, ${misc:Pre-Depends}
+Depends: ${python3:Depends}, ${misc:Depends}
+Description: A Wi-Fi client capabilities profiler
+

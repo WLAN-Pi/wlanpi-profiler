@@ -36,6 +36,8 @@ profiler2.constants
 define constant values for app
 """
 
+CONFIG_FILE = "/etc/wlanpi-profiler/config.ini"
+
 DOT11_TYPE_MANAGEMENT = 0
 DOT11_SUBTYPE_BEACON = 0x08
 DOT11_SUBTYPE_PROBE_REQ = 0x04
@@ -54,7 +56,10 @@ RM_CAPABILITIES_IE_TAG = 70  # 802.11k
 EXT_CAPABILITIES_IE_TAG = 127  # 802.11v - Extended Capabilities
 VHT_CAPABILITIES_IE_TAG = 191  # 802.11ac
 VENDOR_SPECIFIC_IE_TAG = 221  # Vendor Specific IE
-EXT_IE_TAG = 255  # Element ID Extension field
+IE_EXT_TAG = 255  # Element ID Extension field
+HE_CAPABILITIES_IE_EXT_TAG = 35  # 802.11ax HE Capabilities IE
+HE_OPERATION_IE_EXT_TAG = 36  # 802.11ax HE Operation IE
+HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 6 GHz capabilities IE
 
 CHANNELS = [
     1,

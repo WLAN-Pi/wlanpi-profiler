@@ -56,9 +56,9 @@ from . import helpers
 from .__version__ import __version__
 
 
-def signal_handler(sig, frame):
+def signal_handler(signum, stack):
     """ Suppress stack traces when intentionally closed """
-    print("SIGINT or Control-C detected... exiting...")
+    print(f"{signal.Signals(signum).name} detected... exiting...")
     sys.exit(0)
 
 
@@ -78,27 +78,28 @@ def start(args: dict):
         sys.exit("pytest")
 
     if not are_we_root():
-        log.error("must run with root permissions... exiting...")
+        log.error("profiler must be run with root permissions... exiting...")
         sys.exit(-1)
 
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGHUP, signal_handler)
     helpers.setup_logger(args)
 
     log.debug("%s version %s", __name__.split(".")[0], __version__)
     log.debug("python platform version is %s", platform.python_version())
-    log.debug("scapy version is %s", scapy.__version__)
-    log.debug("args: %s", args)
+    scapy_version = ""
+    try:
+        scapy_version = scapy.__version__
+        log.debug("scapy version is %s", scapy_version)
+    except:
+        log.warn("could not get version information from scapy.__version__")
+        log.debug("args: %s", args)
 
     if args.oui_update:
+        # run manuf oui update and exit
         sys.exit(0) if helpers.update_manuf() else sys.exit(-1)
 
     config = helpers.setup_config(args)
-
-    if helpers.validate(config):
-        log.debug("config %s", config)
-    else:
-        log.error("configuration validation failed... exiting...")
-        sys.exit(-1)
 
     if args.clean and args.files:
         clients_dir = os.path.join(config["GENERAL"].get("files_path"), "clients")
@@ -110,16 +111,15 @@ def start(args: dict):
         helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
-    interface = config.get("GENERAL").get("interface")
-    channel = int(config.get("GENERAL").get("channel"))
-    pcap_analysis = config.get("GENERAL").get("pcap_analysis")
-    listen_only = config.get("GENERAL").get("listen_only")
     queue = mp.Queue()
-
-    log.debug("%s pid %s", __name__, os.getpid())
+    pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+    parent_pid = os.getpid()
+    log.debug("%s pid %s", __name__, parent_pid)
 
     if pcap_analysis:
-        log.info("not starting beacon or sniffer - user wants to do file analysis only")
+        log.info(
+            "not starting beacon or sniffer because user requested pcap file analysis"
+        )
         try:
             frame = rdpcap(pcap_analysis)
         except FileNotFoundError:
@@ -133,6 +133,16 @@ def start(args: dict):
         # put frame into the multiprocessing queue for the profiler to analyze
         queue.put(assoc_req_frame)
     else:
+        if helpers.validate(config):
+            log.debug("config %s", config)
+        else:
+            log.error("configuration validation failed... exiting...")
+            sys.exit(-1)
+
+        interface = config.get("GENERAL").get("interface")
+        channel = int(config.get("GENERAL").get("channel"))
+        listen_only = config.get("GENERAL").get("listen_only")
+
         helpers.generate_run_message(config)
 
         from .fakeap import Sniffer, TxBeacons
@@ -145,31 +155,30 @@ def start(args: dict):
         if args.no_interface_prep:
             log.warning("skipping interface prep...")
         else:
-            log.info("start interface prep...")
+            log.debug("interface prep...")
             if not helpers.prep_interface(interface, "monitor", channel):
-                log.error("failed to prep interface")
-                print("exiting...")
+                log.error("failed to prep interface... exiting...")
                 sys.exit(-1)
-            log.info("done prep interface...")
+            log.debug("finish interface prep...")
 
         if listen_only:
             log.info("beacon process not started due to listen only mode")
         else:
-            log.info("starting beacon process")
+            log.debug("beacon process")
             mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
                 args=(config, boot_time, lock, sequence_number),
             ).start()
 
-        log.info("starting sniffer process")
+        log.debug("sniffer process")
         mp.Process(
             name="sniffer",
             target=Sniffer,
-            args=(config, boot_time, lock, sequence_number, queue),
+            args=(config, boot_time, lock, sequence_number, queue, args),
         ).start()
 
     from .profiler import Profiler
 
-    log.info("starting profiler process")
+    log.debug("profiler process")
     mp.Process(name="profiler", target=Profiler, args=(config, queue)).start()

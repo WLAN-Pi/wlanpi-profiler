@@ -45,6 +45,7 @@ import logging.config
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -58,16 +59,17 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
-                           get_if_raw_hwaddr)
+    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "manuf":
-        print(f"{error}. please install manuf... exiting...")
+        print(f"required module manuf not found. try installing manuf.")
     elif error.name == "scapy":
-        print(f"{error}. please install scapy... exiting...")
+        print(
+            "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
+        )
     else:
         print(f"{error}")
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # is tcpdump installed?
 try:
@@ -78,7 +80,7 @@ except Exception:
     print(
         "problem checking tcpdump version. is tcpdump installed and functioning? exiting..."
     )
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # is netstat installed?
 try:
@@ -89,11 +91,11 @@ except Exception:
     print(
         "problem checking netstat version. is netstat installed and functioning? exiting..."
     )
-    sys.exit(-1)
+    sys.exit(signal.SIGABRT)
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS
+from .constants import CHANNELS, CONFIG_FILE
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -160,12 +162,14 @@ def check_interface(interface: str) -> str:
         log.warning(
             "%s interface not found in phy80211 interfaces: %s",
             interface,
-            discovered_interfaces,
+            ", ".join(discovered_interfaces),
         )
         raise ValueError(f"{interface} is not a valid interface")
     else:
         log.debug(
-            "%s is in discovered interfaces: [%s]", interface, discovered_interfaces
+            "%s is in discovered phy80211 interfaces: %s",
+            interface,
+            ", ".join(discovered_interfaces),
         )
         return interface
 
@@ -256,12 +260,11 @@ def setup_parser() -> argparse:
         dest="pcap_analysis",
         help="analyze first packet of pcap (expecting an association request frame)",
     )
-    config = "/etc/profiler2/config.ini"
     parser.add_argument(
         "--config",
         type=str,
         metavar="<FILE>",
-        default=config,
+        default=CONFIG_FILE,
         help="customize path for configuration file (default: %(default)s)",
     )
     parser.add_argument(
@@ -270,6 +273,13 @@ def setup_parser() -> argparse:
         dest="files_path",
         default="/var/www/html/profiler",
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--no_sniffer_filter",
+        dest="no_sniffer_filter",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--clean",
@@ -438,7 +448,7 @@ def validate(config: dict) -> bool:
         verify_reporting_directories(config)
     except ValueError:
         log.error("%s", sys.exc_info()[1])
-        sys.exit(-1)
+        sys.exit(signal.SIGABRT)
 
     return True
 
@@ -468,10 +478,10 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 check=True,
                 capture_output=True,
             )
-            log.debug(
-                "driver: %s, mac: %s",
-                driver.stdout.split("/")[-1].replace("\n", ""),
+            log.info(
+                "mac: %s, driver: %s",
                 mac.stdout.replace("\n", ""),
+                driver.stdout.split("/")[-1].replace("\n", ""),
             )
             regdomain = subprocess.run(
                 ["iw", "reg", "get"],
@@ -480,10 +490,15 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 check=True,
                 capture_output=True,
             )
-            log.debug(
-                "reg domain: %s",
-                [line for line in regdomain.stdout.split("\n") if "country" in line],
-            )
+            regdomain = [
+                line for line in regdomain.stdout.split("\n") if "country" in line
+            ]
+
+            if "UNSET" in "".join(regdomain):
+                log.warn("UNSET REG DOMAIN DETECTED!")
+            else:
+                log.debug("reg domain: %s", regdomain)
+
             for cmd in commands:
                 cp = subprocess.run(
                     cmd, encoding="utf-8", shell=False, capture_output=True
@@ -493,7 +508,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
 
             return True
         except Exception:
-            log.exception("error setting wlan interface config %s", cp.stderr)
+            log.error("error setting wlan interface config %s", cp.stderr)
     else:
         log.error("failed to prep interface config...")
         return False
@@ -678,7 +693,6 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     #
     # frame_bytes = bytes(frame)
     # print(frame_bytes)
-    # sys.exit()
     return frame
 
 

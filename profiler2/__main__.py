@@ -40,6 +40,7 @@ import os
 import platform
 import sys
 
+
 def main():
     """ Set up args and start the profiler manager """
     from . import helpers, manager
@@ -47,8 +48,9 @@ def main():
     parser = helpers.setup_parser()
     args = parser.parse_args()
     manager.start(args)
-    
+
     import asyncio
+
     loop = asyncio.get_event_loop()
     try:
         loop.run_forever()

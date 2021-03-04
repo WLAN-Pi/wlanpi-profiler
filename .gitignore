@@ -28,6 +28,15 @@ wheels/
 *.egg
 MANIFEST
 
+# dh-virtualenv
+.pybuild/
+debian/.debhelper/
+debian/files
+debian/wlanpi-profiler.postrm.debhelper
+debian/wlanpi-profiler.postinst.debhelper
+debian/wlanpi-profiler.substvars
+debian/wlanpi-profiler/
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.

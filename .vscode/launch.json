@@ -37,9 +37,35 @@
             "module": "profiler2",
             "args": [
                 "-i",
+                "wlan1"
+            ]
+        },
+        {
+            "name": "-i wlan1 verbose",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "-i",
                 "wlan1",
                 "--logging",
                 "debug"
+            ]
+        },
+        {
+            "name": "--pcap",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "--pcap",
+                "~/dev/profiler2/tests/pcaps/iPhone11ProMax.pcap_randomized.pcap",
+                "--logging",
+                "debug",
+                "-i",
+                "wlan99",
             ]
         }
     ]
