@@ -5,18 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "clean profiles",
-            "type": "python",
-            "request": "launch",
-            "sudo": true,
-            "module": "profiler2",
-            "args": [
-                "--clean",
-                "--files",
-                "--yes"
-            ]
-        },
-        {
             "name": "-i wlan0",
             "type": "python",
             "request": "launch",
@@ -66,6 +54,18 @@
                 "debug",
                 "-i",
                 "wlan99",
+            ]
+        },
+        {
+            "name": "clean profiles",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "--clean",
+                "--files",
+                "--yes"
             ]
         }
     ]
