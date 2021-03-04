@@ -26,7 +26,7 @@ Tox for testing and linting
 Install tox:
 
 ```
-$ python<version> -m pip install tox 
+$ python3 -m pip install tox 
 ```
 
 You can now invoke tox in the directory where tox.ini resides.
