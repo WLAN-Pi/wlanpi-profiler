@@ -59,8 +59,7 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
-                           get_if_raw_hwaddr)
+    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"required module manuf not found. try installing manuf.")
@@ -661,6 +660,12 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
     he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
 
+    spatial_reuse_data = b"\x03\x27\x05\x00"
+    spatial_reuse = Dot11Elt(ID=0xFF, info=spatial_reuse_data)
+
+    mu_edca_data = b"\x0e\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
+    mu_edca_data = Dot11Elt(ID=0xFF, info=mu_edca_data)
+
     if ft_disabled:
         frame = (
             essid
@@ -693,7 +698,9 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     if he_disabled:
         frame = frame / wmm
     else:
-        frame = frame / he_capabilities / he_operation / wmm
+        frame = (
+            frame / he_capabilities / he_operation / spatial_reuse / mu_edca_data / wmm
+        )
 
     # for gathering data to validate tests:
     #
