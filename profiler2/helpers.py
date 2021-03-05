@@ -59,7 +59,8 @@ from typing import Union
 # third party imports
 try:
     import manuf
-    from scapy.all import Dot11Elt, Scapy_Exception, get_if_hwaddr, get_if_raw_hwaddr
+    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
+                           get_if_raw_hwaddr)
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print(f"required module manuf not found. try installing manuf.")
@@ -621,7 +622,7 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     dtim_data = b"\x05\x04\x00\x03\x00\x00"
     dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
-    ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
     if ft_disabled:

@@ -37,6 +37,8 @@
             "args": [
                 "-i",
                 "wlan1",
+                "-c",
+                "165",
                 "--logging",
                 "debug"
             ]
