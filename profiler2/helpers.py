@@ -553,7 +553,7 @@ def update_manuf() -> bool:
         )
         log.debug("running 'sudo manuf --update'")
         cp = subprocess.run(
-            ["sudo", "manuf", "--update"],
+            ["sudo", f"{sys.prefix}/bin/manuf", "--update"],
             encoding="utf-8",
             shell=False,
             check=True,
@@ -601,6 +601,21 @@ def get_frequency_bytes(channel: int) -> bytes:
         freq = 5000 + (channel * 5)
 
     return freq.to_bytes(2, byteorder="little")
+
+
+def get_wlanpi_version():
+    wlanpi_version = "unknown"
+    try:
+        with open("/etc/wlanpi-release") as _file:
+            lines = _file.read().splitlines()
+            for line in lines:
+                if "VERSION" in line:
+                    wlanpi_version = "{0}".format(
+                        line.split("=")[1].replace('"', "").strip()
+                    )
+    except OSError:
+        pass
+    return wlanpi_version
 
 
 def build_fake_frame_ies(config: dict) -> Dot11Elt:
@@ -665,7 +680,17 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
     spatial_reuse = Dot11Elt(ID=0xFF, info=spatial_reuse_data)
 
     mu_edca_data = b"\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
-    mu_edca_data = Dot11Elt(ID=0xFF, info=mu_edca_data)
+    mu_edca = Dot11Elt(ID=0xFF, info=mu_edca_data)
+
+    six_ghz_cap_data = b"\x3b\x00\x00"
+    six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
+
+    # reduced_neighbor_report_data = b"\x02"
+    # reduced_neighbor_report = Dot11Elt(ID=0xFF, info=reduced_neighbor_report_data)
+
+    # custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
+    # custom_data = bytes(f"{custom_hash}", "utf-8")
+    # custom = Dot11Elt(ID=0xDE, info=custom_data)
 
     if ft_disabled:
         frame = (
@@ -700,7 +725,15 @@ def build_fake_frame_ies(config: dict) -> Dot11Elt:
         frame = frame / wmm
     else:
         frame = (
-            frame / he_capabilities / he_operation / spatial_reuse / mu_edca_data / wmm
+            frame
+            # / reduced_neighbor_report
+            / he_capabilities
+            / he_operation
+            / spatial_reuse
+            / mu_edca
+            / six_ghz_cap
+            / wmm
+            # / custom
         )
 
     # for gathering data to validate tests:

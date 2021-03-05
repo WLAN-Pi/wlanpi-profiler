@@ -209,21 +209,20 @@ class Sniffer(multiprocessing.Process):
 
     def received_frame(self, packet) -> None:
         """ Handle incoming packets for profiling """
-        if packet.haslayer(Dot11Elt):
-            if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-                if packet.addr1 == self.mac:  # if we are the receiver
-                    self.dot11_auth_cb(packet.addr2)
-            elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
-                ssid = packet[Dot11Elt].info.decode()
-                # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
-                if ssid == self.ssid or packet[Dot11Elt].len == 0:
-                    self.dot11_probe_request_cb(packet)
-            elif (
-                packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
-                or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
-            ):
-                if packet.addr1 == self.mac:  # if we are the receiver
-                    self.dot11_assoc_request_cb(packet)
+        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
+            if packet.addr1 == self.mac:  # if we are the receiver
+                self.dot11_auth_cb(packet.addr2)
+        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+            ssid = packet[Dot11Elt].info.decode()
+            # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
+            if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                self.dot11_probe_request_cb(packet)
+        elif (
+            packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
+            or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
+        ):
+            if packet.addr1 == self.mac:  # if we are the receiver
+                self.dot11_assoc_request_cb(packet)
 
     def probe_response(self, probe_request) -> None:
         """ Send probe resp to assist with profiler discovery """
