@@ -581,7 +581,7 @@ class Profiler(object):
             db_value="0",
         )
 
-        twt = Capability(name="TWT", value="Not supported", db_key="twt", db_value=0)
+        twt = Capability(db_key="twt", db_value=0)
         dot11ax_ss = Capability(db_key="802.11ax_ss", db_value=0)
         dot11ax_su_bf = Capability(db_key="802.11ax_su_bf", db_value=0)
 
@@ -596,12 +596,6 @@ class Profiler(object):
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
-
-                        twt_octet = element_data[1]
-
-                        if get_bit(twt_octet, 1):
-                            twt.value = "Supported"
-                            twt.db_value = 1
 
                         # Check for number streams supported
                         mcs_upper_octet = element_data[19]
@@ -626,15 +620,14 @@ class Profiler(object):
                         dot11ax.value = f"Supported ({spatial_streams}ss)"
                         dot11ax_ss.db_value = spatial_streams
 
-                        # check for SU beam formee support
-                        su_octet = element_data[11]
+                        twt_octet = element_data[1]
 
-                        # bit 0 indicates support for SU BF (1 = supported, 0 = not supported)
-                        if get_bit(su_octet, 0):
-                            dot11ax.value += ", SU BF supported"
-                            dot11ax_su_bf.db_value = 1
+                        if get_bit(twt_octet, 1):
+                            twt.value = "Supported"
+                            twt.db_value = 1
+                            dot11ax.value += ", TWT supported"
                         else:
-                            dot11ax.value += ", SU BF not supported"
+                            dot11ax.value += ", TWT not supported"
 
                         continue
 
