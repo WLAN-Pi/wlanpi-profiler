@@ -39,6 +39,7 @@ profiler code goes here, separate from fake ap code.
 # standard library imports
 import csv
 import inspect
+import json
 import logging
 import os
 import signal
@@ -53,13 +54,21 @@ from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (EXT_CAPABILITIES_IE_TAG, FT_CAPABILITIES_IE_TAG,
-                        HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-                        HE_CAPABILITIES_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
-                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
-                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
-                        VHT_CAPABILITIES_IE_TAG)
+from .constants import (
+    _20MHZ_CHANNEL_LIST,
+    EXT_CAPABILITIES_IE_TAG,
+    FT_CAPABILITIES_IE_TAG,
+    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+    HE_CAPABILITIES_IE_EXT_TAG,
+    HT_CAPABILITIES_IE_TAG,
+    IE_EXT_TAG,
+    POWER_MIN_MAX_IE_TAG,
+    RM_CAPABILITIES_IE_TAG,
+    RSN_CAPABILITIES_IE_TAG,
+    SUPPORTED_CHANNELS_IE_TAG,
+    VENDOR_SPECIFIC_IE_TAG,
+    VHT_CAPABILITIES_IE_TAG,
+)
 from .helpers import Capability, flag_last_object, get_bit
 
 
@@ -104,6 +113,8 @@ class Profiler(object):
         frame = queue.get()
         oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
+        # we want channel from frame, not from profiler.
+        channel = _20MHZ_CHANNEL_LIST[frame.ChannelFrequency]
         if analysis_hash in self.analyzed_hash.keys():
             self.log.debug(
                 "already seen %s (capabilities hash=%s) this session, ignoring...",
@@ -122,14 +133,14 @@ class Profiler(object):
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
             self.analyzed_hash[analysis_hash] = frame
             text_report = self.generate_text_report(
-                oui_manuf, capabilities, frame.addr2, self.channel
+                oui_manuf, capabilities, frame.addr2, channel
             )
 
             self.log.info("text report for %s\n%s", frame.addr2, text_report)
 
-            if self.channel < 15:
+            if channel < 15:
                 band = "2.4GHz"
-            elif self.channel > 30 and self.channel < 170:
+            elif channel > 30 and channel < 170:
                 band = "5.8GHz"
             else:
                 band = "unknown"
@@ -140,7 +151,7 @@ class Profiler(object):
                 analysis_hash,
             )
             self.write_analysis_to_file_system(
-                text_report, capabilities, frame, oui_manuf, band
+                text_report, capabilities, frame, oui_manuf, band, channel
             )
 
             self.client_profiled_count += 1
@@ -177,7 +188,7 @@ class Profiler(object):
         return text_report
 
     def write_analysis_to_file_system(
-        self, text_report, capabilities, frame, oui_manuf, band
+        self, text_report, capabilities, frame, oui_manuf, band, channel
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
@@ -193,6 +204,18 @@ class Profiler(object):
                 sys.exit(signal.SIGHUP)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
+
+        data = {}
+
+        data["mac"] = client_mac
+        data["manuf"] = oui_manuf
+        data["band"] = band
+        data["channel"] = channel
+
+        for capability in capabilities:
+            data[capability.db_key] = capability.db_value
 
         try:
             if os.path.exists(filename):
@@ -214,8 +237,16 @@ class Profiler(object):
                     text_report = "\n".join(text_report)
             with open(filename, "w") as writer:
                 writer.write(text_report)
+
+            if os.path.exists(json_filename):
+                pass  # compare json
+
+            with open(json_filename, "w") as writer:
+                json.dump(data, writer)
         except Exception:
-            log.exception("error creating flat file to dump client info (%s)", filename)
+            log.exception(
+                "error creating flat files to dump client info (%s)", filename
+            )
             sys.exit(signal.SIGHUP)
 
         out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
@@ -539,7 +570,7 @@ class Profiler(object):
         supported_channels = Capability(
             name="Supported_Channels",
             value="Not reported",
-            db_key="SupportedChannels",
+            db_key="supported_channels",
             db_value=None,
         )
         if SUPPORTED_CHANNELS_IE_TAG in dot11_elt_dict.keys():
