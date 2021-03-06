@@ -664,7 +664,7 @@ class Profiler(object):
                         six_ghz.value = "Supported"
                         six_ghz.db_value = 1
 
-        return [dot11ax, twt, dot11ax_su_bf]  # , six_ghz]
+        return [dot11ax, dot11ax_ss, twt, dot11ax_su_bf]  # , six_ghz]
 
     def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """
