@@ -54,21 +54,13 @@ from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (
-    _20MHZ_CHANNEL_LIST,
-    EXT_CAPABILITIES_IE_TAG,
-    FT_CAPABILITIES_IE_TAG,
-    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-    HE_CAPABILITIES_IE_EXT_TAG,
-    HT_CAPABILITIES_IE_TAG,
-    IE_EXT_TAG,
-    POWER_MIN_MAX_IE_TAG,
-    RM_CAPABILITIES_IE_TAG,
-    RSN_CAPABILITIES_IE_TAG,
-    SUPPORTED_CHANNELS_IE_TAG,
-    VENDOR_SPECIFIC_IE_TAG,
-    VHT_CAPABILITIES_IE_TAG,
-)
+from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
+                        FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+                        HE_CAPABILITIES_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
+                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
+                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
+                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
+                        VHT_CAPABILITIES_IE_TAG)
 from .helpers import Capability, flag_last_object, get_bit
 
 
@@ -211,7 +203,13 @@ class Profiler(object):
 
         data["mac"] = client_mac
         data["manuf"] = oui_manuf
-        data["band"] = band
+        if band[0] == "2":
+            band_db = 2
+        elif band[0] == "5":
+            band_db = 5
+        else:
+            band_db = 0
+        data["band"] = band_db
         data["channel"] = channel
 
         for capability in capabilities:
@@ -536,13 +534,13 @@ class Profiler(object):
             name="Max_Power",
             value="Not reported",
             db_key="max_power",
-            db_value="Not reported",
+            db_value=0,
         )
         min_power_cap = Capability(
-            name="Min_Power",
-            value="Not reported",
+            # name="Min_Power",
+            # value="Not reported",
             db_key="min_power",
-            db_value="Not reported",
+            db_value=0,
         )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict.keys():
@@ -571,7 +569,7 @@ class Profiler(object):
             name="Supported_Channels",
             value="Not reported",
             db_key="supported_channels",
-            db_value=None,
+            db_value=[],
         )
         if SUPPORTED_CHANNELS_IE_TAG in dot11_elt_dict.keys():
             channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
@@ -603,16 +601,16 @@ class Profiler(object):
             name="802.11ax",
             value="Not supported",
             db_key="802.11ax",
-            db_value="0",
+            db_value=0,
         )
         six_ghz = Capability(
             name="6 GHz",
             value="Not supported",
             db_key="six_ghz",
-            db_value="0",
+            db_value=0,
         )
 
-        twt = Capability(db_key="twt", db_value=0)
+        twt = Capability(db_key="802.11ax_twt", db_value=0)
         dot11ax_ss = Capability(db_key="802.11ax_ss", db_value=0)
         dot11ax_su_bf = Capability(db_key="802.11ax_su_bf", db_value=0)
 
