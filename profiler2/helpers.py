@@ -181,21 +181,13 @@ def setup_parser() -> argparse:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
             """
-            a Wi-Fi client analyzer for identifying supported 802.11 capabilities
+            Profiler is a Wi-Fi client capabilities analyzer.
+            
+            It helps identify claimed supported 802.11 feature-set.
+            
+            The purpose is to automate the gathering and analysis of association frames.
             """
         ),
-    )
-    parser.add_argument(
-        "-i",
-        dest="interface",
-        help="set network interface for profiler (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--noprep",
-        dest="no_interface_prep",
-        action="store_true",
-        default=False,
-        help="disable interface preperation (default: %(default)s)",
     )
     parser.add_argument(
         "--pytest",
@@ -207,59 +199,14 @@ def setup_parser() -> argparse:
     parser.add_argument(
         "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
     )
+    parser.add_argument(
+        "-i",
+        dest="interface",
+        help="set network interface for profiler",
+    )
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument(
-        "-s", dest="ssid", type=check_ssid, help="set profiler SSID"
-    )
-    ssid_group.add_argument(
-        "--hostname_ssid",
-        dest="hostname_ssid",
-        action="store_true",
-        default=False,
-        help="use the WLAN Pi's hostname as SSID name",
-    )
-    ssid_group.add_argument(
-        "--noAP",
-        dest="listen_only",
-        action="store_true",
-        default=False,
-        help="enable listen only mode (Rx only)",
-    )
-    dot11r_group = parser.add_mutually_exclusive_group()
-    dot11r_group.add_argument(
-        "--11r",
-        dest="ft_enabled",
-        action="store_true",
-        default=False,
-        help="turn on 802.11r Fast Transition (FT) reporting (override --config file)",
-    )
-    dot11r_group.add_argument(
-        "--no11r",
-        dest="ft_disabled",
-        action="store_true",
-        default=False,
-        help="turn off 802.11r Fast Transition (FT) reporting",
-    )
-    dot11ax_group = parser.add_mutually_exclusive_group()
-    dot11ax_group.add_argument(
-        "--11ax",
-        dest="he_enabled",
-        action="store_true",
-        default=False,
-        help="turn on 802.11ax High Efficiency (HE) reporting (override --config file)",
-    )
-    dot11ax_group.add_argument(
-        "--no11ax",
-        dest="he_disabled",
-        action="store_true",
-        default=False,
-        help="turn off 802.11ax High Efficiency (HE) reporting",
-    )
-    parser.add_argument(
-        "--pcap",
-        metavar="<FILE>",
-        dest="pcap_analysis",
-        help="analyze first packet of pcap (expecting an association request frame)",
+        "-s", dest="ssid", type=check_ssid, help="set profiler SSID name"
     )
     parser.add_argument(
         "--config",
@@ -274,6 +221,63 @@ def setup_parser() -> argparse:
         dest="files_path",
         default="/var/www/html/profiler",
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
+    )
+    ssid_group.add_argument(
+        "--hostname_ssid",
+        dest="hostname_ssid",
+        action="store_true",
+        default=False,
+        help="use the WLAN Pi's hostname as SSID name (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--logging",
+        help="change logging output",
+        nargs="?",
+        choices=("debug", "warning"),
+    )
+    parser.add_argument(
+        "--noprep",
+        dest="no_interface_prep",
+        action="store_true",
+        default=False,
+        help="disable interface preperation (default: %(default)s)",
+    )
+    ssid_group.add_argument(
+        "--noAP",
+        dest="listen_only",
+        action="store_true",
+        default=False,
+        help="enable Rx only mode (default: %(default)s)",
+    )
+    dot11r_group = parser.add_mutually_exclusive_group()
+    dot11r_group.add_argument(
+        "--11r",
+        dest="ft_enabled",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,  # "turn on 802.11r Fast Transition (FT) reporting (override --config <file>)",
+    )
+    dot11r_group.add_argument(
+        "--no11r",
+        dest="ft_disabled",
+        action="store_true",
+        default=False,
+        help="turn off 802.11r Fast Transition (FT) reporting",
+    )
+    dot11ax_group = parser.add_mutually_exclusive_group()
+    dot11ax_group.add_argument(
+        "--11ax",
+        dest="he_enabled",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,  # "turn on 802.11ax High Efficiency (HE) reporting (override --config <file>)",
+    )
+    dot11ax_group.add_argument(
+        "--no11ax",
+        dest="he_disabled",
+        action="store_true",
+        default=False,
+        help="turn off 802.11ax High Efficiency (HE) reporting",
     )
     parser.add_argument(
         "--no_sniffer_filter",
@@ -304,13 +308,13 @@ def setup_parser() -> argparse:
         dest="oui_update",
         action="store_true",
         default=False,
-        help="initiates Internet update of OUI database",
+        help="initiates update of OUI database (requires Internet connection)",
     )
     parser.add_argument(
-        "--logging",
-        help="change logging output",
-        nargs="?",
-        choices=("debug", "warning"),
+        "--pcap",
+        metavar="<FILE>",
+        dest="pcap_analysis",
+        help="analyze first packet of pcap (expects association request frame)",
     )
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
