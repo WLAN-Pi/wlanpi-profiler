@@ -105,8 +105,6 @@ class Profiler(object):
         frame = queue.get()
         oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
-        # we want channel from frame, not from profiler.
-        channel = _20MHZ_CHANNEL_LIST[frame.ChannelFrequency]
         if analysis_hash in self.analyzed_hash.keys():
             self.log.debug(
                 "already seen %s (capabilities hash=%s) this session, ignoring...",
@@ -114,22 +112,19 @@ class Profiler(object):
                 analysis_hash,
             )
         else:
-
-            if self.is_randomized(frame.addr2):
+            randomized = self.is_randomized(frame.addr2)
+            if randomized:
                 if oui_manuf is None:
-                    oui_manuf = "Randomized MAC"
+                    text_report_oui_manuf = "Randomized MAC"
                 else:
-                    oui_manuf = "{0} (Randomized MAC)".format(oui_manuf)
+                    text_report_oui_manuf = "{0} (Randomized MAC)".format(oui_manuf)
 
             self.last_manuf = oui_manuf
             self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
             self.analyzed_hash[analysis_hash] = frame
-            text_report = self.generate_text_report(
-                oui_manuf, capabilities, frame.addr2, channel
-            )
 
-            self.log.info("text report for %s\n%s", frame.addr2, text_report)
-
+            # we want channel from frame, not from profiler.
+            channel = _20MHZ_CHANNEL_LIST[frame.ChannelFrequency]
             if channel < 15:
                 band = "2.4GHz"
             elif channel > 30 and channel < 170:
@@ -137,17 +132,26 @@ class Profiler(object):
             else:
                 band = "unknown"
 
+            # genereat text report
+            text_report = self.generate_text_report(
+                text_report_oui_manuf, capabilities, frame.addr2, channel
+            )
+
+            self.log.info("text report for %s\n%s", frame.addr2, text_report)
+
             self.log.debug(
                 "writing text and csv report for %s (capabilities hash=%s)",
                 frame.addr2,
                 analysis_hash,
             )
             self.write_analysis_to_file_system(
-                text_report, capabilities, frame, oui_manuf, band, channel
+                text_report, capabilities, frame, oui_manuf, randomized, band, channel
             )
 
             self.client_profiled_count += 1
-            self.log.debug("%s clients profiled", self.client_profiled_count)
+            self.log.debug(
+                "%s clients profiled this session", self.client_profiled_count
+            )
 
             # if we end up sending multiple frames from pcap for profiling - this will need changed
             if self.pcap_analysis:
@@ -180,7 +184,7 @@ class Profiler(object):
         return text_report
 
     def write_analysis_to_file_system(
-        self, text_report, capabilities, frame, oui_manuf, band, channel
+        self, text_report, capabilities, frame, oui_manuf, randomized, band, channel
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
@@ -202,6 +206,7 @@ class Profiler(object):
         data = {}
 
         data["mac"] = client_mac
+        data["is_laa"] = randomized
         data["manuf"] = oui_manuf
         if band[0] == "2":
             band_db = 2
