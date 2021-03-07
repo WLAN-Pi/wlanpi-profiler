@@ -54,13 +54,21 @@ from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
-                        FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-                        HE_CAPABILITIES_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
-                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
-                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
-                        VHT_CAPABILITIES_IE_TAG)
+from .constants import (
+    _20MHZ_CHANNEL_LIST,
+    EXT_CAPABILITIES_IE_TAG,
+    FT_CAPABILITIES_IE_TAG,
+    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+    HE_CAPABILITIES_IE_EXT_TAG,
+    HT_CAPABILITIES_IE_TAG,
+    IE_EXT_TAG,
+    POWER_MIN_MAX_IE_TAG,
+    RM_CAPABILITIES_IE_TAG,
+    RSN_CAPABILITIES_IE_TAG,
+    SUPPORTED_CHANNELS_IE_TAG,
+    VENDOR_SPECIFIC_IE_TAG,
+    VHT_CAPABILITIES_IE_TAG,
+)
 from .helpers import Capability, flag_last_object, get_bit
 
 
@@ -378,9 +386,9 @@ class Profiler(object):
     def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> []:
         """ Check for 802.11n support """
         dot11n = Capability(
-            name="802.11n", value="Not reported*", db_key="802.11n", db_value=0
+            name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
         )
-        dot11n_ss = Capability(db_key="802.11n_ss", db_value=0)
+        dot11n_ss = Capability(db_key="dot11n_ss", db_value=0)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
 
@@ -404,11 +412,11 @@ class Profiler(object):
     def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> []:
         """ Check for 802.11ac support """
         dot11ac = Capability(
-            name="802.11ac", value="Not reported*", db_key="802.11ac", db_value=0
+            name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
         )
-        dot11ac_ss = Capability(db_key="802.11ac_ss", db_value=0)
-        dot11ac_su_bf = Capability(db_key="802.11ac_su_bf", db_value=0)
-        dot11ac_mu_bf = Capability(db_key="802.11ac_mu_bf", db_value=0)
+        dot11ac_ss = Capability(db_key="dot11ac_ss", db_value=0)
+        dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
+        dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             # Check for number streams supported
@@ -462,7 +470,7 @@ class Profiler(object):
         dot11k = Capability(
             name="802.11k",
             value="Not reported* - treat with caution, many clients lie about this",
-            db_key="802.11k",
+            db_key="dot11k",
             db_value=0,
         )
         if RM_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -475,7 +483,7 @@ class Profiler(object):
     def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> []:
         """ Check for 802.11r support """
         dot11r = Capability(
-            name="802.11r", value="Not reported*", db_key="802.11r", db_value=0
+            name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
         )
         if ft_disabled:
             dot11r.value = "Reporting disabled (--no11r option used)"
@@ -491,7 +499,7 @@ class Profiler(object):
     def analyze_ext_capabilities_ie(dot11_elt_dict: dict) -> []:
         """ Check for 802.11v support """
         dot11v = Capability(
-            name="802.11v", value="Not reported*", db_key="802.11v", db_value=0
+            name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
         )
 
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -516,7 +524,7 @@ class Profiler(object):
     def analyze_rsn_capabilities_ie(dot11_elt_dict: dict) -> []:
         """ Check for 802.11w support """
         dot11w = Capability(
-            name="802.11w", value="Not reported", db_key="802.11w", db_value=0
+            name="802.11w", value="Not reported", db_key="dot11w", db_value=0
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -605,7 +613,7 @@ class Profiler(object):
         dot11ax = Capability(
             name="802.11ax",
             value="Not supported",
-            db_key="802.11ax",
+            db_key="dot11ax",
             db_value=0,
         )
         six_ghz = Capability(
@@ -615,9 +623,9 @@ class Profiler(object):
             db_value=0,
         )
 
-        twt = Capability(db_key="802.11ax_twt", db_value=0)
-        dot11ax_ss = Capability(db_key="802.11ax_ss", db_value=0)
-        dot11ax_su_bf = Capability(db_key="802.11ax_su_bf", db_value=0)
+        twt = Capability(db_key="dot11ax_twt", db_value=0)
+        dot11ax_ss = Capability(db_key="dot11ax_ss", db_value=0)
+        dot11ax_su_bf = Capability(db_key="dot11ax_su_bf", db_value=0)
 
         if he_disabled:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
