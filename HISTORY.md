@@ -1,9 +1,10 @@
 Release 1.0.6 (WIP)
 
 - Debian packaging
-- Output to screen less noisy by default
 - Allow pcap file to be analyzed when no WLAN NICs are detected
 - Remove draft label from 802.11ax detection
+- Make output to screen less noisy by default
+- Add JSON output
 - Update documentation
 
 Release 1.0.5
