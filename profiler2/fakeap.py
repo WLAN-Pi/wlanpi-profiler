@@ -48,16 +48,27 @@ from multiprocessing import Lock, Value
 from multiprocessing.queues import Queue
 from time import sleep, time
 
-from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt, Dot11ProbeResp,
-                       RadioTap)
-from scapy.all import conf as scapyconf
-from scapy.all import sniff
+from scapy.all import (
+    conf as scapyconf,
+    Dot11,
+    Dot11Auth,
+    Dot11Beacon,
+    Dot11Elt,
+    Dot11ProbeResp,
+    RadioTap,
+    sniff,
+)
 
 # app imports
-from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
-                        DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
-                        DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
-                        DOT11_TYPE_MANAGEMENT)
+from .constants import (
+    DOT11_SUBTYPE_ASSOC_REQ,
+    DOT11_SUBTYPE_AUTH_REQ,
+    DOT11_SUBTYPE_BEACON,
+    DOT11_SUBTYPE_PROBE_REQ,
+    DOT11_SUBTYPE_PROBE_RESP,
+    DOT11_SUBTYPE_REASSOC_REQ,
+    DOT11_TYPE_MANAGEMENT,
+)
 from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
 # third party imports
