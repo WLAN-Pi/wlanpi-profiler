@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 # anonymizer.py
@@ -15,7 +16,7 @@ import sys
 import zlib
 import textwrap
 
-from scapy.all import Dot11, Dot11Elt, PcapReader, PcapWriter, RadioTap, scapy
+from scapy.all import Dot11, Dot11Elt, PcapReader, PcapWriter, RadioTap, scapy, Dot11FCS
 
 __version__ = "1"
 
@@ -110,6 +111,7 @@ def anonymize_ssid(ssid: str, ssid_number: int, hash: dict) -> str:
 
 def anonymize_file(input_file: str, output_file: str) -> None:
     logger = logging.getLogger(inspect.stack()[0][3])
+    logger.info(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     with PcapReader(input_file) as reader:
 
         writer = PcapWriter(output_file, sync=True)
@@ -118,22 +120,31 @@ def anonymize_file(input_file: str, output_file: str) -> None:
         address_hash = {}
         ssid_hash = {}
 
+        has_fcs = False
+
         for frame in reader:
 
             if frame.haslayer(Dot11):
-                frame_fcs = frame.fcs
-                logger.info("frame_fcs: %s", hex(frame_fcs))
+                if frame.haslayer(Dot11FCS):
+                    has_fcs = True
+                    frame_fcs = frame.fcs
+                    logger.info("frame_fcs: %s", frame_fcs)
+
+                    crc_bytes = struct.pack(
+                        "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
+                    )
+                    crc_int = hex(int.from_bytes(crc_bytes, byteorder="little"))
+                    logger.info("crc_int: %s", crc_int)
+
+                    fcs_match = frame_fcs == crc_int
+                    logger.info("fcs_match: %s", fcs_match)
+
+                else:
+                    logger.warning("input frame has no fcs")
+                    frame_fcs = 0
+
                 # raw_fcs = struct.unpack("I", bytes(frame.payload)[-4:])[0]
                 # matches frame.fcs
-
-                crc_bytes = struct.pack(
-                    "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
-                )
-                crc_int = int.from_bytes(crc_bytes, byteorder="little")
-                logger.info("crc_int: %s", hex(crc_int))
-
-                fcs_match = frame_fcs == crc_int
-                logger.info("fcs_match: %s", fcs_match)
 
                 # anonymize mac addresses
                 frame[Dot11].addr1 = anonymize_mac(frame.addr1, address_hash)
@@ -153,19 +164,22 @@ def anonymize_file(input_file: str, output_file: str) -> None:
                             dot11elt.info = ssid
                         dot11elt = dot11elt.payload.getlayer(Dot11Elt)
 
-                if fcs_match:
-                    # if fcs and crc originally matched, recompute new valid fcs:
-                    fcs = struct.pack(
-                        "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
+                if has_fcs:
+                    if fcs_match:
+                        # if fcs and crc originally matched, recompute new valid fcs:
+                        fcs = struct.pack(
+                            "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
+                        )
+                    else:
+                        # otherwise throw garbage in the fcs which will not validate
+                        fcs = b"\x00\x00\x00\x00"
+                    logger.info(
+                        "new fcs: %s", hex(int.from_bytes(fcs, byteorder="little"))
                     )
+                    # write anonymized packet
+                    writer.write(RadioTap(bytes(frame)[:-4] + fcs))
                 else:
-                    # otherwise throw garbage in the fcs which will not validate
-                    fcs = b"\x00\x00\x00\x00"
-
-                logger.info("new fcs: %s", hex(int.from_bytes(fcs, byteorder="little")))
-
-                # write anonymized packet
-                writer.write(RadioTap(bytes(frame)[:-4] + fcs))
+                    writer.write(RadioTap(bytes(frame)))
                 logger.info("done")
 
 
@@ -182,4 +196,5 @@ if __name__ == "__main__":
     logger.info("input file: %s", args.input_file)
     output_file = os.path.splitext(args.input_file)[0] + "-anonymized.pcap"
     logger.info("output file: %s", output_file)
+    logger.warning("THIS SEEMS BROKE ON SCAPY 2.4.4!!! VERIFY BEFORE TRUSTING!!!")
     anonymize_file(args.input_file, output_file)
