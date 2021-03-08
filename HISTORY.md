@@ -1,6 +1,6 @@
 Release 1.0.6 (WIP)
 
-- Debian packaging
+- Replace pipx with debianization
 - Allow pcap file to be analyzed when no WLAN NICs are detected
 - Remove draft label from 802.11ax detection
 - Make output to screen less noisy by default
