@@ -121,6 +121,7 @@ class Profiler(object):
             )
         else:
             randomized = self.is_randomized(frame.addr2)
+            text_report_oui_manuf = oui_manuf
             if randomized:
                 if oui_manuf is None:
                     text_report_oui_manuf = "Randomized MAC"
