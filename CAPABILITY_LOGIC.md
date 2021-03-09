@@ -59,21 +59,42 @@ values to determine client capabilities.
         - Y - 11w supported
         - N - 11w not supported
 
-9. 802.11ax inspect extended tag number 35 (HE Capabilities)
+9. 802.11ax: inspect extended tag number 35 (HE Capabilities)
     - a. is HE capabilities tagged parameter present? 
         - Y - 802.11ax supported
         - N - 802.11ax not supported
-    - b. (TBA) number of spatial streams
-    - c. (TBA) BSS coloring
-    - d. (TBA) UL/DL OFMDA
-    - e. (TBA) UL/DL MU-MIMO
+    - b. number of spatial streams by inspecting octets 19 & 20 (Rx MCS map) - 
+        - count Rx MCS map bit pairs not set to '11' to determine number of streams supported
+    - c. MCS 10/11 support inspect NSS subfield (b.)
+        - MCS 0-7: NSS bit pairs set to '00'
+        - MCS 0-9: NSS bit pairs set to '01'
+        - MCS 0-11: NSS bit pairs set to '10'
+    - d. punctured preamble support: B8-B11 of HE PHY Capabilities 
+        - Y - supported - if any(B0, B1, B2, B3) == true
+        - N - not supported - if any(B0, B1, B2, B3) == false
+    - e. HE ER SU PPDU: B64 of HE PHY Capabilities
+        - Y - supported 
+        - N - not supported
+    - f. TWT support by inspecting octet 1 (bit 1):
+        - Y - supported
+        - N - not supported
 
-10. Randomized MAC address - inspect OUI of 24-bit MAC address
+10. 802.11ax spatial reuse: inspect spatial reuse tag number 39 (Spatial Reuse Parameter Set)
+    - a. is Spatial Reuse Parameter Set tagged parameter present?
+        - Y - supported
+        - N - not supported
+
+11. 802.11ax 6 GHz capabilities: inspect extend tag number 59 (HE 6 GHz band capabilities)
+    - a. is HE 6 GHz band capabilities tagged parameter present?
+        - Y - supported
+        - N - not supported
+
+12. Randomized MAC address - inspect OUI of 24-bit MAC address
     - a. check if any of these digits `2`, `6`, `a`, or `e` is located in the second hex position from the left
         - N - MAC is not unicast local address
         - Y - MAC is a unicast local address (private mac/randomized mac)
 
-11. MAC address manufacturer detection through heuristics 
+13. MAC address manufacturer detection through heuristics 
     - a. can MAC address be resolved by lookup of OUI in manuf db?
         - Y - Return match
         - N - investigate tagged parameter 221 (vendor specific)

@@ -47,29 +47,22 @@ import sys
 import time
 from difflib import Differ
 from multiprocessing.queues import Queue
-from typing import Tuple
+from typing import List, Tuple
 
 # third party imports
 from manuf import manuf
 from scapy.all import wrpcap
 
 # app imports
-from .constants import (
-    _20MHZ_CHANNEL_LIST,
-    EXT_CAPABILITIES_IE_TAG,
-    FT_CAPABILITIES_IE_TAG,
-    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-    HE_CAPABILITIES_IE_EXT_TAG,
-    HT_CAPABILITIES_IE_TAG,
-    IE_EXT_TAG,
-    POWER_MIN_MAX_IE_TAG,
-    RM_CAPABILITIES_IE_TAG,
-    RSN_CAPABILITIES_IE_TAG,
-    SUPPORTED_CHANNELS_IE_TAG,
-    VENDOR_SPECIFIC_IE_TAG,
-    VHT_CAPABILITIES_IE_TAG,
-)
-from .helpers import Capability, flag_last_object, get_bit
+from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
+                        FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+                        HE_CAPABILITIES_IE_EXT_TAG,
+                        HE_SPATIAL_REUSE_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
+                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
+                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
+                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
+                        VHT_CAPABILITIES_IE_TAG)
+from .helpers import Base64Encoder, Capability, flag_last_object, get_bit
 
 
 class Profiler(object):
@@ -193,7 +186,14 @@ class Profiler(object):
         return text_report
 
     def write_analysis_to_file_system(
-        self, text_report, capabilities, frame, oui_manuf, randomized, band, channel
+        self,
+        text_report,
+        capabilities,
+        frame,
+        oui_manuf,
+        randomized: bool,
+        band,
+        channel,
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
@@ -224,10 +224,12 @@ class Profiler(object):
         else:
             band_db = 0
         data["band"] = band_db
-        data["channel"] = channel
-
+        data["capture_channel"] = channel
+        features = {}
         for capability in capabilities:
-            data[capability.db_key] = capability.db_value
+            features[capability.db_key] = capability.db_value
+        data["features"] = features
+        data["pcap"] = json.dumps(bytes(frame), cls=Base64Encoder)
 
         try:
             if os.path.exists(filename):
@@ -384,12 +386,12 @@ class Profiler(object):
         return oui_manuf
 
     @staticmethod
-    def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> []:
+    def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> List:
         """ Check for 802.11n support """
         dot11n = Capability(
             name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
         )
-        dot11n_ss = Capability(db_key="dot11n_ss", db_value=0)
+        dot11n_nss = Capability(db_key="dot11n_nss", db_value=0)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
 
@@ -405,9 +407,9 @@ class Profiler(object):
 
             dot11n.value = f"Supported ({spatial_streams}ss)"
             dot11n.db_value = 1
-            dot11n_ss.db_value = spatial_streams
+            dot11n_nss.db_value = spatial_streams
 
-        return [dot11n, dot11n_ss]
+        return [dot11n, dot11n_nss]
 
     @staticmethod
     def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> []:
@@ -415,7 +417,7 @@ class Profiler(object):
         dot11ac = Capability(
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
         )
-        dot11ac_ss = Capability(db_key="dot11ac_ss", db_value=0)
+        dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
 
@@ -442,7 +444,7 @@ class Profiler(object):
 
             dot11ac.value = f"Supported ({spatial_streams}ss)"
             dot11ac.db_value = 1
-            dot11ac_ss.db_value = spatial_streams
+            dot11ac_nss.db_value = spatial_streams
 
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
@@ -463,7 +465,7 @@ class Profiler(object):
             else:
                 dot11ac.value += ", MU BF not supported"
 
-        return [dot11ac, dot11ac_ss, dot11ac_su_bf, dot11ac_mu_bf]
+        return [dot11ac, dot11ac_nss, dot11ac_su_bf, dot11ac_mu_bf]
 
     @staticmethod
     def analyze_rm_capabilities_ie(dot11_elt_dict: dict) -> []:
@@ -617,16 +619,19 @@ class Profiler(object):
             db_key="dot11ax",
             db_value=0,
         )
-        six_ghz = Capability(
-            name="6 GHz",
-            value="Not supported",
-            db_key="six_ghz",
+        dot11ax_six_ghz = Capability(
+            db_key="dot11ax_six_ghz",
             db_value=0,
         )
 
-        twt = Capability(db_key="dot11ax_twt", db_value=0)
-        dot11ax_ss = Capability(db_key="dot11ax_ss", db_value=0)
-        dot11ax_su_bf = Capability(db_key="dot11ax_su_bf", db_value=0)
+        dot11ax_punctured_preamble = Capability(
+            db_key="dot11ax_punctured_preamble", db_value=0
+        )
+        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
+        dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
+        dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
+        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
+        dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
 
         if he_disabled:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
@@ -637,48 +642,101 @@ class Profiler(object):
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
+                        # dot11ax is supported
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
 
-                        # Check for number streams supported
+                        # determine number of spatial streams (NSS) supported
                         mcs_upper_octet = element_data[19]
                         mcs_lower_octet = element_data[18]
-                        mcs_rx_map = (mcs_upper_octet * 256) + mcs_lower_octet
+                        nss = 0
+                        mcs = []
+                        for octet in [mcs_lower_octet, mcs_upper_octet]:
+                            for bit_position in [0, 2, 4, 6]:
+                                a = get_bit(octet, bit_position)
+                                b = get_bit(octet, bit_position + 1)
+                                if (a == 1) and (b == 1):  # (0x3) Not supported
+                                    continue
+                                if (a == 0) and (b == 0):  # (0x0) MCS 0-7
+                                    nss += 1
+                                    mcs.append("0-7")
+                                    continue
+                                if (a == 1) and (b == 0):  # (0x1) MCS 0-9
+                                    nss += 1
+                                    mcs.append("0-9")
+                                    continue
+                                if (a == 0) and (b == 1):  # (0x2) MCS 0-11
+                                    nss += 1
+                                    mcs.append("0-11")
+                                    continue
 
-                        # define the bit pair we need to look at
-                        spatial_streams = 0
-                        stream_mask = 3
+                        dot11ax.value = f"Supported ({nss}ss)"
+                        dot11ax_nss.db_value = nss
 
-                        # move through each bit pair & test for '10' (stream supported)
-                        for _mcs_bits in range(1, 9):
-
-                            if (mcs_rx_map & stream_mask) != stream_mask:
-
-                                # stream mask bits both '1' when mcs map range not supported
-                                spatial_streams += 1
-
-                            # shift to next mcs range bit pair (stream)
-                            stream_mask = stream_mask * 4
-
-                        dot11ax.value = f"Supported ({spatial_streams}ss)"
-                        dot11ax_ss.db_value = spatial_streams
+                        mcs = sorted(set(mcs))
+                        mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
+                        dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
+                        dot11ax_mcs.db_value = mcs
 
                         twt_octet = element_data[1]
-
                         if get_bit(twt_octet, 1):
-                            twt.value = "Supported"
-                            twt.db_value = 1
+                            dot11ax_twt.db_value = 1
                             dot11ax.value += ", TWT supported"
                         else:
                             dot11ax.value += ", TWT not supported"
 
+                        punctured_preamble_octet = element_data[8]
+                        punctured_preamble_octet_binary_string = ""
+                        for bit_position in range(8):
+                            punctured_preamble_octet_binary_string += f"{int(get_bit(punctured_preamble_octet, bit_position))}"
+                        puncture_preamble_support = any(
+                            [
+                                bool(int(b))
+                                for b in punctured_preamble_octet_binary_string[0:4]
+                            ]
+                        )
+
+                        if puncture_preamble_support:
+                            dot11ax_punctured_preamble.db_value = 1
+                            dot11ax.value += ", Punctured Preamble supported"
+                        else:
+                            dot11ax_punctured_preamble.db_value = 0
+                            dot11ax.value += ", Punctured Preamble not supported"
+
+                        he_er_su_ppdu_octet = element_data[15]
+                        he_er_su_ppdu_octet_binary_string = ""
+                        for bit_position in range(8):
+                            he_er_su_ppdu_octet_binary_string += (
+                                f"{int(get_bit(he_er_su_ppdu_octet, bit_position))}"
+                            )
+                        if int(he_er_su_ppdu_octet_binary_string[0]):
+                            he_er_su_ppdu_support = True
+                        else:
+                            he_er_su_ppdu_support = False
+                        if he_er_su_ppdu_support:
+                            dot11ax_he_er_su_ppdu.db_value = 1
+                            dot11ax.value += ", HE Extended Range supported"
+                        else:
+                            dot11ax_he_er_su_ppdu.db_value = 0
+                            dot11ax.value += ", HE Extended Range not supported"
                         continue
 
-                    if ext_ie_id == HE_6_GHZ_BAND_CAP_IE_EXT_TAG:
-                        six_ghz.value = "Supported"
-                        six_ghz.db_value = 1
+                    if ext_ie_id == HE_SPATIAL_REUSE_IE_EXT_TAG:
+                        dot11ax_spatial_reuse.db_value = 1
 
-        return [dot11ax, dot11ax_ss, twt, dot11ax_su_bf]  # , six_ghz]
+                    if ext_ie_id == HE_6_GHZ_BAND_CAP_IE_EXT_TAG:
+                        # dot11ax_six_ghz.value = "Supported"
+                        dot11ax_six_ghz.db_value = 1
+
+        return [
+            dot11ax,
+            dot11ax_nss,
+            dot11ax_mcs,
+            dot11ax_twt,
+            dot11ax_punctured_preamble,
+            dot11ax_he_er_su_ppdu,
+            dot11ax_six_ghz,
+        ]
 
     def analyze_assoc_req(self, frame) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """

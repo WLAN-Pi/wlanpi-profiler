@@ -1,11 +1,11 @@
 Release 1.0.6 (WIP)
 
-- Replace pipx with debianization
-- Allow pcap file to be analyzed when no WLAN NICs are detected
-- Remove draft label from 802.11ax detection
+- Replace pipx packaging with debianization
+- Allow pcap file to be analyzed when no WLAN NICs are present
 - Make output to screen less noisy by default
-- Add JSON output
-- Update documentation
+- Add JSON output to support backend
+- Remove draft label from 802.11ax detection
+- Add beta feature detection for 802.11ax TWT, Punctured Preamble, and HE (ER) Extended Range
 
 Release 1.0.5
 

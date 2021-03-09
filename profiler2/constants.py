@@ -59,7 +59,8 @@ VENDOR_SPECIFIC_IE_TAG = 221  # Vendor Specific IE
 IE_EXT_TAG = 255  # Element ID Extension field
 HE_CAPABILITIES_IE_EXT_TAG = 35  # 802.11ax HE Capabilities IE
 HE_OPERATION_IE_EXT_TAG = 36  # 802.11ax HE Operation IE
-HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 6 GHz capabilities IE
+HE_SPATIAL_REUSE_IE_EXT_TAG = 39  # 802.11ax Spatial Reuse Paramater IE
+HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 802.11ax 6 GHz capabilities IE
 
 CHANNELS = [
     1,

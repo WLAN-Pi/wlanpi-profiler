@@ -40,6 +40,7 @@ provides init functions that are used to help setup the app.
 import argparse
 import configparser
 import inspect
+import json
 import logging
 import logging.config
 import os
@@ -50,6 +51,7 @@ import socket
 import subprocess
 import sys
 import textwrap
+from base64 import b64encode
 from dataclasses import dataclass
 from distutils.util import strtobool
 from multiprocessing import Value
@@ -607,6 +609,14 @@ def get_frequency_bytes(channel: int) -> bytes:
     return freq.to_bytes(2, byteorder="little")
 
 
+class Base64Encoder(json.JSONEncoder):
+    # pylint: disable=method-hidden
+    def default(self, o):
+        if isinstance(o, bytes):
+            return b64encode(o).decode()
+        return json.JSONEncoder.default(self, o)
+
+
 def get_wlanpi_version():
     wlanpi_version = "unknown"
     try:
@@ -615,7 +625,7 @@ def get_wlanpi_version():
             for line in lines:
                 if "VERSION" in line:
                     wlanpi_version = "{0}".format(
-                        line.split("=")[1].replace('"', "").strip()
+                        line.split("=")[1].replace('"', "").replace("'", "").strip()
                     )
     except OSError:
         pass
