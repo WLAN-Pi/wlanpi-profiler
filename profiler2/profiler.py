@@ -420,6 +420,7 @@ class Profiler(object):
         dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
+        dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             # Check for number streams supported
@@ -449,16 +450,26 @@ class Profiler(object):
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
             su_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
+            onesixty = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][0]
 
-            beam_form_mask = 16
+            # 160 MHz
+            if get_bit(onesixty, 2):
+                dot11ac_160_mhz.db_value = 1
+                dot11ac.value += ", 160 MHz supported"
+            else:
+                dot11ac.value += ", 160 MHz not supported"
 
             # bit 4 indicates support for both octets (1 = supported, 0 = not supported)
+            beam_form_mask = 16
+
+            # SU BF
             if su_octet & beam_form_mask:
                 dot11ac.value += ", SU BF supported"
                 dot11ac_su_bf.db_value = 1
             else:
                 dot11ac.value += ", SU BF not supported"
 
+            # MU BF
             if mu_octet & beam_form_mask:
                 dot11ac.value += ", MU BF supported"
                 dot11ac_mu_bf.db_value = 1
@@ -632,6 +643,7 @@ class Profiler(object):
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
+        dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
 
         if he_disabled:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
@@ -677,6 +689,13 @@ class Profiler(object):
                         mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
                         dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
+
+                        onesixty_octet = element_data[7]
+                        if get_bit(onesixty_octet, 3):
+                            dot11ax.value += ", 160 MHz supported"
+                            dot11ax_160_mhz.db_value = 1
+                        else:
+                            dot11ax.value += ", 160 MHz not supported"
 
                         twt_octet = element_data[1]
                         if get_bit(twt_octet, 1):

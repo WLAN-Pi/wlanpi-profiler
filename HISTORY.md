@@ -5,6 +5,7 @@ Release 1.0.6 (WIP)
 - Make output to screen less noisy by default
 - Add JSON output to support backend
 - Remove draft label from 802.11ax detection
+- Add detection of support for 160 MHz across 802.11ac and 802.11ax
 - Add beta feature detection for 802.11ax TWT, Punctured Preamble, and HE (ER) Extended Range
 
 Release 1.0.5
