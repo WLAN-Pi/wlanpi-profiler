@@ -16,7 +16,10 @@ values to determine client capabilities.
         - Y - 802.11ac supported
         - N - 802.11ac not supported
     - b. inspect octets 4 & 5 (Rx MCS map) - 
-        - count Rx MCS map bit pairs set to '10' to determine number of streams supported
+        - count Rx MCS map bit pairs not set to '11' to determine number of streams supported
+        - MCS 0-7 if pairs are set to '00'
+        - MCS 0-8 if pairs are set to '01'
+        - MCS 0-9 if pairs are set to '11'
     - c. inspect octet 1 (one of the four vht capability octets)
         - if bit zero set to '1', client is SU Beam-formee capable
     - d. inspect octet 2 (one of the four vht capability octets)

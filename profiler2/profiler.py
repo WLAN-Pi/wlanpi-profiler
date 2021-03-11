@@ -142,9 +142,10 @@ class Profiler(object):
             self.log.info("text report for %s\n%s", frame.addr2, text_report)
 
             self.log.debug(
-                "writing text and csv report for %s (capabilities hash=%s)",
+                "writing textual reports for %s (capabilities hash=%s) to %s",
                 frame.addr2,
                 analysis_hash,
+                os.path.join(self.clients_dir, frame.addr2.replace(":", "-")),
             )
             self.write_analysis_to_file_system(
                 text_report, capabilities, frame, oui_manuf, randomized, band, channel
@@ -418,34 +419,41 @@ class Profiler(object):
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
         )
         dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
+        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value=0)
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
         dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-            # Check for number streams supported
+            # determine number of spatial streams (NSS) supported
             mcs_upper_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][5]
             mcs_lower_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][4]
-            mcs_rx_map = (mcs_upper_octet * 256) + mcs_lower_octet
+            nss = 0
+            mcs = []
+            for octet in [mcs_lower_octet, mcs_upper_octet]:
+                for bit_position in [0, 2, 4, 6]:
+                    a = get_bit(octet, bit_position)
+                    b = get_bit(octet, bit_position + 1)
+                    if (a == 1) and (b == 1):  # (0x3) Not supported
+                        continue
+                    if (a == 0) and (b == 0):  # (0x0) MCS 0-7
+                        nss += 1
+                        mcs.append("0-7")
+                        continue
+                    if (a == 1) and (b == 0):  # (0x1) MCS 0-8
+                        nss += 1
+                        mcs.append("0-8")
+                        continue
+                    if (a == 0) and (b == 1):  # (0x2) MCS 0-9
+                        nss += 1
+                        mcs.append("0-9")
+                        continue
 
-            # define the bit pair we need to look at
-            spatial_streams = 0
-            stream_mask = 3
-
-            # move through each bit pair & test for '10' (stream supported)
-            for _mcs_bits in range(1, 9):
-
-                if (mcs_rx_map & stream_mask) != stream_mask:
-
-                    # stream mask bits both '1' when mcs map range not supported
-                    spatial_streams += 1
-
-                # shift to next mcs range bit pair (stream)
-                stream_mask = stream_mask * 4
-
-            dot11ac.value = f"Supported ({spatial_streams}ss)"
-            dot11ac.db_value = 1
-            dot11ac_nss.db_value = spatial_streams
+            mcs = sorted(set(mcs))
+            mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
+            dot11ac.value = f"Supported ({nss}ss), MCS {mcs}"
+            dot11ac_nss.db_value = nss
+            dot11ac_mcs.db_value = mcs
 
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
@@ -476,7 +484,14 @@ class Profiler(object):
             else:
                 dot11ac.value += ", MU BF not supported"
 
-        return [dot11ac, dot11ac_nss, dot11ac_su_bf, dot11ac_mu_bf]
+        return [
+            dot11ac,
+            dot11ac_nss,
+            dot11ac_160_mhz,
+            dot11ac_mcs,
+            dot11ac_su_bf,
+            dot11ac_mu_bf,
+        ]
 
     @staticmethod
     def analyze_rm_capabilities_ie(dot11_elt_dict: dict) -> []:
@@ -634,14 +649,13 @@ class Profiler(object):
             db_key="dot11ax_six_ghz",
             db_value=0,
         )
-
         dot11ax_punctured_preamble = Capability(
             db_key="dot11ax_punctured_preamble", db_value=0
         )
-        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
+        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
-        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
+        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
         dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
         dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
 
@@ -682,13 +696,11 @@ class Profiler(object):
                                     mcs.append("0-11")
                                     continue
 
-                        dot11ax.value = f"Supported ({nss}ss)"
-                        dot11ax_nss.db_value = nss
-
                         mcs = sorted(set(mcs))
                         mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
                         dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
+                        dot11ax_nss.db_value = nss
 
                         onesixty_octet = element_data[7]
                         if get_bit(onesixty_octet, 3):
@@ -755,6 +767,7 @@ class Profiler(object):
             dot11ax_punctured_preamble,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
+            dot11ax_160_mhz,
         ]
 
     def analyze_assoc_req(self, frame) -> Tuple[str, list]:
