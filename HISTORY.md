@@ -7,7 +7,7 @@ Release 1.0.6 (WIP)
 - Remove draft label from 802.11ax detection
 - Add Supported MCS detection for 802.11ac and 802.11ax
 - Add 160 MHz support for 802.11ac and 802.11ax
-- Add feature detection for 802.11ax TWT, Punctured Preamble, HE (ER) Extended Range, and UORA (Uplink OFDMA Random Access). 
+- Add feature detection for 802.11ax TWT, Punctured Preamble, HE (ER) Extended Range, UORA (Uplink OFDMA Random Access), and BSR Control (Buffer Status Report)
 
 Release 1.0.5
 

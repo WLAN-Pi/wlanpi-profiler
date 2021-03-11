@@ -656,6 +656,7 @@ class Profiler(object):
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
         dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=0)
+        dot11ax_bsr = Capability(db_key="dot11ax_bsr", db_value=0)
         dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
         dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
         dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
@@ -769,6 +770,24 @@ class Profiler(object):
                         else:
                             dot11ax_uora.db_value = 0
                             dot11ax.value += ", UORA not supported"
+
+                        bsr_octet = element_data[3]
+                        bsr_octet_binary_string = ""
+                        for bit_position in range(8):
+                            bsr_octet_binary_string += (
+                                f"{int(get_bit(bsr_octet, bit_position))}"
+                            )
+
+                        if int(bsr_octet_binary_string[3]):
+                            bsr_support = True
+                        else:
+                            bsr_support = False
+                        if bsr_support:
+                            dot11ax_bsr.db_value = 1
+                            dot11ax.value += ", BSR supported"
+                        else:
+                            dot11ax_bsr.db_value = 0
+                            dot11ax.value += ", BSR not supported"
                         continue
 
                     if ext_ie_id == HE_SPATIAL_REUSE_IE_EXT_TAG:
@@ -784,6 +803,7 @@ class Profiler(object):
             dot11ax_mcs,
             dot11ax_twt,
             dot11ax_uora,
+            dot11ax_bsr,
             dot11ax_punctured_preamble,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,

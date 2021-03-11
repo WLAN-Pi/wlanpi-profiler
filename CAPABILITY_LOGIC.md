@@ -88,6 +88,9 @@ values to determine client capabilities.
     - g. Uplink OFDMA Random Access (UORA) support: B26 of HE PHY Capabilities
         - Y - supported
         - N - not supported 
+    - h. Buffer Status Report (BSR) support: B19 of HE PHY Capabilities
+        - Y - supported
+        - N - not supported 
 
 10. 802.11ax spatial reuse: inspect spatial reuse tag number 39 (Spatial Reuse Parameter Set)
     - a. is Spatial Reuse Parameter Set tagged parameter present?
