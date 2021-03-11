@@ -68,21 +68,26 @@ values to determine client capabilities.
     - a. is HE capabilities tagged parameter present? 
         - Y - 802.11ax supported
         - N - 802.11ax not supported
-    - b. number of spatial streams by inspecting octets 19 & 20 (Rx MCS map) - 
+    - aY - pass
+    - aN - do not evaluate remaining capabilities
+    - b. Number of spatial streams by inspecting octets 19 & 20 (Rx MCS map) - 
         - count Rx MCS map bit pairs not set to '11' to determine number of streams supported
     - c. MCS 10/11 support inspect NSS subfield (b.)
         - MCS 0-7: NSS bit pairs set to '00'
         - MCS 0-9: NSS bit pairs set to '01'
         - MCS 0-11: NSS bit pairs set to '10'
-    - d. punctured preamble support: B8-B11 of HE PHY Capabilities 
+    - d. Punctured Preamble support: B8-B11 of HE PHY Capabilities 
         - Y - supported - if any(B0, B1, B2, B3) == true
         - N - not supported - if any(B0, B1, B2, B3) == false
-    - e. HE ER SU PPDU: B64 of HE PHY Capabilities
+    - e. HE ER (Extended Range) SU PPDU: B64 of HE PHY Capabilities
         - Y - supported 
         - N - not supported
-    - f. TWT support by inspecting octet 1 (bit 1):
+    - f. Target Wake Time (TWT) support by inspecting octet 1 (bit 1):
         - Y - supported
         - N - not supported
+    - g. Uplink OFDMA Random Access (UORA) support: B26 of HE PHY Capabilities
+        - Y - supported
+        - N - not supported 
 
 10. 802.11ax spatial reuse: inspect spatial reuse tag number 39 (Spatial Reuse Parameter Set)
     - a. is Spatial Reuse Parameter Set tagged parameter present?

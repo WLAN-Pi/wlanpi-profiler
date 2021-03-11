@@ -655,6 +655,7 @@ class Profiler(object):
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
+        dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=0)
         dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
         dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
         dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
@@ -746,10 +747,28 @@ class Profiler(object):
                             he_er_su_ppdu_support = False
                         if he_er_su_ppdu_support:
                             dot11ax_he_er_su_ppdu.db_value = 1
-                            dot11ax.value += ", HE Extended Range supported"
+                            dot11ax.value += ", HE ER supported"
                         else:
                             dot11ax_he_er_su_ppdu.db_value = 0
-                            dot11ax.value += ", HE Extended Range not supported"
+                            dot11ax.value += ", HE ER not supported"
+
+                        uora_octet = element_data[4]
+                        uora_octet_binary_string = ""
+                        for bit_position in range(8):
+                            uora_octet_binary_string += (
+                                f"{int(get_bit(uora_octet, bit_position))}"
+                            )
+
+                        if int(uora_octet_binary_string[2]):
+                            uora_support = True
+                        else:
+                            uora_support = False
+                        if uora_support:
+                            dot11ax_uora.db_value = 1
+                            dot11ax.value += ", UORA supported"
+                        else:
+                            dot11ax_uora.db_value = 0
+                            dot11ax.value += ", UORA not supported"
                         continue
 
                     if ext_ie_id == HE_SPATIAL_REUSE_IE_EXT_TAG:
@@ -764,6 +783,7 @@ class Profiler(object):
             dot11ax_nss,
             dot11ax_mcs,
             dot11ax_twt,
+            dot11ax_uora,
             dot11ax_punctured_preamble,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
