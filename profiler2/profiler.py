@@ -53,6 +53,7 @@ from typing import List, Tuple
 from manuf import manuf
 from scapy.all import wrpcap
 
+from .__version__ import __version__
 # app imports
 from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
                         FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
@@ -231,6 +232,8 @@ class Profiler(object):
             features[capability.db_key] = capability.db_value
         data["features"] = features
         data["pcap"] = json.dumps(bytes(frame), cls=Base64Encoder)
+        data["schema_version"] = 1
+        data["profiler_version"] = __version__
 
         try:
             if os.path.exists(filename):
@@ -451,7 +454,7 @@ class Profiler(object):
 
             mcs = sorted(set(mcs))
             mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
-            dot11ac.value = f"Supported ({nss}ss), MCS {mcs}"
+            dot11ac.value = f"Supported ({nss}ss) | MCS {mcs}"
             dot11ac_nss.db_value = nss
             dot11ac_mcs.db_value = mcs
 
@@ -463,26 +466,26 @@ class Profiler(object):
             # 160 MHz
             if get_bit(onesixty, 2):
                 dot11ac_160_mhz.db_value = 1
-                dot11ac.value += ", 160 MHz supported"
+                dot11ac.value += " | *[Y] 160 MHz"
             else:
-                dot11ac.value += ", 160 MHz not supported"
+                dot11ac.value += " | -[N] 160 MHz"
 
             # bit 4 indicates support for both octets (1 = supported, 0 = not supported)
             beam_form_mask = 16
 
             # SU BF
             if su_octet & beam_form_mask:
-                dot11ac.value += ", SU BF supported"
+                dot11ac.value += " | *[Y] SU BF"
                 dot11ac_su_bf.db_value = 1
             else:
-                dot11ac.value += ", SU BF not supported"
+                dot11ac.value += " | -[N] SU BF"
 
             # MU BF
             if mu_octet & beam_form_mask:
-                dot11ac.value += ", MU BF supported"
+                dot11ac.value += " | *[Y] MU BF"
                 dot11ac_mu_bf.db_value = 1
             else:
-                dot11ac.value += ", MU BF not supported"
+                dot11ac.value += " | -[N] MU BF"
 
         return [
             dot11ac,
@@ -700,23 +703,23 @@ class Profiler(object):
 
                         mcs = sorted(set(mcs))
                         mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
-                        dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
+                        dot11ax.value = f"Supported ({nss}ss) | MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
                         dot11ax_nss.db_value = nss
 
                         onesixty_octet = element_data[7]
                         if get_bit(onesixty_octet, 3):
-                            dot11ax.value += ", 160 MHz supported"
+                            dot11ax.value += " | *[Y] 160 MHz"
                             dot11ax_160_mhz.db_value = 1
                         else:
-                            dot11ax.value += ", 160 MHz not supported"
+                            dot11ax.value += " | -[N] 160 MHz"
 
                         twt_octet = element_data[1]
                         if get_bit(twt_octet, 1):
                             dot11ax_twt.db_value = 1
-                            dot11ax.value += ", TWT supported"
+                            dot11ax.value += " | *[Y] TWT"
                         else:
-                            dot11ax.value += ", TWT not supported"
+                            dot11ax.value += " | -[N] TWT"
 
                         punctured_preamble_octet = element_data[8]
                         punctured_preamble_octet_binary_string = ""
@@ -731,10 +734,10 @@ class Profiler(object):
 
                         if puncture_preamble_support:
                             dot11ax_punctured_preamble.db_value = 1
-                            dot11ax.value += ", Punctured Preamble supported"
+                            dot11ax.value += " | *[Y] Punctured Preamble"
                         else:
                             dot11ax_punctured_preamble.db_value = 0
-                            dot11ax.value += ", Punctured Preamble not supported"
+                            dot11ax.value += " | -[N] Punctured Preamble"
 
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
@@ -748,10 +751,10 @@ class Profiler(object):
                             he_er_su_ppdu_support = False
                         if he_er_su_ppdu_support:
                             dot11ax_he_er_su_ppdu.db_value = 1
-                            dot11ax.value += ", HE ER supported"
+                            dot11ax.value += " | *[Y] HE ER SU PPDU"
                         else:
                             dot11ax_he_er_su_ppdu.db_value = 0
-                            dot11ax.value += ", HE ER not supported"
+                            dot11ax.value += " | -[N] HE ER SU PPDU"
 
                         uora_octet = element_data[4]
                         uora_octet_binary_string = ""
@@ -766,10 +769,10 @@ class Profiler(object):
                             uora_support = False
                         if uora_support:
                             dot11ax_uora.db_value = 1
-                            dot11ax.value += ", UORA supported"
+                            dot11ax.value += " | *[Y] UORA"
                         else:
                             dot11ax_uora.db_value = 0
-                            dot11ax.value += ", UORA not supported"
+                            dot11ax.value += " | -[N] UORA"
 
                         bsr_octet = element_data[3]
                         bsr_octet_binary_string = ""
@@ -784,10 +787,10 @@ class Profiler(object):
                             bsr_support = False
                         if bsr_support:
                             dot11ax_bsr.db_value = 1
-                            dot11ax.value += ", BSR supported"
+                            dot11ax.value += " | *[Y] BSR"
                         else:
                             dot11ax_bsr.db_value = 0
-                            dot11ax.value += ", BSR not supported"
+                            dot11ax.value += " | -[N] BSR"
                         continue
 
                     if ext_ie_id == HE_SPATIAL_REUSE_IE_EXT_TAG:

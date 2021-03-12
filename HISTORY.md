@@ -1,11 +1,11 @@
 Release 1.0.6 (WIP)
 
-- Replace pipx packaging with debianization
-- Allow pcap file to be analyzed when no WLAN NICs are present
+- Replace pipx packaging with debian packaging
+- Allow read of pcap file when no WLAN NICs are present
 - Make output to screen less noisy by default
-- Add JSON output to support backend
+- Add output to JSON flat file to support backend
 - Remove draft label from 802.11ax detection
-- Add Supported MCS detection for 802.11ac and 802.11ax
+- Add MCS detection for 802.11ac and 802.11ax
 - Add 160 MHz support for 802.11ac and 802.11ax
 - Add feature detection for 802.11ax TWT, Punctured Preamble, HE (ER) Extended Range, UORA (Uplink OFDMA Random Access), and BSR Control (Buffer Status Report)
 

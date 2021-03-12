@@ -1,7 +1,7 @@
 # wlanpi-profiler.service
 
 [Unit]
-Description=wlan client capabilities profiler
+Description=Wi-Fi client capabilities analyzer tool
 After=multi-user.target
 
 [Service]

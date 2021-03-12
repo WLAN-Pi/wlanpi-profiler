@@ -183,11 +183,7 @@ def setup_parser() -> argparse:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
             """
-            Profiler is a Wi-Fi client capabilities analyzer.
-            
-            It helps identify claimed supported 802.11 feature-set.
-            
-            The purpose is to automate the gathering and analysis of association frames.
+            wlanpi-profiler is an 802.11 client capabilities profiler. Its purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request to.
             """
         ),
     )
@@ -313,8 +309,8 @@ def setup_parser() -> argparse:
         help="initiates update of OUI database (requires Internet connection)",
     )
     parser.add_argument(
-        "--pcap",
-        metavar="<FILE>",
+        "--read",
+        metavar="<FILE.pcap>",
         dest="pcap_analysis",
         help="analyze first packet of pcap (expects association request frame)",
     )

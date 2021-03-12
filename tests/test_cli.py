@@ -26,9 +26,9 @@ class TestArgParsing:
         out, err = capsys.readouterr()
         assert err == ""
 
-    def test_pcap_fail(self, parser, capsys):
+    def test_read_pcap_fail(self, parser, capsys):
         with pytest.raises(SystemExit):
-            parser.parse_args(["", "--pcap"])
+            parser.parse_args(["", "--read"])
         out, err = capsys.readouterr()
         assert "expected one argument" in err
 
@@ -76,7 +76,7 @@ class TestArgParsing:
     @pytest.mark.parametrize(
         "args,expected",
         [
-            (["--pcap", "fake_file_does_not_exist.pcap"], ""),
+            (["--read", "fake_file_does_not_exist.pcap"], ""),
             (["--noAP"], ""),
             (["--11r"], ""),
             (["--no11r"], ""),

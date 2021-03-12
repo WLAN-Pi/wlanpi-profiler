@@ -1,8 +1,8 @@
 ![versions](docs/images/profiler2-pybadge-w-logo.svg) ![tests](https://github.com/joshschmelzle/profiler2/workflows/tests/badge.svg) ![coverage-badge](coverage.svg) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
-# profiler2
+# wlanpi-profiler
 
-profiler is a Wi-Fi client capability analyzer built for the [WLAN Pi](https://github.com/WLAN-Pi/).
+wlanpi-profiler is a Wi-Fi client capability analyzer tool built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
 The primary purpose is to automate the collection and analysis of association request frames.
 
@@ -110,7 +110,7 @@ Elevated permissions are required to prep the interface in monitor mode and for 
 ```
 usage: profiler [-h] [-i INTERFACE] [--noprep] [-c CHANNEL]
                 [-s SSID | --hostname_ssid | --noAP] [--11r | --no11r]
-                [--11ax | --no11ax] [--pcap <FILE>] [--config <FILE>]
+                [--11ax | --no11ax] [--read <FILE>] [--config <FILE>]
                 [--files_path <PATH>] [--oui_update]
                 [--logging [{debug,warning}]] [--version]
 
@@ -128,7 +128,7 @@ optional arguments:
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --11ax                turn on 802.11ax High Efficiency (HE) reporting (override --config file)
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting   
-  --pcap <FILE>         analyze first packet of pcap (expecting an association request frame)
+  --read <FILE>         analyze first packet of pcap (expecting an association request frame)
   --config <FILE>       customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
   --files_path <PATH>   customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
   --oui_update          initiates Internet update of OUI database
@@ -166,7 +166,7 @@ sudo profiler --noAP -c 100
 
 ```
 # analyze an association request in a previously captured PCAP file (must be the only frame in the file)
-sudo profiler --pcap assoc_frame.pcap
+sudo profiler --read assoc_frame.pcap
 ```
 
 ```
