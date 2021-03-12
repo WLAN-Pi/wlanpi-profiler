@@ -137,7 +137,7 @@ class Profiler(object):
 
             # genereat text report
             text_report = self.generate_text_report(
-                text_report_oui_manuf, capabilities, frame.addr2, channel
+                text_report_oui_manuf, capabilities, frame.addr2, channel, band
             )
 
             self.log.info("text report for %s\n%s", frame.addr2, text_report)
@@ -167,13 +167,21 @@ class Profiler(object):
 
     @staticmethod
     def generate_text_report(
-        oui_manuf: str, capabilities: list, client_mac: str, channel: int
+        oui_manuf: str, capabilities: list, client_mac: str, channel: int, band: str
     ) -> str:
         """ Generate a report for output """
         # start report
         text_report = "-" * 45
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
+        band_label = ""
+        if [s for s in band][0] == "2":
+            band_label = "2.4 GHz"
+        if [s for s in band][0] == "5":
+            band_label = "5 GHz"
+        if [s for s in band][0] == "6":
+            band_label = "6 GHz"
+        text_report += f"\n - Frequency band: {band_label}"
         text_report += f"\n - Capture channel: {channel}\n"
         text_report += "-" * 45
         text_report += "\n"
@@ -183,8 +191,9 @@ class Profiler(object):
                     "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
                 )
 
+        text_report += "\nKey: [X]: Supported, [ ]: Not supported"
         text_report += "\n* Reported client capabilities are dependent on available features at the time of client association."
-        text_report += "\n** Reported channels do not factor local regulatory domain."
+        text_report += "\n** Reported channels do not factor local regulatory domain. Detected channel sets are assumed contiguous."
         return text_report
 
     def write_analysis_to_file_system(
@@ -454,7 +463,7 @@ class Profiler(object):
 
             mcs = sorted(set(mcs))
             mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
-            dot11ac.value = f"Supported ({nss}ss) | MCS {mcs}"
+            dot11ac.value = f"Supported ({nss}ss), MCS {mcs}"
             dot11ac_nss.db_value = nss
             dot11ac_mcs.db_value = mcs
 
@@ -466,26 +475,26 @@ class Profiler(object):
             # 160 MHz
             if get_bit(onesixty, 2):
                 dot11ac_160_mhz.db_value = 1
-                dot11ac.value += " | *[Y] 160 MHz"
+                dot11ac.value += ", [X] 160 MHz"
             else:
-                dot11ac.value += " | -[N] 160 MHz"
+                dot11ac.value += ", [ ] 160 MHz"
 
             # bit 4 indicates support for both octets (1 = supported, 0 = not supported)
             beam_form_mask = 16
 
             # SU BF
             if su_octet & beam_form_mask:
-                dot11ac.value += " | *[Y] SU BF"
+                dot11ac.value += ", [X] SU BF"
                 dot11ac_su_bf.db_value = 1
             else:
-                dot11ac.value += " | -[N] SU BF"
+                dot11ac.value += ", [ ] SU BF"
 
             # MU BF
             if mu_octet & beam_form_mask:
-                dot11ac.value += " | *[Y] MU BF"
+                dot11ac.value += ", [X] MU BF"
                 dot11ac_mu_bf.db_value = 1
             else:
-                dot11ac.value += " | -[N] MU BF"
+                dot11ac.value += ", [ ] MU BF"
 
         return [
             dot11ac,
@@ -576,13 +585,13 @@ class Profiler(object):
     def analyze_power_capability_ie(dot11_elt_dict: dict) -> []:
         """ Check for supported power capabilities """
         max_power_cap = Capability(
-            name="Max_Power",
+            name="Max Power",
             value="Not reported",
             db_key="max_power",
             db_value=0,
         )
         min_power_cap = Capability(
-            # name="Min_Power",
+            # name="Min Power",
             # value="Not reported",
             db_key="min_power",
             db_value=0,
@@ -611,10 +620,14 @@ class Profiler(object):
     def analyze_supported_channels_ie(dot11_elt_dict: dict) -> []:
         """ Check supported channels """
         supported_channels = Capability(
-            name="Supported_Channels",
+            name="Supported Channels",
             value="Not reported",
             db_key="supported_channels",
             db_value=[],
+        )
+        number_of_supported_channels = Capability(
+            name="Number of Channels",
+            value=0,
         )
         if SUPPORTED_CHANNELS_IE_TAG in dot11_elt_dict.keys():
             channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
@@ -631,13 +644,34 @@ class Profiler(object):
                 else:
                     channel_multiplier = 1
 
+                number_of_supported_channels.value += channel_range
                 for i in range(channel_range):
                     channel_list.append(start_channel + (i * channel_multiplier))
 
-            supported_channels.value = ",".join(map(str, channel_list))
+            ranges = []
+            placeholder = []
+            for index, channel in enumerate(channel_list):
+                if index == 0:
+                    placeholder.append(channel)
+                    continue
+                if channel - placeholder[-1] == channel_multiplier:
+                    placeholder.append(channel)
+                    # are we at last index? add last list to ranges
+                    if channel == channel_list[-1]:
+                        ranges.append(placeholder)
+                else:
+                    ranges.append(placeholder)
+                    placeholder = []
+                    placeholder.append(channel)
+
+            channel_ranges = []
+            for r in ranges:
+                channel_ranges.append(f"{r[0]}-{r[-1]}")
+
+            supported_channels.value = f"{', '.join(channel_ranges)}**"
             supported_channels.db_value = channel_list
 
-        return [supported_channels]
+        return [supported_channels, number_of_supported_channels]
 
     @staticmethod
     def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
@@ -703,23 +737,23 @@ class Profiler(object):
 
                         mcs = sorted(set(mcs))
                         mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
-                        dot11ax.value = f"Supported ({nss}ss) | MCS {mcs}"
+                        dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
                         dot11ax_nss.db_value = nss
 
                         onesixty_octet = element_data[7]
                         if get_bit(onesixty_octet, 3):
-                            dot11ax.value += " | *[Y] 160 MHz"
+                            dot11ax.value += ", [X] 160 MHz"
                             dot11ax_160_mhz.db_value = 1
                         else:
-                            dot11ax.value += " | -[N] 160 MHz"
+                            dot11ax.value += ", [ ] 160 MHz"
 
                         twt_octet = element_data[1]
                         if get_bit(twt_octet, 1):
                             dot11ax_twt.db_value = 1
-                            dot11ax.value += " | *[Y] TWT"
+                            dot11ax.value += ", [X] TWT"
                         else:
-                            dot11ax.value += " | -[N] TWT"
+                            dot11ax.value += ", [ ] TWT"
 
                         punctured_preamble_octet = element_data[8]
                         punctured_preamble_octet_binary_string = ""
@@ -734,10 +768,10 @@ class Profiler(object):
 
                         if puncture_preamble_support:
                             dot11ax_punctured_preamble.db_value = 1
-                            dot11ax.value += " | *[Y] Punctured Preamble"
+                            dot11ax.value += ", [X] Punctured Preamble"
                         else:
                             dot11ax_punctured_preamble.db_value = 0
-                            dot11ax.value += " | -[N] Punctured Preamble"
+                            dot11ax.value += ", [ ] Punctured Preamble"
 
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
@@ -751,10 +785,10 @@ class Profiler(object):
                             he_er_su_ppdu_support = False
                         if he_er_su_ppdu_support:
                             dot11ax_he_er_su_ppdu.db_value = 1
-                            dot11ax.value += " | *[Y] HE ER SU PPDU"
+                            dot11ax.value += ", [X] HE ER SU PPDU"
                         else:
                             dot11ax_he_er_su_ppdu.db_value = 0
-                            dot11ax.value += " | -[N] HE ER SU PPDU"
+                            dot11ax.value += ", [ ] HE ER SU PPDU"
 
                         uora_octet = element_data[4]
                         uora_octet_binary_string = ""
@@ -769,10 +803,10 @@ class Profiler(object):
                             uora_support = False
                         if uora_support:
                             dot11ax_uora.db_value = 1
-                            dot11ax.value += " | *[Y] UORA"
+                            dot11ax.value += ", [X] UORA"
                         else:
                             dot11ax_uora.db_value = 0
-                            dot11ax.value += " | -[N] UORA"
+                            dot11ax.value += ", [ ] UORA"
 
                         bsr_octet = element_data[3]
                         bsr_octet_binary_string = ""
@@ -787,10 +821,10 @@ class Profiler(object):
                             bsr_support = False
                         if bsr_support:
                             dot11ax_bsr.db_value = 1
-                            dot11ax.value += " | *[Y] BSR"
+                            dot11ax.value += ", [X] BSR"
                         else:
                             dot11ax_bsr.db_value = 0
-                            dot11ax.value += " | -[N] BSR"
+                            dot11ax.value += ", [ ] BSR"
                         continue
 
                     if ext_ie_id == HE_SPATIAL_REUSE_IE_EXT_TAG:
