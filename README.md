@@ -97,7 +97,7 @@ pipx install git+https://github.com/WLAN-Pi/profiler2.git
 iw reg set US
 ```
 
-And run the profiler2 console script like this:
+And the entry point for launching profiler looks like this:
 
 ```
 sudo profiler
@@ -105,35 +105,36 @@ sudo profiler
 
 # usage
 
-Elevated permissions are required to prep the interface in monitor mode and for scapy to open a raw native socket for frame injection. You must run profiler with elevated permissions e.g. `sudo profiler`. Launching profiler from the WLAN Pi FPMS will handle this for you.
+Note elevated permissions are required to prep the interface in monitor mode and for scapy to open a raw native socket for frame injection. This means if you run profiler manually you must do so like `sudo profiler` for example. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this automatically.
 
 ```
-usage: profiler [-h] [-i INTERFACE] [--noprep] [-c CHANNEL]
-                [-s SSID | --hostname_ssid | --noAP] [--11r | --no11r]
-                [--11ax | --no11ax] [--read <FILE>] [--config <FILE>]
-                [--files_path <PATH>] [--oui_update]
-                [--logging [{debug,warning}]] [--version]
+usage: __main__.py [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID]
+                   [--config <FILE>] [--files_path <PATH>] [--hostname_ssid]
+                   [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r]
+                   [--no11ax] [--oui_update] [--read <FILE.pcap>] [--version]
 
-a Wi-Fi client analyzer for identifying supported 802.11 capabilities
+wlanpi-profiler is an 802.11 client capabilities profiler. The purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INTERFACE          set network interface for profiler (default: None)                                                                     
-  --noprep              disable interface preperation (default: False)
   -c CHANNEL            802.11 channel to broadcast on
-  -s SSID               set profiler SSID
-  --hostname_ssid       use the WLAN Pi's hostname as SSID name
-  --noAP                enable listen only mode (Rx only)
-  --11r                 turn on 802.11r Fast Transition (FT) reporting (override --config file)
-  --no11r               turn off 802.11r Fast Transition (FT) reporting
-  --11ax                turn on 802.11ax High Efficiency (HE) reporting (override --config file)
-  --no11ax              turn off 802.11ax High Efficiency (HE) reporting   
-  --read <FILE>         analyze first packet of pcap (expecting an association request frame)
-  --config <FILE>       customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
-  --files_path <PATH>   customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
-  --oui_update          initiates Internet update of OUI database
+  -i INTERFACE          set network interface for profiler
+  -s SSID               set profiler SSID name
+  --config <FILE>       customize path for configuration file (default:
+                        /etc/wlanpi-profiler/config.ini)
+  --files_path <PATH>   customize default directory where analysis is saved on
+                        local system (default: /var/www/html/profiler)
+  --hostname_ssid       use the WLAN Pi's hostname as SSID name (default:
+                        False)
   --logging [{debug,warning}]
                         change logging output
+  --noprep              disable interface preperation (default: False)
+  --noAP                enable Rx only mode (default: False)
+  --no11r               turn off 802.11r Fast Transition (FT) reporting
+  --no11ax              turn off 802.11ax High Efficiency (HE) reporting
+  --oui_update          initiates update of OUI database (requires Internet
+                        connection)
+  --read <FILE.pcap>    read and analyze association request frames from pcap
   --version, -V         show program's version number and exit
 ```
 

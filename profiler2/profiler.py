@@ -157,13 +157,14 @@ class Profiler(object):
                 "%s clients profiled this session", self.client_profiled_count
             )
 
-            # if we end up sending multiple frames from pcap for profiling - this will need changed
-            if self.pcap_analysis:
-                self.log.info(
-                    "exiting because we were told to only analyze %s",
-                    self.pcap_analysis,
-                )
-                sys.exit(signal.SIGTERM)
+            if queue.empty():
+                # if nothing is left in the queue and we're only analyzing a pcap file
+                if self.pcap_analysis:
+                    self.log.info(
+                        "exiting because we were told to only analyze %s",
+                        self.pcap_analysis,
+                    )
+                    sys.exit(signal.SIGTERM)
 
     @staticmethod
     def generate_text_report(

@@ -183,7 +183,7 @@ def setup_parser() -> argparse:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
             """
-            wlanpi-profiler is an 802.11 client capabilities profiler. Its purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request to.
+            wlanpi-profiler is an 802.11 client capabilities profiler. The purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request.
             """
         ),
     )
@@ -312,7 +312,7 @@ def setup_parser() -> argparse:
         "--read",
         metavar="<FILE.pcap>",
         dest="pcap_analysis",
-        help="analyze first packet of pcap (expects association request frame)",
+        help="read and analyze association request frames from pcap",
     )
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
@@ -325,7 +325,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
     from pathlib import Path
 
     result = list(Path(directory).rglob("*"))
-    print(f"Delete the following files: {', '.join([str(x) for x in result])}")
+    log.warning(f"Delete the following files: {', '.join([str(x) for x in result])}")
 
     if acknowledged:
         pass
@@ -613,7 +613,7 @@ class Base64Encoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-def get_wlanpi_version():
+def get_wlanpi_version() -> str:
     wlanpi_version = "unknown"
     try:
         with open("/etc/wlanpi-release") as _file:

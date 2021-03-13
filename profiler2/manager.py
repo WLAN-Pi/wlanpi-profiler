@@ -124,17 +124,17 @@ def start(args: dict):
             "not starting beacon or sniffer because user requested pcap file analysis"
         )
         try:
-            frame = rdpcap(pcap_analysis)
+            frames = rdpcap(pcap_analysis)
         except FileNotFoundError:
             log.exception("could not find file %s", pcap_analysis)
             print("exiting...")
             sys.exit(-1)
 
-        # extract the first frame object from pcap
-        assoc_req_frame = frame[0]
-
-        # put frame into the multiprocessing queue for the profiler to analyze
-        queue.put(assoc_req_frame)
+        for frame in frames:
+            # extract frames that are Dot11
+            if frame.haslayer(scapy.layers.dot11.Dot11AssoReq):
+                # put frame into the multiprocessing queue for the profiler to analyze
+                queue.put(frame)
     else:
         if helpers.validate(config):
             log.debug("config %s", config)

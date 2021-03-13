@@ -2,6 +2,7 @@ Release 1.0.6 (WIP)
 
 - Replace pipx packaging with debian packaging
 - Allow read of pcap file when no WLAN NICs are present
+- Allow reading and analysis of multiple association requests in a single pcap
 - Make output to screen less noisy by default
 - Add output to JSON flat file to support backend
 - Remove draft label from 802.11ax detection
