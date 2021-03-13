@@ -104,7 +104,7 @@ class TxBeacons(multiprocessing.Process):
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
-    def every(self, interval: int, task) -> None:
+    def every(self, interval: float, task) -> None:
         """ Attempt to address beacon drift """
         start_time = time()
         while True:
@@ -141,7 +141,7 @@ class TxBeacons(multiprocessing.Process):
         except OSError as error:
             for event in ("Network is down", "No such device"):
                 if event in error.strerror:
-                    self.log.error(f"{error}; exiting...")
+                    self.log.exception("exiting...")
                     sys.exit(signal.SIGTERM)
 
 

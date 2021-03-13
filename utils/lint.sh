@@ -5,4 +5,4 @@ set -x
 mypy profiler2
 black profiler2 --check
 isort --check-only profiler2
-flake8
+flake8 profiler2

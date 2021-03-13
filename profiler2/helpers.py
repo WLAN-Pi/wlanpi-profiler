@@ -65,7 +65,7 @@ try:
                            get_if_raw_hwaddr)
 except ModuleNotFoundError as error:
     if error.name == "manuf":
-        print(f"required module manuf not found. try installing manuf.")
+        print("required module manuf not found. try installing manuf.")
     elif error.name == "scapy":
         print(
             "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
@@ -79,7 +79,7 @@ try:
     result = subprocess.run(
         ["tcpdump", "--version"], shell=False, check=True, capture_output=True
     )
-except Exception:
+except OSError:
     print(
         "problem checking tcpdump version. is tcpdump installed and functioning? exiting..."
     )
@@ -90,7 +90,7 @@ try:
     result = subprocess.run(
         ["netstat", "--version"], shell=False, check=True, capture_output=True
     )
-except Exception:
+except OSError:
     print(
         "problem checking netstat version. is netstat installed and functioning? exiting..."
     )
@@ -103,7 +103,7 @@ from .constants import CHANNELS, CONFIG_FILE
 FILES_PATH = "/var/www/html/profiler"
 
 
-def setup_logger(args) -> logging.Logger:
+def setup_logger(args) -> None:
     """ Configure and set logging levels """
     if args.logging:
         if args.logging == "debug":
@@ -130,7 +130,6 @@ def setup_logger(args) -> logging.Logger:
         "loggers": {"": {"handlers": ["default"], "level": logging_level}},
     }
     logging.config.dictConfig(default_logging)
-    # return logging.getLogger(__name__)
 
 
 def check_channel(value: str) -> int:
@@ -177,7 +176,7 @@ def check_interface(interface: str) -> str:
         return interface
 
 
-def setup_parser() -> argparse:
+def setup_parser() -> argparse.ArgumentParser:
     """ Set default values and handle arg parser """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -325,7 +324,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
     from pathlib import Path
 
     result = list(Path(directory).rglob("*"))
-    log.warning(f"Delete the following files: {', '.join([str(x) for x in result])}")
+    log.warning("Delete the following files: %s", ", ".join([str(x) for x in result]))
 
     if acknowledged:
         pass
@@ -333,15 +332,15 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
         sys.exit(1)
 
     try:
-        for p in os.listdir(Path(directory)):
-            p = Path(directory) / Path(p)
-            if p.is_file():
-                print(f"Removing file: {p}")
-                p.unlink()
-            if p.is_dir():
-                print(f"Removing directory: {p}")
-                shutil.rmtree(p)
-    except Exception:
+        for path in os.listdir(Path(directory)):
+            path = Path(directory) / Path(path)
+            if path.is_file():
+                print(f"Removing file: {path}")
+                path.unlink()
+            if path.is_dir():
+                print(f"Removing directory: {path}")
+                shutil.rmtree(path)
+    except OSError:
         log.exception("issue removing files")
 
 
@@ -358,7 +357,6 @@ def setup_config(args) -> dict:
         # we want to work with a dict whether we have config.ini or not
         config = convert_configparser_to_dict(parser)
     else:
-        parser = None
         log.warning("can not find config at %s", args.config)
         config = {}
 
@@ -456,6 +454,11 @@ def validate(config: dict) -> bool:
     return True
 
 
+def is_randomized(mac) -> bool:
+    """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
+    return any(local == mac[1] for local in ["2", "6", "a", "e"])
+
+
 def prep_interface(interface: str, mode: str, channel: int) -> bool:
     """ Prepare the interface for monitor mode and injection """
     log = logging.getLogger(inspect.stack()[0][3])
@@ -498,7 +501,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
             ]
 
             if "UNSET" in "".join(regdomain):
-                log.warn("UNSET REG DOMAIN DETECTED!")
+                log.warning("UNSET REG DOMAIN DETECTED!")
             else:
                 log.debug("reg domain: %s", regdomain)
 
@@ -510,8 +513,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                     raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
 
             return True
-        except Exception:
-            log.error(
+        except OSError:
+            log.exception(
                 "error setting wlan interface config %s",
                 "\n".join(
                     [line for line in cp.stderr.split("\n") if line.strip() != ""]
@@ -566,7 +569,7 @@ def update_manuf() -> bool:
             "manuf last modified time: %s",
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
-    except Exception:
+    except OSError:
         log.exception("problem updating manuf. make sure manuf is installed...")
         print("exiting...")
         return False
@@ -606,14 +609,18 @@ def get_frequency_bytes(channel: int) -> bytes:
 
 
 class Base64Encoder(json.JSONEncoder):
+    """ A Base64 encoder for JSON """
+
     # pylint: disable=method-hidden
-    def default(self, o):
-        if isinstance(o, bytes):
-            return b64encode(o).decode()
-        return json.JSONEncoder.default(self, o)
+    def default(self, obj):
+        """ Perform default Base64 encode """
+        if isinstance(obj, bytes):
+            return b64encode(obj).decode()
+        return json.JSONEncoder.default(self, obj)
 
 
 def get_wlanpi_version() -> str:
+    """ Retrieve system image verson """
     wlanpi_version = "unknown"
     try:
         with open("/etc/wlanpi-release") as _file:
@@ -789,8 +796,8 @@ def get_ssh_destination_ip() -> Union[str, bool]:
                 dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
                 if dest_ip_re:
                     return dest_ip_re.group(1)
-    except Exception:
-        log.warning(
+    except OSError:
+        log.exception(
             "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
         )
         return False
@@ -838,5 +845,5 @@ class Capability:
 
 
 def get_bit(byteval, index) -> bool:
-    """ retrieve bit value from byte at provided index """
+    """ Retrieve bit value from byte at provided index """
     return (byteval & (1 << index)) != 0

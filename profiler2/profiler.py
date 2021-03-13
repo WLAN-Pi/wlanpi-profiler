@@ -46,15 +46,14 @@ import signal
 import sys
 import time
 from difflib import Differ
-from multiprocessing.queues import Queue
 from typing import List, Tuple
 
 # third party imports
 from manuf import manuf
-from scapy.all import wrpcap
+from scapy.all import Dot11, RadioTap, wrpcap
 
-from .__version__ import __version__
 # app imports
+from .__version__ import __version__
 from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
                         FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
                         HE_CAPABILITIES_IE_EXT_TAG,
@@ -63,7 +62,8 @@ from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
                         RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
                         SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
                         VHT_CAPABILITIES_IE_TAG)
-from .helpers import Base64Encoder, Capability, flag_last_object, get_bit
+from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
+                      is_randomized)
 
 
 class Profiler(object):
@@ -90,31 +90,58 @@ class Profiler(object):
         self.client_profiled_count = 0
         self.lookup = manuf.MacParser(update=False)
         self.last_manuf = "N/A"
+        self.running = True
+        self.run(queue)
 
+    def run(self, queue) -> None:
+        """ Runner which performs checks prior to profiling an association request """
         if queue:
-            while True:
-                self.profile(queue)
+            buffer = {}
+            buffer_squelch = 3
 
-    def __del__(self):
-        """ Clean up while we shut down """
+            while self.running:
+                frame = queue.get()
 
-    def is_randomized(self, mac) -> bool:
-        """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
-        return any(local == mac[1] for local in ["2", "6", "a", "e"])
+                if frame:
+                    if isinstance(frame, RadioTap) or isinstance(frame, Dot11):
+                        if frame.addr2 in buffer:
+                            toc = time.time() - buffer[frame.addr2]
+                            if toc < buffer_squelch:
+                                self.log.debug(
+                                    "suppressing %s as %s is less than squelch (%s)",
+                                    frame.addr2,
+                                    f"{toc:.2f}",
+                                    buffer_squelch,
+                                )
+                                continue
+                            else:
+                                buffer[frame.addr2] = time.time()
+                        else:
+                            buffer[frame.addr2] = time.time()
 
-    def profile(self, queue: Queue) -> None:
+                        self.profile(frame)
+
+                if queue.empty():
+                    # if nothing is left in the queue and we're only analyzing a pcap file
+                    if self.pcap_analysis:
+                        self.log.info(
+                            "exiting because we were told to only analyze %s",
+                            self.pcap_analysis,
+                        )
+                        sys.exit(signal.SIGTERM)
+
+    def profile(self, frame) -> None:
         """ Handle profiling clients as they come into the queue """
-        frame = queue.get()
         oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
-            self.log.debug(
+            self.log.info(
                 "already seen %s (capabilities hash=%s) this session, ignoring...",
                 frame.addr2,
                 analysis_hash,
             )
         else:
-            randomized = self.is_randomized(frame.addr2)
+            randomized = is_randomized(frame.addr2)
             text_report_oui_manuf = oui_manuf
             if randomized:
                 if oui_manuf is None:
@@ -123,7 +150,6 @@ class Profiler(object):
                     text_report_oui_manuf = "{0} (Randomized MAC)".format(oui_manuf)
 
             self.last_manuf = oui_manuf
-            self.log.debug("%s oui lookup matched to %s", frame.addr2, oui_manuf)
             self.analyzed_hash[analysis_hash] = frame
 
             # we want channel from frame, not from profiler.
@@ -135,7 +161,7 @@ class Profiler(object):
             else:
                 band = "unknown"
 
-            # genereat text report
+            # generate text report
             text_report = self.generate_text_report(
                 text_report_oui_manuf, capabilities, frame.addr2, channel, band
             )
@@ -157,15 +183,6 @@ class Profiler(object):
                 "%s clients profiled this session", self.client_profiled_count
             )
 
-            if queue.empty():
-                # if nothing is left in the queue and we're only analyzing a pcap file
-                if self.pcap_analysis:
-                    self.log.info(
-                        "exiting because we were told to only analyze %s",
-                        self.pcap_analysis,
-                    )
-                    sys.exit(signal.SIGTERM)
-
     @staticmethod
     def generate_text_report(
         oui_manuf: str, capabilities: list, client_mac: str, channel: int, band: str
@@ -176,11 +193,11 @@ class Profiler(object):
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
         band_label = ""
-        if [s for s in band][0] == "2":
+        if band[0] == "2":
             band_label = "2.4 GHz"
-        if [s for s in band][0] == "5":
+        if band[0] == "5":
             band_label = "5 GHz"
-        if [s for s in band][0] == "6":
+        if band[0] == "6":
             band_label = "6 GHz"
         text_report += f"\n - Frequency band: {band_label}"
         text_report += f"\n - Capture channel: {channel}\n"
@@ -216,8 +233,8 @@ class Profiler(object):
         if not os.path.isdir(dest):
             try:
                 os.mkdir(dest)
-            except Exception:
-                log.error("problem creating %s directory", dest)
+            except OSError:
+                log.exception("problem creating %s directory", dest)
                 sys.exit(signal.SIGHUP)
 
         filename = os.path.join(dest, f"{client_mac}_{band}.txt")
@@ -271,7 +288,7 @@ class Profiler(object):
 
             with open(json_filename, "w") as writer:
                 json.dump(data, writer)
-        except Exception:
+        except OSError:
             log.exception(
                 "error creating flat files to dump client info (%s)", filename
             )
@@ -445,19 +462,19 @@ class Profiler(object):
             mcs = []
             for octet in [mcs_lower_octet, mcs_upper_octet]:
                 for bit_position in [0, 2, 4, 6]:
-                    a = get_bit(octet, bit_position)
-                    b = get_bit(octet, bit_position + 1)
-                    if (a == 1) and (b == 1):  # (0x3) Not supported
+                    bit1 = get_bit(octet, bit_position)
+                    bit2 = get_bit(octet, bit_position + 1)
+                    if (bit1 == 1) and (bit2 == 1):  # (0x3) Not supported
                         continue
-                    if (a == 0) and (b == 0):  # (0x0) MCS 0-7
+                    if (bit1 == 0) and (bit2 == 0):  # (0x0) MCS 0-7
                         nss += 1
                         mcs.append("0-7")
                         continue
-                    if (a == 1) and (b == 0):  # (0x1) MCS 0-8
+                    if (bit1 == 1) and (bit2 == 0):  # (0x1) MCS 0-8
                         nss += 1
                         mcs.append("0-8")
                         continue
-                    if (a == 0) and (b == 1):  # (0x2) MCS 0-9
+                    if (bit1 == 0) and (bit2 == 1):  # (0x2) MCS 0-9
                         nss += 1
                         mcs.append("0-9")
                         continue
@@ -666,8 +683,8 @@ class Profiler(object):
                     placeholder.append(channel)
 
             channel_ranges = []
-            for r in ranges:
-                channel_ranges.append(f"{r[0]}-{r[-1]}")
+            for _range in ranges:
+                channel_ranges.append(f"{_range[0]}-{_range[-1]}")
 
             supported_channels.value = f"{', '.join(channel_ranges)}**"
             supported_channels.db_value = channel_list
@@ -719,19 +736,19 @@ class Profiler(object):
                         mcs = []
                         for octet in [mcs_lower_octet, mcs_upper_octet]:
                             for bit_position in [0, 2, 4, 6]:
-                                a = get_bit(octet, bit_position)
-                                b = get_bit(octet, bit_position + 1)
-                                if (a == 1) and (b == 1):  # (0x3) Not supported
+                                bit1 = get_bit(octet, bit_position)
+                                bit2 = get_bit(octet, bit_position + 1)
+                                if (bit1 == 1) and (bit2 == 1):  # (0x3) Not supported
                                     continue
-                                if (a == 0) and (b == 0):  # (0x0) MCS 0-7
+                                if (bit1 == 0) and (bit2 == 0):  # (0x0) MCS 0-7
                                     nss += 1
                                     mcs.append("0-7")
                                     continue
-                                if (a == 1) and (b == 0):  # (0x1) MCS 0-9
+                                if (bit1 == 1) and (bit2 == 0):  # (0x1) MCS 0-9
                                     nss += 1
                                     mcs.append("0-9")
                                     continue
-                                if (a == 0) and (b == 1):  # (0x2) MCS 0-11
+                                if (bit1 == 0) and (bit2 == 1):  # (0x2) MCS 0-11
                                     nss += 1
                                     mcs.append("0-11")
                                     continue
@@ -760,12 +777,11 @@ class Profiler(object):
                         punctured_preamble_octet_binary_string = ""
                         for bit_position in range(8):
                             punctured_preamble_octet_binary_string += f"{int(get_bit(punctured_preamble_octet, bit_position))}"
-                        puncture_preamble_support = any(
-                            [
-                                bool(int(b))
-                                for b in punctured_preamble_octet_binary_string[0:4]
-                            ]
-                        )
+                        punctured_bit_booleans = [
+                            bool(int(bit))
+                            for bit in punctured_preamble_octet_binary_string[0:4]
+                        ]
+                        puncture_preamble_support = any(punctured_bit_booleans)
 
                         if puncture_preamble_support:
                             dot11ax_punctured_preamble.db_value = 1

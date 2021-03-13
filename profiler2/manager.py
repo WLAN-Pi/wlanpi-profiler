@@ -38,6 +38,7 @@ handle profiler
 """
 
 # standard library imports
+import argparse
 import inspect
 import logging
 import multiprocessing as mp
@@ -57,7 +58,7 @@ from .__version__ import __version__
 
 
 def signal_handler(signum, frame):
-    """ handle noisy keyboardinterrupt """
+    """ Handle noisy keyboardinterrupt """
     if signum == 2:
         print(f"profiler PID {os.getpid()} detected SIGINT or Control-C... exiting...")
         sys.exit(2)
@@ -71,7 +72,7 @@ def are_we_root() -> bool:
         return False
 
 
-def start(args: dict):
+def start(args: argparse.Namespace):
     """ Begin work """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -90,8 +91,8 @@ def start(args: dict):
     try:
         scapy_version = scapy.__version__
         log.debug("scapy version is %s", scapy_version)
-    except:
-        log.warn("could not get version information from scapy.__version__")
+    except AttributeError:
+        log.exception("could not get version information from scapy.__version__")
         log.debug("args: %s", args)
 
     if args.oui_update:
