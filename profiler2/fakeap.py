@@ -168,6 +168,7 @@ class Sniffer(multiprocessing.Process):
         self.ssid = config.get("GENERAL").get("ssid")
         self.interface = config.get("GENERAL").get("interface")
         self.channel = int(config.get("GENERAL").get("channel"))
+        self.listen_only = config.get("GENERAL").get("listen_only")
         self.assoc_reqs = {}
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
@@ -222,6 +223,8 @@ class Sniffer(multiprocessing.Process):
             or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
         ):
             if packet.addr1 == self.mac:  # if we are the receiver
+                self.dot11_assoc_request_cb(packet)
+            if self.listen_only:
                 self.dot11_assoc_request_cb(packet)
 
     def probe_response(self, probe_request) -> None:
