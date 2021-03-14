@@ -5,32 +5,167 @@
 .SH NAME
 .PP
 wlanpi-profiler - Wi-Fi client capabilities analyzer tool
-.SH SYNOPSIS
-.PP
-\f[B]profiler\f[R] [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID] [--config
-] [--files_path ] [--hostname_ssid] [--logging [{debug,warning}]]
-[--noprep] [--noAP] [--no11r] [--no11ax] [--oui_update] [--pcap ]
-[--version]
 .SH DESCRIPTION
 .PP
 wlanpi-profiler is an 802.11 client capabilities profiler.
-Its purpose is to automate the collection and analysis of the
-association request frame, which contains the capabilities the client
-indicates support for.
-This is accomplished by creating a fake AP to which the client can send
-an association request to.
-.SH RETURN VALUES
 .PP
-wlanpi-profiler uses the following exit codes:
-.IP \[bu] 2
-0: All profiles successfully analyzed with no issues.
+It automates the collection and analysis of the association request
+frame, which contains the claimed capabilities of the client.
+.PP
+This is accomplished by creating a fake AP to which a client can send
+its association request to.
+.PP
+Note that wlanpi-profiler requires elevated permissions to stage the
+wireless interface and open native raw sockets for frame injection.
+.SH SYNOPSIS
+.PP
+\f[B]profiler\f[R] [ \f[I]OPTIONS\f[R] ]
+.PP
+\f[I]OPTIONS\f[R] := { -c | -i | -s | --config | --files_path |
+--hostname_ssid | --noprep | --noAP | --no11r | --no11ax | --oui_update
+| --read | --version | --logging debug }
+.SH OPTIONS
+.TP
+\f[B]-c\f[R]
+Set the operating channel to broadcast on.
+Channels are usually numbered starting at 1, and you may use
+\f[B]iw(8)\f[R] to get the total number of channels and list the
+available channels.
+Depending on regulatory settings, some channels may not be available.
+You may need to set a regulatory domain [see \f[B]iw(8)\f[R] or
+\f[B]crda(8)\f[R]] in order to use a 5 GHz channel.
+.RS
+.PP
+Examples:
+.RE
+.RS
+.RS
+.PP
+\f[B]sudo profiler -c 11\f[R]
+.RE
+.RE
+.RS
+.RS
+.PP
+\f[B]sudo profiler -c 149\f[R]
+.RE
+.RE
+.TP
+\f[B]-i\f[R]
+Set the interface to use.
+.RS
+.PP
+Example:
+.RE
+.RS
+.RS
+.PP
+\f[B]sudo profiler -i wlan1\f[R]
+.RE
+.RE
+.TP
+\f[B]-s\f[R]
+Set the SSID (or Network Name).
+.RS
+.PP
+Example:
+.RE
+.RS
+.RS
+.PP
+\f[B]sudo profiler -s Test\f[R]
+.RE
+.RE
+.RS
+.RS
+.PP
+\f[B]sudo profiler -s \[dq]Bruh! Far out!\[dq]\f[R]
+.RE
+.RE
+.TP
+\f[B]--config\f[R]
+Set the configuration file.
+Default is /etc/wlanpi-profiler/config.ini
+.RS
+.PP
+Example:
+.RE
+.RS
+.RS
+.PP
+\f[B]profiler --config\f[R] \f[I]FILE\f[R]
+.RE
+.RE
+.TP
+\f[B]--files_path\f[R]
+Set where the profiled flat files output to.
+Default is /var/www/html/profiler
+.RS
+.PP
+Example:
+.RE
+.RS
+.RS
+.PP
+\f[B]profiler --config\f[R] \f[I]PATH\f[R]
+.RE
+.RE
+.TP
+\f[B]--hostname_ssid\f[R]
+Set the SSID name as the current hostname.
+.TP
+\f[B]--noprep\f[R]
+Bypass interface preparation.
+Assumes you\[aq]ve already staged the wireless interface in monitor mode
+on the desired channel.
+.TP
+\f[B]--noAP\f[R]
+Turns off the beacon process and passively listens for any association
+request frames on the given channel.
+.TP
+\f[B]--no11r\f[R]
+Disables and removes 802.11r Information Elements from the profiler
+beacon.
+This is for profiling older clients.
+.TP
+\f[B]--no11ax\f[R]
+Disables and removes 802.11ax Information Elements from the profiler
+beacon.
+This is for profiling older clients.
+.TP
+\f[B]--oui_update\f[R]
+Updates manuf oui lookup database file.
+.TP
+\f[B]--read\f[R]
+Look for and analyze any association requests contained within a pcap
+file.
+.RS
+.PP
+Example:
+.RE
+.RS
+.RS
+.PP
+\f[B]profiler --read\f[R] \f[I]FILE\f[R]
+.RE
+.RE
+.TP
+\f[B]--version\f[R]
+Print version.
 .SH LOCALE
 .PP
 This version of wlanpi-profiler is only available in English.
+.SH FILES
+.PP
+/etc/wlanpi-profiler
+.PP
+/var/www/html/profiler
+.PP
+/opt/venvs/wlanpi-profiler
 .SH AUTHORS
 .PP
 wlanpi-profiler is developed and maintained by Josh Schmelzle, with
-assistance from a long list of wonderful contributors.
+assistance from a list of wonderful contributors.
 .SH REPORTING BUGS
 .PP
 Bugs and issues can be reported on GitHub:
@@ -38,4 +173,8 @@ Bugs and issues can be reported on GitHub:
 https://github.com/joshschmelzle/profiler2
 .SH COPYRIGHT
 .PP
-Copyright 2019-2021, Josh Schmelzle and contributors.
+Copyright \[co] 2021 Josh Schmelzle.
+License BSD-3-Clause.
+.SH SEE ALSO
+.PP
+iw(8) crda(8)

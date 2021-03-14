@@ -53,6 +53,35 @@ class TestHelpers:
         assert helpers.generate_run_message(conf2) == None
 
     @pytest.mark.parametrize(
+        "mac,expected",
+        [
+            ("EE-C7-3B-59-EE-DD", True),
+            ("3A:CC:DD:BB:CC:AA", True),
+            ("68-F7-28-F1-23-A9", False)
+        ],
+    )
+    def test_is_randomized(self, mac, expected):
+        resp = helpers.is_randomized(mac)
+        assert resp == expected
+
+    @pytest.mark.parametrize(
+        "byte,index,expected",
+        [
+            (1, 0, True),
+            (2, 1, True),
+            (4, 2, True),
+            (8, 3, True),
+            (16, 4, True),
+            (32, 5, True),
+            (64, 6, True),
+            (128, 7, True),
+        ],
+    )
+    def test_get_bit(self, byte, index, expected):
+        resp = helpers.get_bit(byte, index)
+        assert resp == expected
+
+    @pytest.mark.parametrize(
         "channel,expected",
         [
             (1, b"l\t"),

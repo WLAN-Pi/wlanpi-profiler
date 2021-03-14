@@ -50,7 +50,6 @@ import signal
 import socket
 import subprocess
 import sys
-import textwrap
 from base64 import b64encode
 from dataclasses import dataclass
 from distutils.util import strtobool
@@ -180,11 +179,7 @@ def setup_parser() -> argparse.ArgumentParser:
     """ Set default values and handle arg parser """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(
-            """
-            wlanpi-profiler is an 802.11 client capabilities profiler. The purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request.
-            """
-        ),
+        description="wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler",
     )
     parser.add_argument(
         "--pytest",
@@ -194,7 +189,10 @@ def setup_parser() -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "-c", dest="channel", type=check_channel, help="802.11 channel to broadcast on"
+        "-c",
+        dest="channel",
+        type=check_channel,
+        help="set the operating channel to broadcast on",
     )
     parser.add_argument(
         "-i",
@@ -208,13 +206,13 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         type=str,
-        metavar="<FILE>",
+        metavar="FILE",
         default=CONFIG_FILE,
         help="customize path for configuration file (default: %(default)s)",
     )
     parser.add_argument(
         "--files_path",
-        metavar="<PATH>",
+        metavar="PATH",
         dest="files_path",
         default="/var/www/html/profiler",
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
@@ -309,7 +307,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--read",
-        metavar="<FILE.pcap>",
+        metavar="PCAP",
         dest="pcap_analysis",
         help="read and analyze association request frames from pcap",
     )
@@ -456,7 +454,7 @@ def validate(config: dict) -> bool:
 
 def is_randomized(mac) -> bool:
     """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
-    return any(local == mac[1] for local in ["2", "6", "a", "e"])
+    return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
 
 
 def prep_interface(interface: str, mode: str, channel: int) -> bool:
@@ -519,6 +517,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 "\n".join(
                     [line for line in cp.stderr.split("\n") if line.strip() != ""]
                 ),
+                exc_info=None,
             )
     else:
         log.error("failed to prep interface config...")

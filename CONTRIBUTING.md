@@ -50,35 +50,40 @@ Please be aware of the following things when filing bug reports:
 
 ## Code Contributions
 
+### Development Environment
+
+Consider using PyCharm or Visual Studio Code with the official Python and Pylance extensions from Microsoft (recommended).
+
 ### Development Setup  ('without pip install or pipx', 'may be recommended for development work'):
 
 ```
+cd <where your dev folder is>
 git clone <repo>
 cd <repo>
 virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
-sudo python3 -m profiler2 
-sudo python3 -m profiler2 <optional params>
-sudo python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
+sudo ./venv/bin/python3 -m profiler2 
+sudo ./venv/bin/python3 -m profiler2 <optional params>
+sudo ./venv/bin/python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
 ```
 
 - note that package name is `profiler2` while the console_scripts entry point is `profiler`.
 
 ### Before You Start
 
-To increase the chances of PR approval, first, talk to one of the core team members. Aligning your ideas with the project team will save everybody's time. 
+To increase the chances of Pull Request (PR) approval, first, talk to one of the core team members. Aligning your ideas with the project team will save everybody's time. 
 
 ### Pull Requests
 
 Before submitting a PR perform the following:
 
-1. Lint your code with `tox -e lint` and make sure it passes.
+1. Lint your code with `tox -e lint` and make sure it minimally passes the flake8 checks.
 
-1. Format your code with `tox -e format` (this basically just runs black for now).
+1. Format your code with `tox -e format` (this will run autoflake with desired options, black, and isort on the profiler2 codebase)
 
 2. Create a test that validates your changes. this test should go in `/tests`.
 
 3. Ensure your tests pass by running `tox`.
 
-Failure to do so means it will take longer to test, validate, and merge your PR into the repo.
+Failure to do this means it will take longer to test, validate, and merge your PR into the repo.

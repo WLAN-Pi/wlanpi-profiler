@@ -443,7 +443,7 @@ class Profiler(object):
         return [dot11n, dot11n_nss]
 
     @staticmethod
-    def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> []:
+    def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> List:
         """ Check for 802.11ac support """
         dot11ac = Capability(
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
@@ -539,7 +539,7 @@ class Profiler(object):
         return [dot11k]
 
     @staticmethod
-    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> []:
+    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> List:
         """ Check for 802.11r support """
         dot11r = Capability(
             name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
@@ -555,7 +555,7 @@ class Profiler(object):
         return [dot11r]
 
     @staticmethod
-    def analyze_ext_capabilities_ie(dot11_elt_dict: dict) -> []:
+    def analyze_ext_capabilities_ie(dot11_elt_dict: dict) -> List:
         """ Check for 802.11v support """
         dot11v = Capability(
             name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
@@ -580,7 +580,7 @@ class Profiler(object):
         return [dot11v]
 
     @staticmethod
-    def analyze_rsn_capabilities_ie(dot11_elt_dict: dict) -> []:
+    def analyze_rsn_capabilities_ie(dot11_elt_dict: dict) -> List:
         """ Check for 802.11w support """
         dot11w = Capability(
             name="802.11w", value="Not reported", db_key="dot11w", db_value=0
@@ -600,7 +600,7 @@ class Profiler(object):
         return [dot11w]
 
     @staticmethod
-    def analyze_power_capability_ie(dot11_elt_dict: dict) -> []:
+    def analyze_power_capability_ie(dot11_elt_dict: dict) -> List:
         """ Check for supported power capabilities """
         max_power_cap = Capability(
             name="Max Power",
@@ -635,7 +635,7 @@ class Profiler(object):
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict: dict) -> []:
+    def analyze_supported_channels_ie(dot11_elt_dict: dict) -> List:
         """ Check supported channels """
         supported_channels = Capability(
             name="Supported Channels",
@@ -692,7 +692,7 @@ class Profiler(object):
         return [supported_channels, number_of_supported_channels]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> []:
+    def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> List:
         """ Check for 802.11ax support """
         dot11ax = Capability(
             name="802.11ax",
