@@ -44,6 +44,22 @@
             ]
         },
         {
+            "name": "--noAP",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler2",
+            "args": [
+                "--noAP",
+                "--logging",
+                "debug",
+                "-i",
+                "wlan2",
+                "-c",
+                "165"
+            ]
+        },
+        {
             "name": "--read pcap",
             "type": "python",
             "request": "launch",
@@ -51,7 +67,7 @@
             "module": "profiler2",
             "args": [
                 "--read",
-                "~/dev/profiler2/tests/pcaps/Intel_ax210_Win10_22.30.0.11_4a-41-16-6c-7f-f5_5.8GHz.pcap",
+                "~/dev/profiler2/tests/pcaps/ax210_and_iphone12promax.pcap",
                 "--logging",
                 "debug",
                 "-i",
