@@ -1,6 +1,6 @@
 # -* coding: utf-8 -*-
 #
-# profiler2: a Wi-Fi client capability analyzer
+# profiler: a Wi-Fi client capability analyzer
 # Copyright 2021 Josh Schmelzle
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,8 +30,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """
-profiler2.helpers
-~~~~~~~~~~~~~~~~~
+profiler.helpers
+~~~~~~~~~~~~~~~~
 
 provides init functions that are used to help setup the app.
 """
@@ -348,7 +348,7 @@ def setup_config(args) -> dict:
 
     config_found = False
 
-    # load in config (a: from default location "/etc/profiler2/config.ini" or b: from provided)
+    # load in config (a: from default location "/etc/wlanpi-profiler/config.ini" or b: from provided)
     if os.path.isfile(args.config):
         config_found = True
         parser = load_config(args.config)
@@ -499,11 +499,15 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
             ]
 
             if "UNSET" in "".join(regdomain):
-                log.warning("REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'")
-                log.warning("https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain")
+                log.warning(
+                    "REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'"
+                )
+                log.warning(
+                    "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
+                )
             else:
                 log.debug("reg domain set to %s", regdomain)
-                log.debug("see 'iw reg get' for details)
+                log.debug("see 'iw reg get' for details")
 
             for cmd in commands:
                 cp = subprocess.run(

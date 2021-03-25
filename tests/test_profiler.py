@@ -3,7 +3,7 @@
 import pytest
 from scapy.all import rdpcap
 
-from profiler2 import profiler
+from profiler import profiler
 
 
 class TestProfiler:

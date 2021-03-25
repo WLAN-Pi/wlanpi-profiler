@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# profiler2: a Wi-Fi client capability analyzer
+# profiler: a Wi-Fi client capability analyzer
 # Copyright 2021 Josh Schmelzle
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,8 +30,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """
-profiler2.fakeap
-~~~~~~~~~~~~~~~~
+profiler.fakeap
+~~~~~~~~~~~~~~~
 
 fake ap code handling beaconing and sniffing for the profiler
 """

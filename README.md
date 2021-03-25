@@ -1,4 +1,4 @@
-![versions](docs/images/profiler2-pybadge-w-logo.svg) ![tests](https://github.com/joshschmelzle/profiler2/workflows/tests/badge.svg) ![coverage-badge](coverage.svg) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
+![versions](docs/images/profiler-pybadge-w-logo.svg) ![tests](https://github.com/wlan-pi/profiler/workflows/tests/badge.svg) ![coverage-badge](coverage.svg) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 # wlanpi-profiler
 
@@ -91,7 +91,7 @@ python3 -m pip install pipx
 python3 -m pipx ensurepath
 
 # install profiler from github
-pipx install git+https://github.com/WLAN-Pi/profiler2.git
+pipx install git+https://github.com/WLAN-Pi/profiler.git
 
 # set reg domain (some adapters/drivers require this in order to Tx in 5 GHz bands)
 iw reg set US
@@ -108,33 +108,29 @@ sudo profiler
 Note elevated permissions are required to prep the interface in monitor mode and for scapy to open a raw native socket for frame injection. This means if you run profiler manually you must do so like `sudo profiler` for example. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this automatically.
 
 ```
-usage: __main__.py [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID]
-                   [--config <FILE>] [--files_path <PATH>] [--hostname_ssid]
-                   [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r]
-                   [--no11ax] [--oui_update] [--read <FILE.pcap>] [--version]
+usage: profiler [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID]
+                [--config FILE] [--files_path PATH] [--hostname_ssid]
+                [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r]
+                [--no11ax] [--oui_update] [--read PCAP] [--version]
 
-wlanpi-profiler is an 802.11 client capabilities profiler. The purpose is to automate the collection and analysis of the association request frame, which contains the capabilities the client indicates support for. This is accomplished by creating a fake AP to which the client can send an association request.
+wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler
 
 optional arguments:
   -h, --help            show this help message and exit
-  -c CHANNEL            802.11 channel to broadcast on
+  -c CHANNEL            set the operating channel to broadcast on
   -i INTERFACE          set network interface for profiler
   -s SSID               set profiler SSID name
-  --config <FILE>       customize path for configuration file (default:
-                        /etc/wlanpi-profiler/config.ini)
-  --files_path <PATH>   customize default directory where analysis is saved on
-                        local system (default: /var/www/html/profiler)
-  --hostname_ssid       use the WLAN Pi's hostname as SSID name (default:
-                        False)
+  --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
+  --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
+  --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
   --logging [{debug,warning}]
                         change logging output
   --noprep              disable interface preperation (default: False)
   --noAP                enable Rx only mode (default: False)
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
-  --oui_update          initiates update of OUI database (requires Internet
-                        connection)
-  --read <FILE.pcap>    read and analyze association request frames from pcap
+  --oui_update          initiates update of OUI database (requires Internet connection)
+  --read PCAP           read and analyze association request frames from pcap
   --version, -V         show program's version number and exit
 ```
 

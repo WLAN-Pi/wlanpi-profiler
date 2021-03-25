@@ -68,8 +68,8 @@ values to determine client capabilities.
     - a. is HE capabilities tagged parameter present? 
         - Y - 802.11ax supported
         - N - 802.11ax not supported
-    - aY - pass
-    - aN - do not evaluate remaining capabilities
+    - a (Y) - pass
+    - a (N) - do not evaluate remaining capabilities
     - b. Number of spatial streams by inspecting octets 19 & 20 (Rx MCS map) - 
         - count Rx MCS map bit pairs not set to '11' to determine number of streams supported
     - c. MCS 10/11 support inspect NSS subfield (b.)
@@ -113,6 +113,6 @@ values to determine client capabilities.
         - N - investigate tagged parameter 221 (vendor specific)
             - is vendor MAC in manuf database?
                 - N - Unable to match
-                - Y - Check OUI matches our heurstic
+                - Y - Check OUI matches our heuristic
                     - Y - Return match
                     - N - Unable to match

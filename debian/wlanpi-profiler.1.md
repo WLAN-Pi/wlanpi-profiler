@@ -125,7 +125,7 @@ from a list of wonderful contributors.
 
 Bugs and issues can be reported on GitHub:
 
-https://github.com/joshschmelzle/profiler2
+https://github.com/wlan-pi/profiler
 
 # COPYRIGHT
 

@@ -2,7 +2,7 @@
 
 set -x
 
-mypy profiler2
-black profiler2 --check
-isort --check-only profiler2
-flake8 profiler2
+mypy profiler
+black profiler --check
+isort --check-only profiler
+flake8 profiler

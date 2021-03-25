@@ -1,4 +1,4 @@
-profiler2 was created by Josh Schmelzle.
+profiler was created by Josh Schmelzle.
 
 Keepers
 ```````

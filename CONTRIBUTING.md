@@ -63,12 +63,12 @@ cd <repo>
 virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
-sudo ./venv/bin/python3 -m profiler2 
-sudo ./venv/bin/python3 -m profiler2 <optional params>
-sudo ./venv/bin/python3 -m profiler2 -c 44 -s "dev" -i wlan2 --no11r --logging debug
+sudo ./venv/bin/python3 -m profiler 
+sudo ./venv/bin/python3 -m profiler <optional params>
+sudo ./venv/bin/python3 -m profiler -c 44 -s "dev" -i wlan2 --no11r --logging debug
 ```
 
-- note that package name is `profiler2` while the console_scripts entry point is `profiler`.
+- note that package name is `profiler` while the console_scripts entry point is `profiler`.
 
 ### Before You Start
 
@@ -80,7 +80,7 @@ Before submitting a PR perform the following:
 
 1. Lint your code with `tox -e lint` and make sure it minimally passes the flake8 checks.
 
-1. Format your code with `tox -e format` (this will run autoflake with desired options, black, and isort on the profiler2 codebase)
+1. Format your code with `tox -e format` (this will run autoflake with desired options, black, and isort on the profiler codebase)
 
 2. Create a test that validates your changes. this test should go in `/tests`.
 

@@ -5,7 +5,7 @@ import multiprocessing as mp
 
 import pytest
 
-from profiler2 import helpers
+from profiler import helpers
 
 
 class TestHelpers:

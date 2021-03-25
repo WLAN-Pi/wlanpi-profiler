@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "-i",
                 "wlan0",
@@ -22,7 +22,7 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "-i",
                 "wlan1"
@@ -33,7 +33,7 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "-i",
                 "wlan2",
@@ -48,7 +48,7 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "--noAP",
                 "--logging",
@@ -64,10 +64,10 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "--read",
-                "~/dev/profiler2/tests/pcaps/ax210_and_iphone12promax.pcap",
+                "~/dev/profiler/tests/pcaps/ax210_and_iphone12promax.pcap",
                 "--logging",
                 "debug",
                 "-i",
@@ -79,7 +79,7 @@
             "type": "python",
             "request": "launch",
             "sudo": true,
-            "module": "profiler2",
+            "module": "profiler",
             "args": [
                 "--clean",
                 "--files",

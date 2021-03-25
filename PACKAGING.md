@@ -32,10 +32,10 @@ From the root directory of this repository run:
 dpkg-buildpackage -us -uc -b
 ```
 
-If you are found favorable by the packaging gods, you should see some output files at `../profiler2` like this:
+If you are found favorable by the packaging gods, you should see some output files at `../profiler` like this:
 
 ```
-wlanpi@rbpi4b-8gb:[~/dev/profiler2]: ls ../ | grep wlanpi-p
+wlanpi@rbpi4b-8gb:[~/dev/profiler]: ls ../ | grep wlanpi-p
 wlanpi-profiler_1.0.6_arm64.buildinfo
 wlanpi-profiler_1.0.6_arm64.changes
 wlanpi-profiler_1.0.6_arm64.deb
@@ -167,8 +167,8 @@ If not available, you can build it from source:
 cd ~
 
 # Install needed packages
-sudo apt-get install devscripts python-virtualenv python-sphinx \
-                     python-sphinx-rtd-theme git equivs
+sudo apt-get install devscripts python3-virtualenv python3-sphinx \
+                     python3-sphinx-rtd-theme git equivs
 # Clone git repository
 git clone https://github.com/spotify/dh-virtualenv.git
 # Change into working directory

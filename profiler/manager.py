@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# profiler2: a Wi-Fi client capability analyzer
+# profiler: a Wi-Fi client capability analyzer
 # Copyright 2021 Josh Schmelzle
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,8 @@
 
 
 """
-profiler2.manager
-~~~~~~~~~~~~~~~~~
+profiler.manager
+~~~~~~~~~~~~~~~~
 
 handle profiler
 """
@@ -124,6 +124,7 @@ def start(args: argparse.Namespace):
         log.info(
             "not starting beacon or sniffer because user requested pcap file analysis"
         )
+        helpers.verify_reporting_directories(config)
         try:
             frames = rdpcap(pcap_analysis)
         except FileNotFoundError:

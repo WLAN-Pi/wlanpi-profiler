@@ -9,7 +9,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 # load the package's __version__.py module as a dictionary
 about = {}
-with open(os.path.join(here, "profiler2", "__version__.py"), "r", "utf-8") as f:
+with open(os.path.join(here, "profiler", "__version__.py"), "r", "utf-8") as f:
     exec(f.read(), about)
 
 try:
@@ -18,7 +18,7 @@ try:
 except FileNotFoundError:
     readme = about["__description__"]
 
-packages = ["profiler2"]
+packages = ["profiler"]
 
 requires = ["tox==3.17.1", "coverage-badge==1.0.1", "scapy==2.4.4", "manuf==1.1.1"]
 
@@ -43,9 +43,9 @@ setup(
     packages=packages,
     project_urls={
         "Documentation": "https://docs.wlanpi.com",
-        "Source": "https://github.com/joshschmelzle/profiler2",
+        "Source": "https://github.com/wlan-pi/profiler",
     },
     include_package_data=True,
     install_requires=requires,
-    entry_points={"console_scripts": ["profiler=profiler2.__main__:main"]},
+    entry_points={"console_scripts": ["profiler=profiler.__main__:main"]},
 )
