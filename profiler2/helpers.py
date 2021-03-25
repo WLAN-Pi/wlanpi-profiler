@@ -499,9 +499,11 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
             ]
 
             if "UNSET" in "".join(regdomain):
-                log.warning("UNSET REG DOMAIN DETECTED!")
+                log.warning("REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'")
+                log.warning("https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain")
             else:
-                log.debug("reg domain: %s", regdomain)
+                log.debug("reg domain set to %s", regdomain)
+                log.debug("see 'iw reg get' for details)
 
             for cmd in commands:
                 cp = subprocess.run(
