@@ -2,7 +2,7 @@
 
 # wlanpi-profiler
 
-wlanpi-profiler is a Wi-Fi client capability analyzer tool built for the [WLAN Pi](https://github.com/WLAN-Pi/).
+Profiler is a Wi-Fi client capability analyzer tool built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
 The primary purpose is to automate the collection and analysis of association request frames.
 
@@ -11,17 +11,19 @@ It performs two primary functions:
 1. advertises a "fake" Access Point
 2. "profiles" any attempted client association requests (which contain the client's claimed capabilities) 
 
-## why?
+## Why?
 
-Understanding the various client capabilities found in a particular environment is helps the Wireless LAN design and troubleshooting process.
+Understanding the various client capabilities found in a particular environment helps in the Wireless LAN definition, design, and troubleshooting/validation process.
 
-The WLAN designer may desire to factor the capabilities of expected clients in their design output.
+The WLAN designer may desire to factor in the capabilities of expected clients in their design output. How many spatial streams? What is the client Tx power? What frequency bands does it support? 
 
-The WLAN troubleshooter may understand better issues they are uncovering when knowing the capabilities of the client.
+The WLAN troubleshooter may understand better the issues they are uncovering when knowing the capabilities of the client. Does the client support .11k/r/v? Which PHYs does the client support? What channels does the client support?
 
-## this matters because capabilities vary
+The profiler helps to more quickly answer these questions for you.
 
-Capabilities across each client type may vary; depending on factors like client chipset, the number of antennas, power mode (e.g. iOS Low Power Mode), age of the client, driver, supplicant, etc.
+## Client capabilities will vary
+
+Capabilities across each client type will vary; depending on factors like client chipset, the number of antennas, power mode (e.g. iOS Low Power Mode), age of the client, driver, supplicant, etc.
 
 Each client includes its capability details in the 802.11 association frame sent from the client to an access point. By capturing this frame, it is possible to decode and report on the client's claimed capabilities.
 
@@ -29,13 +31,15 @@ However, please note that the client will match the capabilities advertised by a
 
 The profiler attempts to address this problem by advertising the highest-level feature sets.   
 
-## how to get started?
+## Getting started
+
+Start the profiler. It will broadcast a fake AP.
 
 When the client attempts association to the profilers fake AP, it will send an association frame. 
 
 The capabilities of a client are determined based on the tool analyzing the association frame. 
 
-If running directly from a terminal, once profiled, a text report prints in real-time to the screen and results write to a local directory on the WLAN Pi host. 
+If running directly from a terminal, once profiled, a text report prints in real-time to the screen, and results write to a local directory on the WLAN Pi host. 
 
 Saved results include a copy of the text report and the association frame in PCAP format, and the result is appended to a rotating `.csv` report.
 
@@ -53,7 +57,7 @@ Saved results include a copy of the text report and the association frame in PCA
 
 2. Profile the client:
 
-    - once profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
+    - once the profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
 
     - connect a client and enter any random 8 characters for the PSK
 
@@ -63,14 +67,14 @@ Saved results include a copy of the text report and the association frame in PCA
 
     - You can look on the WebUI (http://<IPv4_of_WLANPi>/profiler) or on the filesystem at `/var/www/html/profiler`.
 
-## installation
+## Installation
 
-profiler is already included in the [WLAN Pi](https://github.com/WLAN-Pi/) image, but if you want to install it yourself, here is what you need.
+profiler is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image, but if you want to install it manually, here is what you need.
 
 General requirements:
 
 - adapter (and driver) which supports both monitor mode and packet injection
-  - mt76x2u (recommended) and rtl88XXau are tested regularly (everything else is experimental and not officially supported)
+  - mt76x2u (recommended) and rtl88XXau adapters are tested regularly (everything else is experimental and not officially supported)
 - elevated permissions
 
 Package requirements:
@@ -78,7 +82,7 @@ Package requirements:
 - Python version 3.7 or higher
 - `iw`, `netstat`, and `tcpdump` tools installed on the host
 
-### manual installation example with pipx (this will change in the near future)
+### Manual installation example with pipx (this will change to debian packaging in the near future)
 
 ```
 sudo -i
@@ -97,15 +101,15 @@ pipx install git+https://github.com/WLAN-Pi/profiler.git
 iw reg set US
 ```
 
-And the entry point for launching profiler looks like this:
+And starting profiler looks like this:
 
 ```
 sudo profiler
 ```
 
-# usage
+Stop with `CTRL + C`.
 
-Note elevated permissions are required to prep the interface in monitor mode and for scapy to open a raw native socket for frame injection. This means if you run profiler manually you must do so like `sudo profiler` for example. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this automatically.
+# Usage
 
 ```
 usage: profiler [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID]
@@ -134,7 +138,9 @@ optional arguments:
   --version, -V         show program's version number and exit
 ```
 
-## usage examples
+## Usage Examples
+
+We require elevated permissions to put the interface in monitor mode and to open raw native sockets for frame injection. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this for you automatically. 
 
 ```
 # capture frames on channel 48 using the default SSID
@@ -171,13 +177,13 @@ sudo profiler --read assoc_frame.pcap
 sudo profiler --logging debug
 ```
 
-## feature: overriding defaults with configuration file support
+## Feature: overriding defaults with configuration file support
 
 To change the default operation of the script (without passing in CLI args), on the WLAN Pi, a configuration file can be found at `/etc/wlanpi-profiler/config.ini`. 
 
 This can be used as a way to modify settings loaded at runtime such as channel, SSID, and interface. 
 
-## feature: client capabilities diff
+## Feature: client capabilities diff
 
 When a client is profiled, a hash of the capabilities is calculated and stored in memory. 
 
@@ -187,7 +193,7 @@ If the hash is the same, the additional association request is ignored.
 
 If the hash is different, capabilities are profiled and a text diff of the client report is saved.
 
-## feature: MAC OUI database update
+## Feature: MAC OUI database update
 
 A lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. this is a wrapper around a Python module called `manuf` which uses a local flat file for OUI lookup. 
 
@@ -199,20 +205,24 @@ When the WLAN Pi has connectivity to the internet, this can be done from the CLI
 sudo profiler --oui_update
 ```
 
-## caveats and warnings
+## Notes and Warnings
 
 - A client will generally only report the capabilities it has that match the network it associates to.
     - If you want the client to report all of its capabilities, it must associate with a network that supports those capabilities (e.g, a 3 spatial stream client will not report it supports 3 streams if the AP it associates with supports only 1 or 2 streams).
-    - The profiler fake AP attempts to simulate a fully-featured AP, but there may be cases where it does not behave as expected.
-- Treat reporting of 802.11k capabilities with caution. to be sure, verify through other means like:
+    - The fake AP created by the profiler attempts to simulate a fully-featured AP, but there may be cases where it does not behave as expected.
+- Treat reporting of 802.11k capabilities with caution. To be sure verify through other means like:
     - Check neighbor report requests from a WLC/AP debug.
     - Gather and analyze a packet capture for action frames containing the neighbor report.
 - While we try our best to make this as accurate as possible, we do not guarantee the accuracy of reporting. **Trust, but verify.**
 
-# thanks!
+# Thanks 
 
 - Jerry Olla, Nigel Bowden, and the WLAN Pi Community for all their input and effort on the first versions of the profiler. Without them, this project would not exist.
 
-## contributing
+# Contributing
 
 Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTING.md).
+
+# Discussions and Issues
+
+Please use GitHub discussions for dialogue around features and ideas that are not yet implemented, and create issues for problems with the profiler.
