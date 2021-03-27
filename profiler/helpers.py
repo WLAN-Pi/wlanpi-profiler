@@ -482,7 +482,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                     "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
                 )
             else:
-                log.debug("reg domain set to %s", regdomain)
+                log.debug("reg domain set to %s", " ".join(regdomain))
                 log.debug("see 'iw reg get' for details")
 
             for cmd in commands:
@@ -502,7 +502,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                 exc_info=None,
             )
     else:
-        log.error("failed to prep interface config...")
+        log.error("failed to prepare the interface...")
         return False
 
 

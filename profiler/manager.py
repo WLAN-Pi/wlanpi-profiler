@@ -136,7 +136,7 @@ def start(args: argparse.Namespace):
         else:
             log.debug("interface prep...")
             if not helpers.prep_interface(interface, "monitor", channel):
-                log.error("failed to prep interface... exiting...")
+                log.error("failed to stage the interface... exiting...")
                 sys.exit(-1)
             log.debug("finish interface prep...")
 
