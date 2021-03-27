@@ -232,7 +232,8 @@ class Profiler(object):
         data["capture_channel"] = channel
         features = {}
         for capability in capabilities:
-            features[capability.db_key] = capability.db_value
+            if capability.db_key:
+                features[capability.db_key] = capability.db_value
         data["features"] = features
         data["pcap"] = json.dumps(bytes(frame), cls=Base64Encoder)
         data["schema_version"] = 1
