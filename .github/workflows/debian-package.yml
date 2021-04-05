@@ -1,0 +1,21 @@
+
+name: Build Debian Packages
+on:
+  push:
+    paths:
+      - 'debian/changelog'
+  pull_request:
+    paths:
+      - 'debian/changelog'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build Debian package
+        uses: danielmundi/sbuild-debian-package@sbuild
+        with:
+          distro: buster
+          arch: armhf
