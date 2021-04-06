@@ -11,14 +11,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        distro: [buster]
+        arch: [armhf]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build Debian package
         uses: danielmundi/sbuild-debian-package@sbuild
         with:
-          distro: buster
-          arch: armhf
+          distro: ${{ matrix.distro }}
+          arch: ${{ matrix.arch }}
       - name: Upload package
         uses: danielmundi/upload-gemfury@main
         with:
