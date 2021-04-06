@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build Debian package
-        uses: danielmundi/sbuild-debian-package@sbuild
+        uses: danielmundi/sbuild-debian-package@main
         id: build-debian-package
         with:
           distro: ${{ matrix.distro }}
