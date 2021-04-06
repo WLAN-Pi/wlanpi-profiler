@@ -19,3 +19,9 @@ jobs:
         with:
           distro: buster
           arch: armhf
+      - name: Upload package
+        uses: danielmundi/upload-gemfury@main
+        with:
+          package-name: ${{ steps.build_debian_package.outputs.deb-package }}
+          gemfury-username: ${GEMFURY_NAME}
+          gemfury-token: ${GEMFURY_TOKEN}
