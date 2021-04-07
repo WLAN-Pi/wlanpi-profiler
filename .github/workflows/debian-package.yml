@@ -20,15 +20,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Build Debian package
         uses: danielmundi/sbuild-debian-package@main
         id: build-debian-package
         with:
           distro: ${{ matrix.distro }}
           arch: ${{ matrix.arch }}
+
       - name: Upload package
         uses: danielmundi/upload-gemfury@main
         with:
           package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          gemfury-username: ${GEMFURY_NAME}
-          gemfury-token: ${GEMFURY_TOKEN}
+          gemfury-username: ${{ secrets.GEMFURY_NAME }}
+          gemfury-token: ${{ secrets.GEMFURY_TOKEN }}
