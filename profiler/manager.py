@@ -180,5 +180,4 @@ def start(args: argparse.Namespace):
                 log.debug(process)
                 processes.remove(process)
                 finished_processes.append(process)
-                if process.exitcode == 15:
-                    shutdown = True
+                shutdown = True
