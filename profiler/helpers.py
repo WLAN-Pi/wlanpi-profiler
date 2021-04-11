@@ -438,6 +438,7 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     if mode in ("managed", "monitor"):
         commands = [
+            ["wpa_cli", "-i", f"{interface}", "terminate"],
             ["ip", "link", "set", f"{interface}", "down"],
             ["iw", "dev", f"{interface}", "set", "type", f"{mode}"],
             ["ip", "link", "set", f"{interface}", "up"],
@@ -490,8 +491,8 @@ def prep_interface(interface: str, mode: str, channel: int) -> bool:
                     cmd, encoding="utf-8", shell=False, capture_output=True
                 )
                 if cp.stderr:
-                    raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
-
+                    if "wpa_cli" not in cmd:
+                        raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
             return True
         except OSError:
             log.exception(
