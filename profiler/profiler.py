@@ -22,6 +22,7 @@ import signal
 import sys
 import time
 from difflib import Differ
+from time import strftime
 from typing import List, Tuple
 
 # third party imports
@@ -36,8 +37,8 @@ from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
                         HE_SPATIAL_REUSE_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
                         IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
                         RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
-                        VHT_CAPABILITIES_IE_TAG)
+                        SSID_PARAMETER_SET_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
+                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
 from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
                       is_randomized)
 
@@ -52,8 +53,14 @@ class Profiler(object):
         self.analyzed_hash = {}
         self.config = config
         if config:
-            self.channel = int(config.get("GENERAL").get("channel"))
-            self.ssid = config.get("GENERAL").get("ssid")
+
+            channel = config.get("GENERAL").get("channel")
+            if channel:
+                self.channel = int(channel)
+            else:
+                self.log.warn("profiler cannot determine channel from config")
+
+            self.listen_only = config.get("GENERAL").get("listen_only")
             self.files_path = config.get("GENERAL").get("files_path")
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
             self.ft_disabled = config.get("GENERAL").get("ft_disabled")
@@ -84,10 +91,9 @@ class Profiler(object):
                             toc = time.time() - buffer[frame.addr2]
                             if toc < buffer_squelch:
                                 self.log.debug(
-                                    "suppressing %s as %s is less than squelch (%s)",
+                                    "already seen %s %s seconds ago; not sending to profiler process",
                                     frame.addr2,
                                     f"{toc:.2f}",
-                                    buffer_squelch,
                                 )
                                 continue
                             else:
@@ -98,17 +104,17 @@ class Profiler(object):
                         self.profile(frame)
 
                 if queue.empty():
-                    # if nothing is left in the queue and we're only analyzing a pcap file
                     if self.pcap_analysis:
+                        # if nothing is left in the queue and we're only analyzing a pcap file
                         self.log.info(
-                            "exiting because we were told to only analyze %s",
+                            "exit because we were told to only analyze %s",
                             self.pcap_analysis,
                         )
                         sys.exit(signal.SIGTERM)
 
     def profile(self, frame) -> None:
         """ Handle profiling clients as they come into the queue """
-        oui_manuf, capabilities = self.analyze_assoc_req(frame)
+        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -137,12 +143,25 @@ class Profiler(object):
             else:
                 band = "unknown"
 
+            if self.listen_only:
+                self.log.info(
+                    "discovered association request for %s to %s",
+                    frame.addr2,
+                    ssid,
+                )
+
             # generate text report
             text_report = self.generate_text_report(
-                text_report_oui_manuf, capabilities, frame.addr2, channel, band
+                text_report_oui_manuf,
+                capabilities,
+                frame.addr2,
+                channel,
+                band,
+                ssid,
+                self.listen_only,
             )
 
-            self.log.info("text report for %s\n%s", frame.addr2, text_report)
+            self.log.info("generating text report for %s\n%s", frame.addr2, text_report)
 
             self.log.debug(
                 "writing textual reports for %s (capabilities hash=%s) to %s",
@@ -151,7 +170,14 @@ class Profiler(object):
                 os.path.join(self.clients_dir, frame.addr2.replace(":", "-")),
             )
             self.write_analysis_to_file_system(
-                text_report, capabilities, frame, oui_manuf, randomized, band, channel
+                text_report,
+                capabilities,
+                frame,
+                oui_manuf,
+                randomized,
+                band,
+                channel,
+                self.listen_only,
             )
 
             self.client_profiled_count += 1
@@ -161,11 +187,19 @@ class Profiler(object):
 
     @staticmethod
     def generate_text_report(
-        oui_manuf: str, capabilities: list, client_mac: str, channel: int, band: str
+        oui_manuf: str,
+        capabilities: list,
+        client_mac: str,
+        channel: int,
+        band: str,
+        ssid: str,
+        listen_only: bool,
     ) -> str:
         """ Generate a report for output """
         # start report
         text_report = "-" * 45
+        if listen_only:
+            text_report += f"\n - SSID: {ssid}"
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
         band_label = ""
@@ -199,6 +233,7 @@ class Profiler(object):
         randomized: bool,
         band,
         channel,
+        listen_only,
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
@@ -213,10 +248,6 @@ class Profiler(object):
                 log.exception("problem creating %s directory", dest)
                 sys.exit(signal.SIGHUP)
 
-        filename = os.path.join(dest, f"{client_mac}_{band}.txt")
-
-        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
-
         data = {}
 
         data["mac"] = client_mac
@@ -230,6 +261,7 @@ class Profiler(object):
             band_db = 0
         data["band"] = band_db
         data["capture_channel"] = channel
+        data["listen_only"] = listen_only
         features = {}
         for capability in capabilities:
             if capability.db_key:
@@ -239,35 +271,54 @@ class Profiler(object):
         data["schema_version"] = 1
         data["profiler_version"] = __version__
 
+        text_filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
+
         try:
-            if os.path.exists(filename):
-
-                existing = open(filename, "r").readlines()
-                temp = []
-                for line in existing:
-                    temp.append(line.replace("\n", ""))
-                existing = temp
-                new = text_report.split("\n")
-                # strip header when comparing existing file from newly profiled
-                if existing[5:] == new[5:]:
-                    pass
-                else:
-                    text_report = list(
-                        Differ().compare(existing, text_report.split("\n"))
-                    )
-                    filename = filename.replace(".txt", "_changed.txt")
-                    text_report = "\n".join(text_report)
-            with open(filename, "w") as writer:
-                writer.write(text_report)
-
+            same = False
+            write_time = strftime("%Y%m%dt%H%M%S")
             if os.path.exists(json_filename):
-                pass  # compare json
+                with open(json_filename, "r") as _file:
+                    existing_json = json.load(_file)
+
+                if hash(str(json.dumps(existing_json.get("features")))) == hash(
+                    str(json.dumps(features))
+                ):
+                    # previously profiled client has the same features
+                    same = True
+
+                if not same:
+                    json_filename = json_filename.replace(
+                        ".json", f"_diff.{write_time}.json"
+                    )
 
             with open(json_filename, "w") as writer:
                 json.dump(data, writer)
+
+            if os.path.exists(text_filename):
+                with open(text_filename, "r") as _file:
+                    existing_text = _file.readlines()
+                    temp = []
+                    for line in existing_text:
+                        temp.append(line.replace("\n", ""))
+                    existing_text = temp
+
+                if not same:
+                    text_report = list(
+                        Differ().compare(existing_text, text_report.split("\n"))
+                    )
+                    text_filename = text_filename.replace(
+                        ".txt", f"_diff.{write_time}.txt"
+                    )
+                    text_report = "\n".join(text_report)
+
+            with open(text_filename, "w") as writer:
+                writer.write(text_report)
+
         except OSError:
             log.exception(
-                "error creating flat files to dump client info (%s)", filename
+                "error creating flat files to dump client info (%s)", text_filename
             )
             sys.exit(signal.SIGHUP)
 
@@ -276,13 +327,17 @@ class Profiler(object):
         out_fieldnames = ["Client_Mac", "OUI_Manuf"]
 
         for capability in capabilities:
-            if capability.name is not None and capability.value is not None:
-                out_fieldnames.append(capability.name)
-                out_row[capability.name] = capability.value
+            if capability.db_key:
+                features[capability.db_key] = capability.db_value
+
+        for capability in capabilities:
+            if capability.db_key is not None and capability.db_value is not None:
+                out_fieldnames.append(capability.db_key)
+                out_row[capability.db_key] = capability.db_value
 
         # dump out the frame to a file
-        filename = os.path.splitext(filename)[0] + ".pcap"
-        wrpcap(filename, [frame])
+        pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
+        wrpcap(pcap_filename, [frame])
 
         # check if csv file exists
         if not os.path.exists(self.csv_file):
@@ -392,6 +447,12 @@ class Profiler(object):
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
+
+    @staticmethod
+    def analyze_ssid_ie(dot11_elt_dict: dict) -> str:
+        if SSID_PARAMETER_SET_IE_TAG in dot11_elt_dict.keys():
+            ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
+            return f"{ssid}"
 
     @staticmethod
     def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> List:
@@ -872,6 +933,8 @@ class Profiler(object):
         #  resolve manufacturer
         oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
+        ssid = self.analyze_ssid_ie(dot11_elt_dict)
+
         # dictionary to store capabilities as we decode them
         capabilities = []
 
@@ -904,4 +967,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
 
-        return oui_manuf, capabilities
+        return ssid, oui_manuf, capabilities

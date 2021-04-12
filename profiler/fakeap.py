@@ -24,19 +24,166 @@ from multiprocessing import Lock, Value
 from multiprocessing.queues import Queue
 from time import sleep, time
 
-from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt, Dot11ProbeResp,
-                       RadioTap)
-from scapy.all import conf as scapyconf
-from scapy.all import sniff
+# third party imports
+try:
+    from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt,
+                           Dot11ProbeResp, RadioTap, Scapy_Exception)
+    from scapy.all import conf as scapyconf
+    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff
+except ModuleNotFoundError as error:
+    if error.name == "scapy":
+        print("required module scapy not found.")
+    else:
+        print(f"{error}")
+    sys.exit(signal.SIGABRT)
 
 # app imports
 from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
                         DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
                         DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
                         DOT11_TYPE_MANAGEMENT)
-from .helpers import build_fake_frame_ies, get_mac, next_sequence_number
 
-# third party imports
+
+class _Utils:
+    """ Fake AP helper functions """
+
+    def build_fake_frame_ies(config: dict) -> Dot11Elt:
+        """ Build base frame for beacon and probe resp """
+        ssid = config.get("GENERAL").get("ssid")
+        channel = int(config.get("GENERAL").get("channel"))
+        ft_disabled = config.get("GENERAL").get("ft_disabled")
+        he_disabled = config.get("GENERAL").get("he_disabled")
+
+        ssid = bytes(ssid, "utf-8")
+        essid = Dot11Elt(ID="SSID", info=ssid)
+
+        rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
+        rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
+
+        channel = bytes([channel])
+        dsset = Dot11Elt(ID="DSset", info=channel)
+
+        dtim_data = b"\x05\x04\x00\x03\x00\x00"
+        dtim = Dot11Elt(ID="TIM", info=dtim_data)
+
+        ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
+
+        if ft_disabled:
+            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+        else:
+            mobility_domain_data = b"\x45\xc2\x00"
+            mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
+            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
+
+        rsn = Dot11Elt(ID=0x30, info=rsn_data)
+
+        ht_info_data = (
+            channel
+            + b"\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        )
+        ht_information = Dot11Elt(ID=0x3D, info=ht_info_data)
+
+        rm_enabled_data = b"\x02\x00\x00\x00\x00"
+        rm_enabled_cap = Dot11Elt(ID=0x46, info=rm_enabled_data)
+
+        extended_data = b"\x00\x00\x08\x00\x00\x00\x00\x40"
+        extended = Dot11Elt(ID=0x7F, info=extended_data)
+
+        vht_cap_data = b"\x32\x00\x80\x03\xaa\xff\x00\x00\xaa\xff\x00\x00"
+        vht_capabilities = Dot11Elt(ID=0xBF, info=vht_cap_data)
+
+        vht_op_data = b"\x00\x24\x00\x00\x00"
+        vht_operation = Dot11Elt(ID=0xC0, info=vht_op_data)
+
+        wmm_data = b"\x00\x50\xf2\x02\x01\x01\x8a\x00\x03\xa4\x00\x00\x27\xa4\x00\x00\x42\x43\x5e\x00\x62\x32\x2f\x00"
+        wmm = Dot11Elt(ID=0xDD, info=wmm_data)
+
+        he_cap_data = b"\x23\x0d\x01\x00\x02\x40\x00\x04\x70\x0c\x89\x7f\x03\x80\x04\x00\x00\x00\xaa\xaa\xaa\xaa\x7b\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71"
+        he_capabilities = Dot11Elt(ID=0xFF, info=he_cap_data)
+
+        he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
+        he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
+
+        spatial_reuse_data = b"\x27\x05\x00"
+        spatial_reuse = Dot11Elt(ID=0xFF, info=spatial_reuse_data)
+
+        mu_edca_data = b"\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
+        mu_edca = Dot11Elt(ID=0xFF, info=mu_edca_data)
+
+        six_ghz_cap_data = b"\x3b\x00\x00"
+        six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
+
+        # reduced_neighbor_report_data = b"\x02"
+        # reduced_neighbor_report = Dot11Elt(ID=0xFF, info=reduced_neighbor_report_data)
+
+        # custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
+        # custom_data = bytes(f"{custom_hash}", "utf-8")
+        # custom = Dot11Elt(ID=0xDE, info=custom_data)
+
+        if ft_disabled:
+            frame = (
+                essid
+                / rates
+                / dsset
+                / dtim
+                / ht_capabilities
+                / rsn
+                / ht_information
+                / rm_enabled_cap
+                / extended
+                / vht_capabilities
+                / vht_operation
+            )
+        else:
+            frame = (
+                essid
+                / rates
+                / dsset
+                / dtim
+                / ht_capabilities
+                / rsn
+                / ht_information
+                / mobility_domain
+                / rm_enabled_cap
+                / extended
+                / vht_capabilities
+                / vht_operation
+            )
+        if he_disabled:
+            frame = frame / wmm
+        else:
+            frame = (
+                frame
+                # / reduced_neighbor_report
+                / he_capabilities
+                / he_operation
+                / spatial_reuse
+                / mu_edca
+                / six_ghz_cap
+                / wmm
+                # / custom
+            )
+
+        # for gathering data to validate tests:
+        #
+        # frame_bytes = bytes(frame)
+        # print(frame_bytes)
+        return frame
+
+    def get_mac(interface: str) -> str:
+        """ Get the mac address for a specified interface """
+
+        try:
+            mac = get_if_hwaddr(interface)
+        except Scapy_Exception:
+            mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
+        return mac
+
+    def next_sequence_number(sequence_number: Value) -> int:
+        """ Update a sequence number of type multiprocessing Value """
+        sequence_number.value = (sequence_number.value + 1) % 4096
+        return sequence_number.value
 
 
 class TxBeacons(multiprocessing.Process):
@@ -57,14 +204,17 @@ class TxBeacons(multiprocessing.Process):
         self.sequence_number = sequence_number
         self.ssid = config.get("GENERAL").get("ssid")
         self.interface = config.get("GENERAL").get("interface")
-        self.channel = int(config.get("GENERAL").get("channel"))
+        channel = config.get("GENERAL").get("channel")
+        if not channel:
+            raise ValueError("cannot determine channel to beacon on")
+        self.channel = int(channel)
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
         self.beacon_interval = 0.102_400
 
         with lock:
-            self.mac = get_mac(self.interface)
+            self.mac = _Utils.get_mac(self.interface)
             dot11 = Dot11(
                 type=DOT11_TYPE_MANAGEMENT,
                 subtype=DOT11_SUBTYPE_BEACON,
@@ -73,7 +223,7 @@ class TxBeacons(multiprocessing.Process):
                 addr3=self.mac,
             )
             dot11beacon = Dot11Beacon(cap=0x1111)
-            beacon_frame_ies = build_fake_frame_ies(self.config)
+            beacon_frame_ies = _Utils.build_fake_frame_ies(self.config)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
         # self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
@@ -91,7 +241,7 @@ class TxBeacons(multiprocessing.Process):
         """ Update and Tx Beacon Frame """
         frame = self.beacon_frame
         with self.sequence_number.get_lock():
-            frame.sequence_number = next_sequence_number(self.sequence_number)
+            frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
 
         # print(f"frame.sequence_number: {frame.sequence_number}")
         # frame.sequence_number value is updating here, but not updating in pcap for some adapters
@@ -143,7 +293,10 @@ class Sniffer(multiprocessing.Process):
         self.sequence_number = sequence_number
         self.ssid = config.get("GENERAL").get("ssid")
         self.interface = config.get("GENERAL").get("interface")
-        self.channel = int(config.get("GENERAL").get("channel"))
+        channel = config.get("GENERAL").get("channel")
+        if not channel:
+            raise ValueError("cannot determine channel to sniff")
+        self.channel = int(channel)
         self.listen_only = config.get("GENERAL").get("listen_only")
         self.assoc_reqs = {}
 
@@ -161,8 +314,8 @@ class Sniffer(multiprocessing.Process):
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
         with lock:
-            probe_resp_ies = build_fake_frame_ies(self.config)
-            self.mac = get_mac(self.interface)
+            probe_resp_ies = _Utils.build_fake_frame_ies(self.config)
+            self.mac = _Utils.get_mac(self.interface)
             self.probe_response_frame = (
                 RadioTap()
                 / Dot11(
@@ -207,7 +360,7 @@ class Sniffer(multiprocessing.Process):
         """ Send probe resp to assist with profiler discovery """
         frame = self.probe_response_frame
         with self.sequence_number.get_lock():
-            frame.sequence_number = next_sequence_number(self.sequence_number)
+            frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
         self.l2socket.send(frame)
         # self.log.debug("sent probe resp to %s", probe_request.addr2)
@@ -223,7 +376,9 @@ class Sniffer(multiprocessing.Process):
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
         with self.sequence_number.get_lock():
-            frame.sequence_number = next_sequence_number(self.sequence_number) - 1
+            frame.sequence_number = (
+                _Utils.next_sequence_number(self.sequence_number) - 1
+            )
 
         # self.log.debug("sending authentication (0x0B) to %s", receiver)
         self.l2socket.send(frame)

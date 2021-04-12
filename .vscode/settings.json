@@ -1,4 +1,9 @@
 {
     "editor.formatOnSave": false,
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/venv/*/**": true
+    }
 }

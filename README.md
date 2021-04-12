@@ -225,4 +225,4 @@ Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTIN
 
 # Discussions and Issues
 
-Please use GitHub discussions for dialogue around features and ideas that are not yet implemented, and create issues for problems with the profiler.
+Please use GitHub discussions for dialogue around features and ideas that do not exist. Create issues for problems found running profiler.
