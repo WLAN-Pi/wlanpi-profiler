@@ -4,6 +4,8 @@
     "files.watcherExclude": {
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
-        "**/venv/*/**": true
+        "**/venv/*/**": true,
+        "**/debian/wlanpi-profiler/*/**": true,
+        "**/debian/.debhelper/*/**": true
     }
 }
