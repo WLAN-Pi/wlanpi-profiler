@@ -759,6 +759,12 @@ class Profiler(object):
         dot11ax_punctured_preamble = Capability(
             db_key="dot11ax_punctured_preamble", db_value=0
         )
+        dot11ax_he_su_beamformer = Capability(
+            db_key="dot11ax_he_su_beamformer", db_value=0
+        )
+        dot11ax_he_su_beamformee = Capability(
+            db_key="dot11ax_he_su_beamformee", db_value=0
+        )
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
@@ -842,6 +848,40 @@ class Profiler(object):
                             dot11ax_punctured_preamble.db_value = 0
                             dot11ax.value += ", [ ] Punctured Preamble"
 
+                        su_beamformer_octet = element_data[10]
+                        su_beamformer_octet_binary_string = ""
+                        for bit_position in range(8):
+                            su_beamformer_octet_binary_string += (
+                                f"{int(get_bit(su_beamformer_octet, bit_position))}"
+                            )
+                        if int(su_beamformer_octet_binary_string[7]):
+                            su_beamformer_support = True
+                        else:
+                            su_beamformer_support = False
+                        if su_beamformer_support:
+                            dot11ax_he_su_beamformer.db_value = 1
+                            dot11ax.value += ", [X] SU Beamformer"
+                        else:
+                            dot11ax_he_su_beamformer.db_value = 0
+                            dot11ax.value += ", [ ] SU Beamformer"
+
+                        su_beamformee_octet = element_data[11]
+                        su_beamformee_octet_binary_string = ""
+                        for bit_position in range(8):
+                            su_beamformee_octet_binary_string += (
+                                f"{int(get_bit(su_beamformee_octet, bit_position))}"
+                            )
+                        if int(su_beamformee_octet_binary_string[0]):
+                            su_beamformee_support = True
+                        else:
+                            su_beamformee_support = False
+                        if su_beamformee_support:
+                            dot11ax_he_su_beamformee.db_value = 1
+                            dot11ax.value += ", [X] SU Beamformee"
+                        else:
+                            dot11ax_he_su_beamformee.db_value = 0
+                            dot11ax.value += ", [ ] SU Beamformee"
+
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
                         for bit_position in range(8):
@@ -911,6 +951,8 @@ class Profiler(object):
             dot11ax_uora,
             dot11ax_bsr,
             dot11ax_punctured_preamble,
+            dot11ax_he_su_beamformer,
+            dot11ax_he_su_beamformee,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
             dot11ax_160_mhz,
