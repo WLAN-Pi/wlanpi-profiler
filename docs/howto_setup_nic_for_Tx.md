@@ -1,7 +1,5 @@
 # How to use `iw` and `ip` to prep your WLAN NIC to Tx frames
 
-The tools `iwconfig` and `ipconfig` that are commonly known and used are actually obsolete and have been replaced with modern tools like `iw` and `ip`.# How to use `iw` and `ip` to prep your WLAN NIC to Tx frames
-
 The tools `iwconfig` and `ipconfig` that are commonly known and used are actually obsolete and have been replaced with modern tools like `iw` and `ip`.
 
 `iw` was meant to replace `iwconfig`.
