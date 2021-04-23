@@ -22,6 +22,7 @@ import os
 import platform
 import sys
 from datetime import datetime
+from multiprocessing import Queue
 from signal import SIGINT, signal
 
 # third party imports
@@ -92,7 +93,7 @@ def start(args: argparse.Namespace):
 
     processes = []
     finished_processes = []
-    queue = mp.Queue()
+    queue: "Queue[str]" = Queue()
     pcap_analysis = config.get("GENERAL").get("pcap_analysis")
     parent_pid = os.getpid()
     log.debug("%s pid %s", __name__, parent_pid)
@@ -151,7 +152,7 @@ def start(args: argparse.Namespace):
         helpers.generate_run_message(config)
 
         if listen_only:
-            log.warn(
+            log.warning(
                 "beacon process not started because user requested listen only mode"
             )
         else:

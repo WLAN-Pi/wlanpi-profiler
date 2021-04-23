@@ -23,7 +23,7 @@ import sys
 import time
 from difflib import Differ
 from time import strftime
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 # third party imports
 from manuf import manuf
@@ -58,7 +58,7 @@ class Profiler(object):
             if channel:
                 self.channel = int(channel)
             else:
-                self.log.warn("profiler cannot determine channel from config")
+                self.log.warning("profiler cannot determine channel from config")
 
             self.listen_only = config.get("GENERAL").get("listen_only")
             self.files_path = config.get("GENERAL").get("files_path")
@@ -79,7 +79,7 @@ class Profiler(object):
     def run(self, queue) -> None:
         """ Runner which performs checks prior to profiling an association request """
         if queue:
-            buffer = {}
+            buffer: "Dict" = {}
             buffer_squelch = 3
 
             while self.running:
@@ -114,7 +114,22 @@ class Profiler(object):
 
     def profile(self, frame) -> None:
         """ Handle profiling clients as they come into the queue """
-        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame)
+        # we to determine the channel from frame itself, not from the profiler config
+        freq = frame.ChannelFrequency
+        channel = _20MHZ_CHANNEL_LIST[freq]
+
+        is_6ghz = False
+        if freq > 2411 and freq < 2485:
+            band = "2.4GHz"
+        elif freq > 5100 and freq < 5900:
+            band = "5.8GHz"
+        elif freq > 5900 and freq < 7120:
+            band = "6.0GHz"
+            is_6ghz = True
+        else:
+            band = "unknown"
+
+        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame, is_6ghz)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -133,19 +148,6 @@ class Profiler(object):
 
             self.last_manuf = oui_manuf
             self.analyzed_hash[analysis_hash] = frame
-
-            # we to determine the channel from frame itself, not from the profiler config
-            freq = frame.ChannelFrequency
-            channel = _20MHZ_CHANNEL_LIST[freq]
-
-            if freq > 2411 and freq < 2485:
-                band = "2.4GHz"
-            elif freq > 5100 and freq < 5900:
-                band = "5.8GHz"
-            elif freq > 5900 and freq < 7120:
-                band = "6.0GHz"
-            else:
-                band = "unknown"
 
             if self.listen_only:
                 self.log.info(
@@ -209,19 +211,21 @@ class Profiler(object):
         band_label = ""
         if band[0] == "2":
             band_label = "2.4 GHz"
-        if band[0] == "5":
+        elif band[0] == "5":
             band_label = "5 GHz"
-        if band[0] == "6":
+        elif band[0] == "6":
             band_label = "6 GHz"
+        else:
+            band_label = "Unknown"
         text_report += f"\n - Frequency band: {band_label}"
         text_report += f"\n - Capture channel: {channel}\n"
         text_report += "-" * 45
         text_report += "\n"
         for capability in capabilities:
-            if capability.name is not None and capability.value is not None:
-                text_report += (
-                    "{0:<20} {1:<20}".format(capability.name, capability.value) + "\n"
-                )
+            if capability.name and capability.value:
+                out = "{0:<20} {1:<20}".format(capability.name, capability.value)
+                if out.strip():
+                    text_report += out + "\n"
 
         text_report += "\nKey: [X]: Supported, [ ]: Not supported"
         text_report += "\n* Reported client capabilities are dependent on available features at the time of client association."
@@ -261,6 +265,8 @@ class Profiler(object):
             band_db = 2
         elif band[0] == "5":
             band_db = 5
+        elif band[0] == "6":
+            band_db = 6
         else:
             band_db = 0
         data["band"] = band_db
@@ -297,12 +303,12 @@ class Profiler(object):
                         ".json", f"_diff.{write_time}.json"
                     )
 
-            with open(json_filename, "w") as writer:
-                json.dump(data, writer)
+            with open(json_filename, "w") as write_json_file:
+                json.dump(data, write_json_file)
 
             if os.path.exists(text_filename):
-                with open(text_filename, "r") as _file:
-                    existing_text = _file.readlines()
+                with open(text_filename, "r") as read_file:
+                    existing_text = read_file.readlines()
                     temp = []
                     for line in existing_text:
                         temp.append(line.replace("\n", ""))
@@ -317,8 +323,8 @@ class Profiler(object):
                     )
                     text_report = "\n".join(text_report)
 
-            with open(text_filename, "w") as writer:
-                writer.write(text_report)
+            with open(text_filename, "w") as file_writer:
+                file_writer.write(text_report)
 
         except OSError:
             log.exception(
@@ -348,13 +354,13 @@ class Profiler(object):
 
             # create file with csv headers
             with open(self.csv_file, mode="w") as file_obj:
-                writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
-                writer.writeheader()
+                csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
+                csv_writer.writeheader()
 
         # append data to csv file
         with open(self.csv_file, mode="a") as file_obj:
-            writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
-            writer.writerow(out_row)
+            csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
+            csv_writer.writerow(out_row)
 
     @staticmethod
     def process_information_elements(buffer: bytes) -> dict:
@@ -366,7 +372,7 @@ class Profiler(object):
         You must strip those before passing the payload in.
         """
         # init element vars
-        information_elements = {}
+        information_elements: "Dict" = {}
         element_id = 0
         element_length = 0
         element_data = []
@@ -421,7 +427,7 @@ class Profiler(object):
 
         return information_elements
 
-    def resolve_oui_manuf(self, mac: str, dot11_elt_dict: dict) -> str:
+    def resolve_oui_manuf(self, mac: str, dot11_elt_dict) -> str:
         """ Resolve client's manuf using manuf database and other heuristics """
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -460,13 +466,16 @@ class Profiler(object):
         return oui_manuf
 
     @staticmethod
-    def analyze_ssid_ie(dot11_elt_dict: dict) -> str:
+    def analyze_ssid_ie(dot11_elt_dict) -> str:
+        """ Check the SSID parameter to determine network name """
+        out = ""
         if SSID_PARAMETER_SET_IE_TAG in dot11_elt_dict.keys():
             ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
-            return f"{ssid}"
+            out = f"{ssid}"
+        return out
 
     @staticmethod
-    def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> List:
+    def analyze_ht_capabilities_ie(dot11_elt_dict) -> List:
         """ Check for 802.11n support """
         dot11n = Capability(
             name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
@@ -492,13 +501,13 @@ class Profiler(object):
         return [dot11n, dot11n_nss]
 
     @staticmethod
-    def analyze_vht_capabilities_ie(dot11_elt_dict: dict) -> List:
+    def analyze_vht_capabilities_ie(dot11_elt_dict) -> List:
         """ Check for 802.11ac support """
         dot11ac = Capability(
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
         )
         dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
-        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value=0)
+        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value="")
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
         dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
@@ -529,10 +538,10 @@ class Profiler(object):
                         continue
 
             mcs = sorted(set(mcs))
-            mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
-            dot11ac.value = f"Supported ({nss}ss), MCS {mcs}"
+            mcs_list = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
+            dot11ac.value = f"Supported ({nss}ss), MCS {mcs_list}"
             dot11ac_nss.db_value = nss
-            dot11ac_mcs.db_value = mcs
+            dot11ac_mcs.db_value = mcs_list
 
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
@@ -573,7 +582,7 @@ class Profiler(object):
         ]
 
     @staticmethod
-    def analyze_rm_capabilities_ie(dot11_elt_dict: dict) -> []:
+    def analyze_rm_capabilities_ie(dot11_elt_dict) -> List:
         """ Check for 802.11k support """
         dot11k = Capability(
             name="802.11k",
@@ -588,7 +597,7 @@ class Profiler(object):
         return [dot11k]
 
     @staticmethod
-    def analyze_ft_capabilities_ie(dot11_elt_dict: dict, ft_disabled: bool) -> List:
+    def analyze_ft_capabilities_ie(dot11_elt_dict, ft_disabled: bool) -> List:
         """ Check for 802.11r support """
         dot11r = Capability(
             name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
@@ -604,7 +613,7 @@ class Profiler(object):
         return [dot11r]
 
     @staticmethod
-    def analyze_ext_capabilities_ie(dot11_elt_dict: dict) -> List:
+    def analyze_ext_capabilities_ie(dot11_elt_dict) -> List:
         """ Check for 802.11v support """
         dot11v = Capability(
             name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
@@ -629,7 +638,7 @@ class Profiler(object):
         return [dot11v]
 
     @staticmethod
-    def analyze_rsn_capabilities_ie(dot11_elt_dict: dict) -> List:
+    def analyze_rsn_capabilities_ie(dot11_elt_dict) -> List:
         """ Check for 802.11w support """
         dot11w = Capability(
             name="802.11w", value="Not reported", db_key="dot11w", db_value=0
@@ -649,7 +658,7 @@ class Profiler(object):
         return [dot11w]
 
     @staticmethod
-    def analyze_power_capability_ie(dot11_elt_dict: dict) -> List:
+    def analyze_power_capability_ie(dot11_elt_dict) -> List:
         """ Check for supported power capabilities """
         max_power_cap = Capability(
             name="Max Power",
@@ -684,7 +693,7 @@ class Profiler(object):
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict: dict, is_6ghz=False) -> List:
+    def analyze_supported_channels_ie(dot11_elt_dict, is_6ghz: bool) -> List:
         """ Check supported channels """
         supported_channels = Capability(
             name="Supported Channels",
@@ -751,7 +760,7 @@ class Profiler(object):
         return [supported_channels, number_of_supported_channels]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict: dict, he_disabled: bool) -> List:
+    def analyze_extension_ies(dot11_elt_dict, he_disabled: bool) -> List:
         """ Check for 802.11ax support """
         dot11ax = Capability(
             name="802.11ax",
@@ -965,7 +974,7 @@ class Profiler(object):
             dot11ax_160_mhz,
         ]
 
-    def analyze_assoc_req(self, frame) -> Tuple[str, list]:
+    def analyze_assoc_req(self, frame, is_6ghz: bool) -> Tuple[str, str, list]:
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -1028,6 +1037,6 @@ class Profiler(object):
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)
 
         # check supported channels
-        capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
+        capabilities += self.analyze_supported_channels_ie(dot11_elt_dict, is_6ghz)
 
         return ssid, oui_manuf, capabilities

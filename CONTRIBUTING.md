@@ -68,8 +68,6 @@ sudo ./venv/bin/python3 -m profiler <optional params>
 sudo ./venv/bin/python3 -m profiler -c 44 -s "dev" -i wlan2 --no11r --logging debug
 ```
 
-- note that package name is `profiler` while the console_scripts entry point is `profiler`.
-
 ### Before You Start
 
 To increase the chances of Pull Request (PR) approval, first, talk to one of the core team members. Aligning your ideas with the project team will save everybody's time. 

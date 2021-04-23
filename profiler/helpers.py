@@ -29,7 +29,7 @@ from base64 import b64encode
 from dataclasses import dataclass
 from distutils.util import strtobool
 from time import ctime
-from typing import List
+from typing import Any, Dict, List, Union
 
 # third party imports
 try:
@@ -43,6 +43,7 @@ except ModuleNotFoundError as error:
 
 
 def run_cli_cmd(cmd: List) -> str:
+    """ Run an arbitrary CLI command and return the results """
     cp = subprocess.run(
         cmd,
         encoding="utf-8",
@@ -56,6 +57,7 @@ def run_cli_cmd(cmd: List) -> str:
             return cp.stdout
         if cp.stderr:
             return cp.stderr
+    return "completed process return code is non-zero"
 
 
 # is tcpdump installed?
@@ -119,7 +121,7 @@ def check_channel(value: str) -> int:
     error_msg = "%s is not a valid channel value" % channel
     if channel <= 0:
         raise ValueError(error_msg)
-    if channel in CHANNELS:
+    if any(channel in band for band in CHANNELS.values()):
         return channel
     else:
         raise ValueError(error_msg)
@@ -312,8 +314,8 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
         sys.exit(1)
 
     try:
-        for path in os.listdir(Path(directory)):
-            path = Path(directory) / Path(path)
+        for _path in os.listdir(Path(directory)):
+            path = Path(directory) / Path(_path)
             if path.is_file():
                 print(f"Removing file: {path}")
                 path.unlink()
@@ -324,7 +326,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
         log.exception("issue removing files")
 
 
-def setup_config(args) -> dict:
+def setup_config(args) -> Dict:
     """ Create the configuration (SSID, channel, interface, etc) for the Profiler """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -384,7 +386,7 @@ def setup_config(args) -> dict:
     return config
 
 
-def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
+def convert_configparser_to_dict(config: configparser.ConfigParser) -> Dict:
     """
     Convert ConfigParser object to dictionary.
 
@@ -393,15 +395,15 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
 
     If there is a string representation of truth, it is converted from str to bool.
     """
-    _dict = {}
+    _dict: "Dict[str, Any]" = {}
     for section in config.sections():
         _dict[section] = {}
-        for key, value in config.items(section):
+        for key, _value in config.items(section):
             try:
-                value = bool(strtobool(value))
+                _value = bool(strtobool(_value))
             except ValueError:
                 pass
-            _dict[section][key] = value
+            _dict[section][key] = _value
     return _dict
 
 
@@ -412,7 +414,7 @@ def load_config(config_file: str) -> configparser.ConfigParser:
     return config
 
 
-def validate(config: dict) -> bool:
+def validate(config) -> bool:
     """ Validate minimum config to run is OK """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -440,9 +442,10 @@ def is_randomized(mac) -> bool:
 
 
 def check_reg_domain() -> None:
+    """ Check and report the set regulatory domain """
     log = logging.getLogger(inspect.stack()[0][3])
-    regdomain = run_cli_cmd(["iw", "reg", "get"])
-    regdomain = [line for line in regdomain.split("\n") if "country" in line]
+    regdomain_result = run_cli_cmd(["iw", "reg", "get"])
+    regdomain = [line for line in regdomain_result.split("\n") if "country" in line]
     if "UNSET" in "".join(regdomain):
         log.warning(
             "REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'"
@@ -491,12 +494,12 @@ def stage_interface(iface: Interface) -> bool:
                 ),
                 exc_info=None,
             )
-    else:
-        log.error("failed to prepare the interface...")
-        return False
+
+    log.error("failed to prepare the interface...")
+    return False
 
 
-def check_config_missing(config: dict) -> bool:
+def check_config_missing(config: Dict) -> bool:
     """ Check that the minimal config items exist """
     log = logging.getLogger(inspect.stack()[0][3])
     try:
@@ -541,7 +544,7 @@ def update_manuf() -> bool:
     return True
 
 
-def verify_reporting_directories(config: dict) -> None:
+def verify_reporting_directories(config: Dict) -> None:
     """ Check reporting directories exist and create if not """
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -600,7 +603,7 @@ def get_wlanpi_version() -> str:
     return wlanpi_version
 
 
-def flag_last_object(seq: iter):
+def flag_last_object(seq):
     """ Treat the last object in an iterable differently """
     seq = iter(seq)  # ensure seq is an iterator
     _a = next(seq)
@@ -610,11 +613,11 @@ def flag_last_object(seq: iter):
     yield _a, True
 
 
-def generate_run_message(config: dict) -> None:
+def generate_run_message(config: Dict) -> None:
     """ Create message to display to users screen """
     if config["GENERAL"].get("listen_only") is True:
         out = []
-        out.append(f"Starting profiler in listen only mode:")
+        out.append("Starting profiler in listen only mode:")
         out.append(
             f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
         )
@@ -641,7 +644,7 @@ def generate_run_message(config: dict) -> None:
         else:
             out.append(f"Starting profiler AP with {interface}")
         out.append(f" - Our fake AP SSID: {ssid}")
-        out.append(" - Results are saved locally and print to screen")
+        out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(f" - Associate your Wi-Fi client to our SSID: {ssid}")
@@ -662,10 +665,10 @@ def generate_run_message(config: dict) -> None:
 class Capability:
     """ Define custom fields for reporting """
 
-    name: str = None
-    value: str = None
-    db_key: str = None
-    db_value: int = 0
+    name: str = ""
+    value: Union[str, int] = ""
+    db_key: str = ""
+    db_value: Union[int, str, List[str]] = 0
 
 
 def get_bit(byteval, index) -> bool:
