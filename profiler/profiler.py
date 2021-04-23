@@ -677,7 +677,7 @@ class Profiler(object):
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict: dict) -> List:
+    def analyze_supported_channels_ie(dot11_elt_dict: dict, is_6ghz=False) -> List:
         """ Check supported channels """
         supported_channels = Capability(
             name="Supported Channels",
@@ -693,15 +693,20 @@ class Profiler(object):
             channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
             channel_list = []
 
+            is_2ghz = False
+            is_5ghz = False
+
             while channel_sets_list:
 
                 start_channel = channel_sets_list.pop(0)
                 channel_range = channel_sets_list.pop(0)
 
-                # check for if 2.4Ghz or 5GHz
-                if start_channel > 14:
+                if start_channel > 14 or is_6ghz:
+                    if not is_6ghz:
+                        is_5ghz = True
                     channel_multiplier = 4
                 else:
+                    is_2ghz = True
                     channel_multiplier = 1
 
                 number_of_supported_channels.value += channel_range
@@ -714,6 +719,11 @@ class Profiler(object):
                 if index == 0:
                     placeholder.append(channel)
                     continue
+                if is_2ghz and is_5ghz:
+                    if channel < 15:
+                        channel_multiplier = 1
+                    else:
+                        channel_multiplier = 4
                 if channel - placeholder[-1] == channel_multiplier:
                     placeholder.append(channel)
                     # are we at last index? add last list to ranges
