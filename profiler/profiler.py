@@ -431,6 +431,8 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
+        sanitize = {"intelwir": "Intel", "samsunge": "Samsung"}
+
         if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
             # inspect vendor specific IEs and see if there's an IE with
             # an OUI that we know can only be included if the manuf
@@ -445,9 +447,14 @@ class Profiler(object):
                         # Matches are vendor specific IEs we know are client specific
                         # e.g. Apple vendor specific IEs can only be found in Apple devices
                         # Samsung may follow similar logic based on S10 5G testing, but unsure
-                        matches = ("apple", "samsung")
+                        matches = ("apple", "samsung", "intel")
                         if oui_manuf_vendor.lower().startswith(matches):
-                            oui_manuf = oui_manuf_vendor
+                            if oui_manuf_vendor.lower() in sanitize:
+                                oui_manuf = sanitize.get(
+                                    oui_manuf_vendor.lower(), oui_manuf_vendor
+                                )
+                            else:
+                                oui_manuf = oui_manuf_vendor
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
