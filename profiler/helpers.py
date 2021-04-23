@@ -618,7 +618,7 @@ def generate_run_message(config: dict) -> None:
         out.append(
             f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
         )
-        out.append(" - Results are saved locally and print to screen")
+        out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(
