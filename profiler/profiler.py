@@ -114,7 +114,23 @@ class Profiler(object):
 
     def profile(self, frame) -> None:
         """ Handle profiling clients as they come into the queue """
-        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame)
+
+        # we to determine the channel from frame itself, not from the profiler config
+        freq = frame.ChannelFrequency
+        channel = _20MHZ_CHANNEL_LIST[freq]
+
+        is_6ghz = False
+        if freq > 2411 and freq < 2485:
+            band = "2.4GHz"
+        elif freq > 5100 and freq < 5900:
+            band = "5.8GHz"
+        elif freq > 5900 and freq < 7120:
+            band = "6.0GHz"
+            is_6ghz = True
+        else:
+            band = "unknown"
+
+        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame, is_6ghz)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -133,19 +149,6 @@ class Profiler(object):
 
             self.last_manuf = oui_manuf
             self.analyzed_hash[analysis_hash] = frame
-
-            # we to determine the channel from frame itself, not from the profiler config
-            freq = frame.ChannelFrequency
-            channel = _20MHZ_CHANNEL_LIST[freq]
-
-            if freq > 2411 and freq < 2485:
-                band = "2.4GHz"
-            elif freq > 5100 and freq < 5900:
-                band = "5.8GHz"
-            elif freq > 5900 and freq < 7120:
-                band = "6.0GHz"
-            else:
-                band = "unknown"
 
             if self.listen_only:
                 self.log.info(
@@ -209,10 +212,12 @@ class Profiler(object):
         band_label = ""
         if band[0] == "2":
             band_label = "2.4 GHz"
-        if band[0] == "5":
+        elif band[0] == "5":
             band_label = "5 GHz"
-        if band[0] == "6":
+        elif band[0] == "6":
             band_label = "6 GHz"
+        else:
+            band_label = "Unknown"
         text_report += f"\n - Frequency band: {band_label}"
         text_report += f"\n - Capture channel: {channel}\n"
         text_report += "-" * 45
@@ -261,6 +266,8 @@ class Profiler(object):
             band_db = 2
         elif band[0] == "5":
             band_db = 5
+        elif band[0] == "6":
+            band_db = 6
         else:
             band_db = 0
         data["band"] = band_db
@@ -684,7 +691,7 @@ class Profiler(object):
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict: dict, is_6ghz=False) -> List:
+    def analyze_supported_channels_ie(dot11_elt_dict: dict, is_6ghz: bool) -> List:
         """ Check supported channels """
         supported_channels = Capability(
             name="Supported Channels",
@@ -965,7 +972,7 @@ class Profiler(object):
             dot11ax_160_mhz,
         ]
 
-    def analyze_assoc_req(self, frame) -> Tuple[str, list]:
+    def analyze_assoc_req(self, frame, is_6ghz) -> Tuple[str, list]:
         """ Tear apart the association request for analysis """
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -1028,6 +1035,6 @@ class Profiler(object):
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)
 
         # check supported channels
-        capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
+        capabilities += self.analyze_supported_channels_ie(dot11_elt_dict, is_6ghz)
 
         return ssid, oui_manuf, capabilities
