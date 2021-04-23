@@ -2,6 +2,8 @@
     "editor.formatOnSave": false,
     "python.formatting.provider": "black",
     "files.watcherExclude": {
+        "**/.pybuild/*/**": true,
+        "**/.tox/*/**": true,
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
         "**/venv/*/**": true,
