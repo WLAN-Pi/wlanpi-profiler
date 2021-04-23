@@ -48,7 +48,7 @@ class Interface:
         if self.no_interface_prep or not self.initial:
             if "monitor" not in self.mode:
                 self.log.warning(
-                    "%s mode is %s when we expect monitor", self.name, self.mode
+                    "%s mode is in %s mode when we expected monitor mode", self.name, self.mode
                 )
 
         if self.no_interface_prep or not self.initial:
