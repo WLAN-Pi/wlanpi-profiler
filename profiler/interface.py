@@ -45,6 +45,7 @@ class Interface:
         self.log_debug()
 
     def checks(self) -> None:
+        """ Perform self checks and warn as neccessary """
         if self.no_interface_prep or not self.initial:
             if "monitor" not in self.mode:
                 self.log.warning(
@@ -60,6 +61,7 @@ class Interface:
                 )
 
     def log_debug(self) -> None:
+        """ Send debug information to logger """
         self.log.debug(
             "mac: %s, channel: %s, driver: %s, version: %s",
             self.mac,
@@ -69,32 +71,40 @@ class Interface:
         )
 
     def get_ethtool_info(self) -> str:
+        """ Gather ethtool information for interface """
         ethtool = run_cli_cmd(["ethtool", "-i", f"{self.name}"])
         return ethtool.strip()
 
     def get_driver(self) -> str:
+        """ Gather driver information for interface """
         driver = run_cli_cmd(
             ["readlink", "-f", f"/sys/class/net/{self.name}/device/driver"]
         )
         return driver.split("/")[-1].strip()
 
     def get_driver_version(self) -> str:
+        """ Gather driver version for interface """
+        out = ""
         for line in self.driver_info.lower().splitlines():
             if "version:" in line:
-                return line.split(" ")[1]
+                out = line.split(" ")[1]
+        return out
 
     def get_firmware_version(self) -> str:
+        """ Gather driver firmware version for interface """
+        out = ""
         for line in self.driver_info.lower().splitlines():
             if "firmware-version:" in line:
-                return line.split(" ")[1]
+                out = line.split(" ")[1]
+        return out
 
     def get_mac(self) -> str:
-        """ get MAC address for a given interface """
+        """ Gather MAC address for a given interface """
         mac = run_cli_cmd(["cat", f"/sys/class/net/{self.name}/address"])
         return mac.strip()
 
     def get_channel(self):
-        """ determine what channel the interface is set to """
+        """ Determine what channel the interface is set to """
         iwconfig = run_cli_cmd(["iwconfig"])
         for line in iwconfig.splitlines():
             line = line.lower()
@@ -106,6 +116,8 @@ class Interface:
 
     def get_operstate(self) -> str:
         """
+        Get the current operating state of the interface.
+
         https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
         What:       /sys/class/net/<iface>/operstate
         Date:       March 2006
@@ -121,17 +133,20 @@ class Interface:
         return operstate.strip()
 
     def get_mode(self) -> str:
-        type = run_cli_cmd(["cat", f"/sys/class/net/{self.name}/type"])
+        """ Get the current mode of the interface """
+        _interface_type: "str" = run_cli_cmd(
+            ["cat", f"/sys/class/net/{self.name}/type"]
+        )
         mode = "unknown"
-        type = int(type)
-        if type == 1:
+        _type = int(_interface_type)
+        if _type == 1:
             mode = "managed"
-        elif type == 801:
+        elif _type == 801:
             mode = "monitor"
-        elif type == 802:
+        elif _type == 802:
             mode = "monitor"
         elif (
-            type == 803
+            _type == 803
         ):  # https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/if_arp.h#L90
             mode = "monitor"
         return mode

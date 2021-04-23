@@ -20,9 +20,8 @@ import multiprocessing
 import os
 import signal
 import sys
-from multiprocessing import Lock, Value
-from multiprocessing.queues import Queue
 from time import sleep, time
+from typing import Dict
 
 # third party imports
 try:
@@ -47,15 +46,16 @@ from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
 class _Utils:
     """ Fake AP helper functions """
 
-    def build_fake_frame_ies(config: dict) -> Dot11Elt:
+    @staticmethod
+    def build_fake_frame_ies(config) -> Dot11Elt:
         """ Build base frame for beacon and probe resp """
-        ssid = config.get("GENERAL").get("ssid")
+        ssid: "str" = config.get("GENERAL").get("ssid")
         channel = int(config.get("GENERAL").get("channel"))
-        ft_disabled = config.get("GENERAL").get("ft_disabled")
-        he_disabled = config.get("GENERAL").get("he_disabled")
+        ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
+        he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
 
-        ssid = bytes(ssid, "utf-8")
-        essid = Dot11Elt(ID="SSID", info=ssid)
+        ssid_bytes: "bytes" = bytes(ssid, "utf-8")
+        essid = Dot11Elt(ID="SSID", info=ssid_bytes)
 
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
@@ -171,16 +171,17 @@ class _Utils:
         # print(frame_bytes)
         return frame
 
+    @staticmethod
     def get_mac(interface: str) -> str:
         """ Get the mac address for a specified interface """
-
         try:
             mac = get_if_hwaddr(interface)
         except Scapy_Exception:
             mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
         return mac
 
-    def next_sequence_number(sequence_number: Value) -> int:
+    @staticmethod
+    def next_sequence_number(sequence_number) -> int:
         """ Update a sequence number of type multiprocessing Value """
         sequence_number.value = (sequence_number.value + 1) % 4096
         return sequence_number.value
@@ -191,10 +192,10 @@ class TxBeacons(multiprocessing.Process):
 
     def __init__(
         self,
-        config: dict,
+        config,
         boot_time: datetime.datetime,
-        lock: Lock,
-        sequence_number: Value,
+        lock,
+        sequence_number,
     ):
         super(TxBeacons, self).__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
@@ -202,9 +203,9 @@ class TxBeacons(multiprocessing.Process):
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid = config.get("GENERAL").get("ssid")
-        self.interface = config.get("GENERAL").get("interface")
-        channel = config.get("GENERAL").get("channel")
+        self.ssid: "str" = config.get("GENERAL").get("ssid")
+        self.interface: "str" = config.get("GENERAL").get("interface")
+        channel: "str" = config.get("GENERAL").get("channel")
         if not channel:
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
@@ -276,11 +277,11 @@ class Sniffer(multiprocessing.Process):
 
     def __init__(
         self,
-        config: dict,
+        config,
         boot_time: datetime.datetime,
-        lock: Lock,
-        sequence_number: Value,
-        queue: Queue,
+        lock,
+        sequence_number,
+        queue,
         args,
     ):
         super(Sniffer, self).__init__()
@@ -291,14 +292,14 @@ class Sniffer(multiprocessing.Process):
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid = config.get("GENERAL").get("ssid")
-        self.interface = config.get("GENERAL").get("interface")
-        channel = config.get("GENERAL").get("channel")
+        self.ssid: "str" = config.get("GENERAL").get("ssid")
+        self.interface: "str" = config.get("GENERAL").get("interface")
+        channel: "str" = config.get("GENERAL").get("channel")
         if not channel:
             raise ValueError("cannot determine channel to sniff")
-        self.channel = int(channel)
-        self.listen_only = config.get("GENERAL").get("listen_only")
-        self.assoc_reqs = {}
+        self.channel: "int" = int(channel)
+        self.listen_only: "bool" = config.get("GENERAL").get("listen_only")
+        self.assoc_reqs: "Dict" = {}
 
         self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
         if args.no_sniffer_filter:
