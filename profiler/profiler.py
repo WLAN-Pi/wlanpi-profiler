@@ -134,12 +134,16 @@ class Profiler(object):
             self.last_manuf = oui_manuf
             self.analyzed_hash[analysis_hash] = frame
 
-            # we want channel from frame, not from profiler.
-            channel = _20MHZ_CHANNEL_LIST[frame.ChannelFrequency]
-            if channel < 15:
+            # we to determine the channel from frame itself, not from the profiler config
+            freq = frame.ChannelFrequency
+            channel = _20MHZ_CHANNEL_LIST[freq]
+
+            if freq > 2411 and freq < 2485:
                 band = "2.4GHz"
-            elif channel > 30 and channel < 170:
+            elif freq > 5100 and freq < 5900:
                 band = "5.8GHz"
+            elif freq > 5900 and freq < 7120:
+                band = "6.0GHz"
             else:
                 band = "unknown"
 
