@@ -621,7 +621,7 @@ def generate_run_message(config: Dict) -> None:
         out.append(
             f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
         )
-        out.append(" - Results are saved locally and print to screen")
+        out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(
@@ -644,7 +644,7 @@ def generate_run_message(config: Dict) -> None:
         else:
             out.append(f"Starting profiler AP with {interface}")
         out.append(f" - Our fake AP SSID: {ssid}")
-        out.append(" - Results are saved locally and print to screen")
+        out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(f" - Associate your Wi-Fi client to our SSID: {ssid}")
