@@ -578,6 +578,7 @@ def get_frequency_bytes(channel: int) -> bytes:
 
 class Base64Encoder(json.JSONEncoder):
     """ A Base64 encoder for JSON """
+    # example usage: json.dumps(bytes(frame), cls=Base64Encoder)
 
     # pylint: disable=method-hidden
     def default(self, obj):

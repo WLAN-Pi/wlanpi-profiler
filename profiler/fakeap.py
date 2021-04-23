@@ -37,10 +37,10 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 # app imports
-from .constants import (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_AUTH_REQ,
-                        DOT11_SUBTYPE_BEACON, DOT11_SUBTYPE_PROBE_REQ,
-                        DOT11_SUBTYPE_PROBE_RESP, DOT11_SUBTYPE_REASSOC_REQ,
-                        DOT11_TYPE_MANAGEMENT)
+from .constants import (CHANNELS, DOT11_SUBTYPE_ASSOC_REQ,
+                        DOT11_SUBTYPE_AUTH_REQ, DOT11_SUBTYPE_BEACON,
+                        DOT11_SUBTYPE_PROBE_REQ, DOT11_SUBTYPE_PROBE_RESP,
+                        DOT11_SUBTYPE_REASSOC_REQ, DOT11_TYPE_MANAGEMENT)
 
 
 class _Utils:
@@ -51,6 +51,11 @@ class _Utils:
         """ Build base frame for beacon and probe resp """
         ssid: "str" = config.get("GENERAL").get("ssid")
         channel = int(config.get("GENERAL").get("channel"))
+
+        is_6ghz = False
+        if channel in CHANNELS["6G"]:
+            is_6ghz = True
+
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
         he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
 
@@ -121,7 +126,9 @@ class _Utils:
         # custom_data = bytes(f"{custom_hash}", "utf-8")
         # custom = Dot11Elt(ID=0xDE, info=custom_data)
 
-        if ft_disabled:
+        if is_6ghz:
+            frame = essid / rates / dsset / dtim / rsn / rm_enabled_cap / extended
+        elif ft_disabled:
             frame = (
                 essid
                 / rates
