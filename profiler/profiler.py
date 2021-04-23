@@ -22,6 +22,7 @@ import signal
 import sys
 import time
 from difflib import Differ
+from time import strftime
 from typing import List, Tuple
 
 # third party imports
@@ -36,8 +37,8 @@ from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
                         HE_SPATIAL_REUSE_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
                         IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
                         RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SUPPORTED_CHANNELS_IE_TAG, VENDOR_SPECIFIC_IE_TAG,
-                        VHT_CAPABILITIES_IE_TAG)
+                        SSID_PARAMETER_SET_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
+                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
 from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
                       is_randomized)
 
@@ -52,8 +53,14 @@ class Profiler(object):
         self.analyzed_hash = {}
         self.config = config
         if config:
-            self.channel = int(config.get("GENERAL").get("channel"))
-            self.ssid = config.get("GENERAL").get("ssid")
+
+            channel = config.get("GENERAL").get("channel")
+            if channel:
+                self.channel = int(channel)
+            else:
+                self.log.warn("profiler cannot determine channel from config")
+
+            self.listen_only = config.get("GENERAL").get("listen_only")
             self.files_path = config.get("GENERAL").get("files_path")
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
             self.ft_disabled = config.get("GENERAL").get("ft_disabled")
@@ -84,10 +91,9 @@ class Profiler(object):
                             toc = time.time() - buffer[frame.addr2]
                             if toc < buffer_squelch:
                                 self.log.debug(
-                                    "suppressing %s as %s is less than squelch (%s)",
+                                    "already seen %s %s seconds ago; not sending to profiler process",
                                     frame.addr2,
                                     f"{toc:.2f}",
-                                    buffer_squelch,
                                 )
                                 continue
                             else:
@@ -98,17 +104,17 @@ class Profiler(object):
                         self.profile(frame)
 
                 if queue.empty():
-                    # if nothing is left in the queue and we're only analyzing a pcap file
                     if self.pcap_analysis:
+                        # if nothing is left in the queue and we're only analyzing a pcap file
                         self.log.info(
-                            "exiting because we were told to only analyze %s",
+                            "exit because we were told to only analyze %s",
                             self.pcap_analysis,
                         )
                         sys.exit(signal.SIGTERM)
 
     def profile(self, frame) -> None:
         """ Handle profiling clients as they come into the queue """
-        oui_manuf, capabilities = self.analyze_assoc_req(frame)
+        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -128,21 +134,38 @@ class Profiler(object):
             self.last_manuf = oui_manuf
             self.analyzed_hash[analysis_hash] = frame
 
-            # we want channel from frame, not from profiler.
-            channel = _20MHZ_CHANNEL_LIST[frame.ChannelFrequency]
-            if channel < 15:
+            # we to determine the channel from frame itself, not from the profiler config
+            freq = frame.ChannelFrequency
+            channel = _20MHZ_CHANNEL_LIST[freq]
+
+            if freq > 2411 and freq < 2485:
                 band = "2.4GHz"
-            elif channel > 30 and channel < 170:
+            elif freq > 5100 and freq < 5900:
                 band = "5.8GHz"
+            elif freq > 5900 and freq < 7120:
+                band = "6.0GHz"
             else:
                 band = "unknown"
 
+            if self.listen_only:
+                self.log.info(
+                    "discovered association request for %s to %s",
+                    frame.addr2,
+                    ssid,
+                )
+
             # generate text report
             text_report = self.generate_text_report(
-                text_report_oui_manuf, capabilities, frame.addr2, channel, band
+                text_report_oui_manuf,
+                capabilities,
+                frame.addr2,
+                channel,
+                band,
+                ssid,
+                self.listen_only,
             )
 
-            self.log.info("text report for %s\n%s", frame.addr2, text_report)
+            self.log.info("generating text report for %s\n%s", frame.addr2, text_report)
 
             self.log.debug(
                 "writing textual reports for %s (capabilities hash=%s) to %s",
@@ -151,7 +174,14 @@ class Profiler(object):
                 os.path.join(self.clients_dir, frame.addr2.replace(":", "-")),
             )
             self.write_analysis_to_file_system(
-                text_report, capabilities, frame, oui_manuf, randomized, band, channel
+                text_report,
+                capabilities,
+                frame,
+                oui_manuf,
+                randomized,
+                band,
+                channel,
+                self.listen_only,
             )
 
             self.client_profiled_count += 1
@@ -161,11 +191,19 @@ class Profiler(object):
 
     @staticmethod
     def generate_text_report(
-        oui_manuf: str, capabilities: list, client_mac: str, channel: int, band: str
+        oui_manuf: str,
+        capabilities: list,
+        client_mac: str,
+        channel: int,
+        band: str,
+        ssid: str,
+        listen_only: bool,
     ) -> str:
         """ Generate a report for output """
         # start report
         text_report = "-" * 45
+        if listen_only:
+            text_report += f"\n - SSID: {ssid}"
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
         band_label = ""
@@ -199,6 +237,7 @@ class Profiler(object):
         randomized: bool,
         band,
         channel,
+        listen_only,
     ):
         """ Write report files out to a directory on the WLAN Pi """
         log = logging.getLogger(inspect.stack()[0][3])
@@ -213,10 +252,6 @@ class Profiler(object):
                 log.exception("problem creating %s directory", dest)
                 sys.exit(signal.SIGHUP)
 
-        filename = os.path.join(dest, f"{client_mac}_{band}.txt")
-
-        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
-
         data = {}
 
         data["mac"] = client_mac
@@ -230,6 +265,7 @@ class Profiler(object):
             band_db = 0
         data["band"] = band_db
         data["capture_channel"] = channel
+        data["listen_only"] = listen_only
         features = {}
         for capability in capabilities:
             if capability.db_key:
@@ -239,35 +275,54 @@ class Profiler(object):
         data["schema_version"] = 1
         data["profiler_version"] = __version__
 
+        text_filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
+
         try:
-            if os.path.exists(filename):
-
-                existing = open(filename, "r").readlines()
-                temp = []
-                for line in existing:
-                    temp.append(line.replace("\n", ""))
-                existing = temp
-                new = text_report.split("\n")
-                # strip header when comparing existing file from newly profiled
-                if existing[5:] == new[5:]:
-                    pass
-                else:
-                    text_report = list(
-                        Differ().compare(existing, text_report.split("\n"))
-                    )
-                    filename = filename.replace(".txt", "_changed.txt")
-                    text_report = "\n".join(text_report)
-            with open(filename, "w") as writer:
-                writer.write(text_report)
-
+            same = False
+            write_time = strftime("%Y%m%dt%H%M%S")
             if os.path.exists(json_filename):
-                pass  # compare json
+                with open(json_filename, "r") as _file:
+                    existing_json = json.load(_file)
+
+                if hash(str(json.dumps(existing_json.get("features")))) == hash(
+                    str(json.dumps(features))
+                ):
+                    # previously profiled client has the same features
+                    same = True
+
+                if not same:
+                    json_filename = json_filename.replace(
+                        ".json", f"_diff.{write_time}.json"
+                    )
 
             with open(json_filename, "w") as writer:
                 json.dump(data, writer)
+
+            if os.path.exists(text_filename):
+                with open(text_filename, "r") as _file:
+                    existing_text = _file.readlines()
+                    temp = []
+                    for line in existing_text:
+                        temp.append(line.replace("\n", ""))
+                    existing_text = temp
+
+                if not same:
+                    text_report = list(
+                        Differ().compare(existing_text, text_report.split("\n"))
+                    )
+                    text_filename = text_filename.replace(
+                        ".txt", f"_diff.{write_time}.txt"
+                    )
+                    text_report = "\n".join(text_report)
+
+            with open(text_filename, "w") as writer:
+                writer.write(text_report)
+
         except OSError:
             log.exception(
-                "error creating flat files to dump client info (%s)", filename
+                "error creating flat files to dump client info (%s)", text_filename
             )
             sys.exit(signal.SIGHUP)
 
@@ -276,13 +331,17 @@ class Profiler(object):
         out_fieldnames = ["Client_Mac", "OUI_Manuf"]
 
         for capability in capabilities:
-            if capability.name is not None and capability.value is not None:
-                out_fieldnames.append(capability.name)
-                out_row[capability.name] = capability.value
+            if capability.db_key:
+                features[capability.db_key] = capability.db_value
+
+        for capability in capabilities:
+            if capability.db_key is not None and capability.db_value is not None:
+                out_fieldnames.append(capability.db_key)
+                out_row[capability.db_key] = capability.db_value
 
         # dump out the frame to a file
-        filename = os.path.splitext(filename)[0] + ".pcap"
-        wrpcap(filename, [frame])
+        pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
+        wrpcap(pcap_filename, [frame])
 
         # check if csv file exists
         if not os.path.exists(self.csv_file):
@@ -372,6 +431,8 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
+        sanitize = {"intelwir": "Intel", "samsunge": "Samsung"}
+
         if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
             # inspect vendor specific IEs and see if there's an IE with
             # an OUI that we know can only be included if the manuf
@@ -386,12 +447,23 @@ class Profiler(object):
                         # Matches are vendor specific IEs we know are client specific
                         # e.g. Apple vendor specific IEs can only be found in Apple devices
                         # Samsung may follow similar logic based on S10 5G testing, but unsure
-                        matches = ("apple", "samsung")
+                        matches = ("apple", "samsung", "intel")
                         if oui_manuf_vendor.lower().startswith(matches):
-                            oui_manuf = oui_manuf_vendor
+                            if oui_manuf_vendor.lower() in sanitize:
+                                oui_manuf = sanitize.get(
+                                    oui_manuf_vendor.lower(), oui_manuf_vendor
+                                )
+                            else:
+                                oui_manuf = oui_manuf_vendor
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
+
+    @staticmethod
+    def analyze_ssid_ie(dot11_elt_dict: dict) -> str:
+        if SSID_PARAMETER_SET_IE_TAG in dot11_elt_dict.keys():
+            ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
+            return f"{ssid}"
 
     @staticmethod
     def analyze_ht_capabilities_ie(dot11_elt_dict: dict) -> List:
@@ -612,7 +684,7 @@ class Profiler(object):
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict: dict) -> List:
+    def analyze_supported_channels_ie(dot11_elt_dict: dict, is_6ghz=False) -> List:
         """ Check supported channels """
         supported_channels = Capability(
             name="Supported Channels",
@@ -628,15 +700,20 @@ class Profiler(object):
             channel_sets_list = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
             channel_list = []
 
+            is_2ghz = False
+            is_5ghz = False
+
             while channel_sets_list:
 
                 start_channel = channel_sets_list.pop(0)
                 channel_range = channel_sets_list.pop(0)
 
-                # check for if 2.4Ghz or 5GHz
-                if start_channel > 14:
+                if start_channel > 14 or is_6ghz:
+                    if not is_6ghz:
+                        is_5ghz = True
                     channel_multiplier = 4
                 else:
+                    is_2ghz = True
                     channel_multiplier = 1
 
                 number_of_supported_channels.value += channel_range
@@ -649,6 +726,11 @@ class Profiler(object):
                 if index == 0:
                     placeholder.append(channel)
                     continue
+                if is_2ghz and is_5ghz:
+                    if channel < 15:
+                        channel_multiplier = 1
+                    else:
+                        channel_multiplier = 4
                 if channel - placeholder[-1] == channel_multiplier:
                     placeholder.append(channel)
                     # are we at last index? add last list to ranges
@@ -683,6 +765,12 @@ class Profiler(object):
         )
         dot11ax_punctured_preamble = Capability(
             db_key="dot11ax_punctured_preamble", db_value=0
+        )
+        dot11ax_he_su_beamformer = Capability(
+            db_key="dot11ax_he_su_beamformer", db_value=0
+        )
+        dot11ax_he_su_beamformee = Capability(
+            db_key="dot11ax_he_su_beamformee", db_value=0
         )
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
@@ -767,6 +855,40 @@ class Profiler(object):
                             dot11ax_punctured_preamble.db_value = 0
                             dot11ax.value += ", [ ] Punctured Preamble"
 
+                        su_beamformer_octet = element_data[10]
+                        su_beamformer_octet_binary_string = ""
+                        for bit_position in range(8):
+                            su_beamformer_octet_binary_string += (
+                                f"{int(get_bit(su_beamformer_octet, bit_position))}"
+                            )
+                        if int(su_beamformer_octet_binary_string[7]):
+                            su_beamformer_support = True
+                        else:
+                            su_beamformer_support = False
+                        if su_beamformer_support:
+                            dot11ax_he_su_beamformer.db_value = 1
+                            dot11ax.value += ", [X] SU Beamformer"
+                        else:
+                            dot11ax_he_su_beamformer.db_value = 0
+                            dot11ax.value += ", [ ] SU Beamformer"
+
+                        su_beamformee_octet = element_data[11]
+                        su_beamformee_octet_binary_string = ""
+                        for bit_position in range(8):
+                            su_beamformee_octet_binary_string += (
+                                f"{int(get_bit(su_beamformee_octet, bit_position))}"
+                            )
+                        if int(su_beamformee_octet_binary_string[0]):
+                            su_beamformee_support = True
+                        else:
+                            su_beamformee_support = False
+                        if su_beamformee_support:
+                            dot11ax_he_su_beamformee.db_value = 1
+                            dot11ax.value += ", [X] SU Beamformee"
+                        else:
+                            dot11ax_he_su_beamformee.db_value = 0
+                            dot11ax.value += ", [ ] SU Beamformee"
+
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
                         for bit_position in range(8):
@@ -836,6 +958,8 @@ class Profiler(object):
             dot11ax_uora,
             dot11ax_bsr,
             dot11ax_punctured_preamble,
+            dot11ax_he_su_beamformer,
+            dot11ax_he_su_beamformee,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
             dot11ax_160_mhz,
@@ -872,6 +996,8 @@ class Profiler(object):
         #  resolve manufacturer
         oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
+        ssid = self.analyze_ssid_ie(dot11_elt_dict)
+
         # dictionary to store capabilities as we decode them
         capabilities = []
 
@@ -904,4 +1030,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict)
 
-        return oui_manuf, capabilities
+        return ssid, oui_manuf, capabilities

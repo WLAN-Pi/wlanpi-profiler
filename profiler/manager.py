@@ -31,6 +31,7 @@ from scapy.all import rdpcap
 # app imports
 from . import helpers
 from .__version__ import __version__
+from .interface import Interface
 
 
 def signal_handler(signum, frame):
@@ -120,8 +121,7 @@ def start(args: argparse.Namespace):
             log.error("configuration validation failed... exiting...")
             sys.exit(-1)
 
-        interface = config.get("GENERAL").get("interface")
-        channel = int(config.get("GENERAL").get("channel"))
+        iface_name = config.get("GENERAL").get("interface")
         listen_only = config.get("GENERAL").get("listen_only")
 
         from .fakeap import Sniffer, TxBeacons
@@ -131,19 +131,29 @@ def start(args: argparse.Namespace):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
+        helpers.check_reg_domain()
+
         if args.no_interface_prep:
-            log.warning("skipping interface prep...")
+            log.debug(
+                "user provided `--noprep` argument meaning profiler will not handle staging the interface"
+            )
+            iface = Interface(iface_name, no_interface_prep=True)
+            config["GENERAL"]["channel"] = iface.channel
         else:
-            log.debug("interface prep...")
-            if not helpers.prep_interface(interface, "monitor", channel):
-                log.error("failed to stage the interface... exiting...")
+            channel = int(config.get("GENERAL").get("channel"))
+            iface = Interface(iface_name, channel, initial=True)
+            if not helpers.stage_interface(iface):
                 sys.exit(-1)
+            iface.initial = False
+            iface.checks()
             log.debug("finish interface prep...")
 
         helpers.generate_run_message(config)
 
         if listen_only:
-            log.info("beacon process not started due to listen only mode")
+            log.warn(
+                "beacon process not started because user requested listen only mode"
+            )
         else:
             log.debug("beacon process")
             txbeacons = mp.Process(
@@ -180,5 +190,4 @@ def start(args: argparse.Namespace):
                 log.debug(process)
                 processes.remove(process)
                 finished_processes.append(process)
-                if process.exitcode == 15:
-                    shutdown = True
+                shutdown = True

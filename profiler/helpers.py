@@ -20,7 +20,6 @@ import json
 import logging
 import logging.config
 import os
-import re
 import shutil
 import signal
 import socket
@@ -29,31 +28,39 @@ import sys
 from base64 import b64encode
 from dataclasses import dataclass
 from distutils.util import strtobool
-from multiprocessing import Value
 from time import ctime
-from typing import Union
+from typing import List
 
 # third party imports
 try:
     import manuf
-    from scapy.all import (Dot11Elt, Scapy_Exception, get_if_hwaddr,
-                           get_if_raw_hwaddr)
 except ModuleNotFoundError as error:
     if error.name == "manuf":
-        print("required module manuf not found. try installing manuf.")
-    elif error.name == "scapy":
-        print(
-            "required module scapy not found. try installing scapy with `python -m pip install --pre scapy[basic]`."
-        )
+        print("required module manuf not found.")
     else:
         print(f"{error}")
     sys.exit(signal.SIGABRT)
 
+
+def run_cli_cmd(cmd: List) -> str:
+    cp = subprocess.run(
+        cmd,
+        encoding="utf-8",
+        shell=False,
+        check=True,
+        capture_output=True,
+    )
+
+    if cp.returncode == 0:
+        if cp.stdout:
+            return cp.stdout
+        if cp.stderr:
+            return cp.stderr
+
+
 # is tcpdump installed?
 try:
-    result = subprocess.run(
-        ["tcpdump", "--version"], shell=False, check=True, capture_output=True
-    )
+    result = run_cli_cmd(["tcpdump", "--version"])
 except OSError:
     print(
         "problem checking tcpdump version. is tcpdump installed and functioning? exiting..."
@@ -62,9 +69,7 @@ except OSError:
 
 # is netstat installed?
 try:
-    result = subprocess.run(
-        ["netstat", "--version"], shell=False, check=True, capture_output=True
-    )
+    result = run_cli_cmd(["netstat", "--version"])
 except OSError:
     print(
         "problem checking netstat version. is netstat installed and functioning? exiting..."
@@ -74,6 +79,7 @@ except OSError:
 # app imports
 from .__version__ import __version__
 from .constants import CHANNELS, CONFIG_FILE
+from .interface import Interface
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -433,69 +439,53 @@ def is_randomized(mac) -> bool:
     return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
 
 
-def prep_interface(interface: str, mode: str, channel: int) -> bool:
+def check_reg_domain() -> None:
+    log = logging.getLogger(inspect.stack()[0][3])
+    regdomain = run_cli_cmd(["iw", "reg", "get"])
+    regdomain = [line for line in regdomain.split("\n") if "country" in line]
+    if "UNSET" in "".join(regdomain):
+        log.warning(
+            "REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'"
+        )
+        log.warning(
+            "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
+        )
+    else:
+        log.debug("reg domain set to %s", " ".join(regdomain))
+        log.debug("see 'iw reg get' for details")
+
+
+def stage_interface(iface: Interface) -> bool:
     """ Prepare the interface for monitor mode and injection """
     log = logging.getLogger(inspect.stack()[0][3])
-    if mode in ("managed", "monitor"):
+    if iface.mode in ("managed", "monitor"):
         commands = [
-            ["ip", "link", "set", f"{interface}", "down"],
-            ["iw", "dev", f"{interface}", "set", "type", f"{mode}"],
-            ["ip", "link", "set", f"{interface}", "up"],
-            ["iw", f"{interface}", "set", "channel", f"{channel}"],
+            ["wpa_cli", "-i", f"{iface.name}", "terminate"],
+            ["ip", "link", "set", f"{iface.name}", "down"],
+            ["iw", "dev", f"{iface.name}", "set", "monitor", "none"],
+            ["ip", "link", "set", f"{iface.name}", "up"],
+            ["iw", f"{iface.name}", "set", "channel", f"{iface.channel}", "HT20"],
         ]
         try:
-            driver = subprocess.run(
-                ["readlink", "-f", f"/sys/class/net/{interface}/device/driver"],
-                encoding="utf-8",
-                shell=False,
-                check=True,
-                capture_output=True,
-            )
-            mac = subprocess.run(
-                ["cat", f"/sys/class/net/{interface}/address"],
-                encoding="utf-8",
-                shell=False,
-                check=True,
-                capture_output=True,
-            )
-            log.info(
-                "mac: %s, driver: %s",
-                mac.stdout.replace("\n", ""),
-                driver.stdout.split("/")[-1].replace("\n", ""),
-            )
-            regdomain = subprocess.run(
-                ["iw", "reg", "get"],
-                encoding="utf-8",
-                shell=False,
-                check=True,
-                capture_output=True,
-            )
-            regdomain = [
-                line for line in regdomain.stdout.split("\n") if "country" in line
-            ]
-
-            if "UNSET" in "".join(regdomain):
-                log.warning(
-                    "REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'"
-                )
-                log.warning(
-                    "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
-                )
-            else:
-                log.debug("reg domain set to %s", " ".join(regdomain))
-                log.debug("see 'iw reg get' for details")
-
             for cmd in commands:
                 cp = subprocess.run(
                     cmd, encoding="utf-8", shell=False, capture_output=True
                 )
                 if cp.stderr:
-                    raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
-
+                    if "monitor" in cmd:
+                        cp = subprocess.run(
+                            ["iw", "dev", f"{iface.name}", "set", "type", "monitor"],
+                            encoding="utf-8",
+                            shell=False,
+                            capture_output=True,
+                        )
+                    if "wpa_cli" not in cmd:
+                        raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
             return True
         except OSError:
             log.exception(
-                "error setting wlan interface config %s",
+                "error setting %s interface config: %s",
+                iface.name,
                 "\n".join(
                     [line for line in cp.stderr.split("\n") if line.strip() != ""]
                 ),
@@ -538,13 +528,7 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
         )
         log.debug("running 'sudo manuf --update'")
-        cp = subprocess.run(
-            ["sudo", f"{sys.prefix}/bin/manuf", "--update"],
-            encoding="utf-8",
-            shell=False,
-            check=True,
-            capture_output=True,
-        )
+        cp = run_cli_cmd(["sudo", f"{sys.prefix}/bin/manuf", "--update"])
         log.info("%s", str(cp))
         log.debug(
             "manuf last modified time: %s",
@@ -616,131 +600,6 @@ def get_wlanpi_version() -> str:
     return wlanpi_version
 
 
-def build_fake_frame_ies(config: dict) -> Dot11Elt:
-    """ Build base frame for beacon and probe resp """
-    ssid = config.get("GENERAL").get("ssid")
-    channel = int(config.get("GENERAL").get("channel"))
-    ft_disabled = config.get("GENERAL").get("ft_disabled")
-    he_disabled = config.get("GENERAL").get("he_disabled")
-
-    ssid = bytes(ssid, "utf-8")
-    essid = Dot11Elt(ID="SSID", info=ssid)
-
-    rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
-    rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
-
-    channel = bytes([channel])
-    dsset = Dot11Elt(ID="DSset", info=channel)
-
-    dtim_data = b"\x05\x04\x00\x03\x00\x00"
-    dtim = Dot11Elt(ID="TIM", info=dtim_data)
-
-    ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-    ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
-
-    if ft_disabled:
-        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
-    else:
-        mobility_domain_data = b"\x45\xc2\x00"
-        mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
-        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
-
-    rsn = Dot11Elt(ID=0x30, info=rsn_data)
-
-    ht_info_data = (
-        channel
-        + b"\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-    )
-    ht_information = Dot11Elt(ID=0x3D, info=ht_info_data)
-
-    rm_enabled_data = b"\x02\x00\x00\x00\x00"
-    rm_enabled_cap = Dot11Elt(ID=0x46, info=rm_enabled_data)
-
-    extended_data = b"\x00\x00\x08\x00\x00\x00\x00\x40"
-    extended = Dot11Elt(ID=0x7F, info=extended_data)
-
-    vht_cap_data = b"\x32\x00\x80\x03\xaa\xff\x00\x00\xaa\xff\x00\x00"
-    vht_capabilities = Dot11Elt(ID=0xBF, info=vht_cap_data)
-
-    vht_op_data = b"\x00\x24\x00\x00\x00"
-    vht_operation = Dot11Elt(ID=0xC0, info=vht_op_data)
-
-    wmm_data = b"\x00\x50\xf2\x02\x01\x01\x8a\x00\x03\xa4\x00\x00\x27\xa4\x00\x00\x42\x43\x5e\x00\x62\x32\x2f\x00"
-    wmm = Dot11Elt(ID=0xDD, info=wmm_data)
-
-    he_cap_data = b"\x23\x0d\x01\x00\x02\x40\x00\x04\x70\x0c\x89\x7f\x03\x80\x04\x00\x00\x00\xaa\xaa\xaa\xaa\x7b\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71"
-    he_capabilities = Dot11Elt(ID=0xFF, info=he_cap_data)
-
-    he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
-    he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
-
-    spatial_reuse_data = b"\x27\x05\x00"
-    spatial_reuse = Dot11Elt(ID=0xFF, info=spatial_reuse_data)
-
-    mu_edca_data = b"\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
-    mu_edca = Dot11Elt(ID=0xFF, info=mu_edca_data)
-
-    six_ghz_cap_data = b"\x3b\x00\x00"
-    six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
-
-    # reduced_neighbor_report_data = b"\x02"
-    # reduced_neighbor_report = Dot11Elt(ID=0xFF, info=reduced_neighbor_report_data)
-
-    # custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
-    # custom_data = bytes(f"{custom_hash}", "utf-8")
-    # custom = Dot11Elt(ID=0xDE, info=custom_data)
-
-    if ft_disabled:
-        frame = (
-            essid
-            / rates
-            / dsset
-            / dtim
-            / ht_capabilities
-            / rsn
-            / ht_information
-            / rm_enabled_cap
-            / extended
-            / vht_capabilities
-            / vht_operation
-        )
-    else:
-        frame = (
-            essid
-            / rates
-            / dsset
-            / dtim
-            / ht_capabilities
-            / rsn
-            / ht_information
-            / mobility_domain
-            / rm_enabled_cap
-            / extended
-            / vht_capabilities
-            / vht_operation
-        )
-    if he_disabled:
-        frame = frame / wmm
-    else:
-        frame = (
-            frame
-            # / reduced_neighbor_report
-            / he_capabilities
-            / he_operation
-            / spatial_reuse
-            / mu_edca
-            / six_ghz_cap
-            / wmm
-            # / custom
-        )
-
-    # for gathering data to validate tests:
-    #
-    # frame_bytes = bytes(frame)
-    # print(frame_bytes)
-    return frame
-
-
 def flag_last_object(seq: iter):
     """ Treat the last object in an iterable differently """
     seq = iter(seq)  # ensure seq is an iterator
@@ -751,68 +610,52 @@ def flag_last_object(seq: iter):
     yield _a, True
 
 
-def next_sequence_number(sequence_number: Value) -> int:
-    """ Update a sequence number of type multiprocessing Value """
-    sequence_number.value = (sequence_number.value + 1) % 4096
-    return sequence_number.value
-
-
-def get_mac(interface: str) -> str:
-    """ Get the mac address for a specified interface """
-    try:
-        mac = get_if_hwaddr(interface)
-    except Scapy_Exception:
-        mac = ":".join(format(x, "02x") for x in get_if_raw_hwaddr(interface)[1])
-    return mac
-
-
-def get_ssh_destination_ip() -> Union[str, bool]:
-    """ Get the destination IP of SSH to display to user """
-    log = logging.getLogger(inspect.stack()[0][3])
-    try:
-        cp = subprocess.run(["netstat", "-tnpa"], capture_output=True)
-        for line in cp.stdout.splitlines():
-            socket = str(line)
-            if "22" in socket and "ESTABLISHED" in socket:
-                dest_ip_re = re.search(r"(\d+?\.\d+?\.\d+?\.\d+?)\:22", socket)
-                if dest_ip_re:
-                    return dest_ip_re.group(1)
-    except OSError:
-        log.exception(
-            "netstat for finding SSH session IP failed - this is expected when launched from the front panel menu system"
-        )
-        return False
-    else:
-        return False
-
-
 def generate_run_message(config: dict) -> None:
     """ Create message to display to users screen """
-    ssh_dest_ip = get_ssh_destination_ip()
     if config["GENERAL"].get("listen_only") is True:
-        print(f"\n{'-' * 44}")
-        print("Listening for association frames...")
-        print(f"SSID: {config['GENERAL']['ssid']}")
-        print(f"Channel: {config['GENERAL']['channel']}")
-        print(f"Interface: {config['GENERAL']['interface']}")
-        if ssh_dest_ip:
-            print(f"Results: http://{ssh_dest_ip}/profiler/")
-        print(f"{'-' * 44}\n")
+        out = []
+        out.append(f"Starting profiler in listen only mode:")
+        out.append(
+            f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
+        )
+        out.append(" - Results are saved locally and print to screen")
+        out.append(" ")
+        out.append("Instructions:")
+        out.append(
+            f" - Associate your Wi-Fi client to any AP on channel {config['GENERAL']['channel']}"
+        )
+        out.append(" - We should passively detect the association request")
+        header_len = len(max(out, key=len))
+
+        print(f"\n{'~' * header_len}")
+        for line in out:
+            print(line)
+        print(f"{'~' * header_len}\n")
     else:
-        print("\n" + "-" * 44)
-        print("Starting Profiler\n")
-        print(f"SSID: {config['GENERAL']['ssid']}")
-        print(f"Channel: {config['GENERAL']['channel']}")
-        print(f"Interface: {config['GENERAL']['interface']}")
-        if ssh_dest_ip:
-            print(f"Results: http://{ssh_dest_ip}/profiler/")
-        print(f"{'-' * 44}")
-        print(f"\n{'#' * 100}")
-        print("Instructions:")
-        print(f" - Connect a Wi-Fi client to SSID: {config['GENERAL']['ssid']}")
-        print(" - Enter any random 8 characters for the PSK")
-        print(" - Goal is to get the client to send an association request")
-        print(f"{'#' * 100}\n")
+        out = []
+        channel = config["GENERAL"]["channel"]
+        interface = config["GENERAL"]["interface"]
+        ssid = config["GENERAL"]["ssid"]
+        if channel:
+            out.append(f"Starting profiler AP with {interface} on channel {channel}:")
+        else:
+            out.append(f"Starting profiler AP with {interface}")
+        out.append(f" - Our fake AP SSID: {ssid}")
+        out.append(" - Results are saved locally and print to screen")
+        out.append(" ")
+        out.append("Instructions:")
+        out.append(f" - Associate your Wi-Fi client to our SSID: {ssid}")
+        out.append(" - Enter any random password to connect")
+        out.append(" ")
+        out.append(
+            "The client will fail authentication but should send an association request"
+        )
+        header_len = len(max(out, key=len))
+
+        print(f"\n{'=' * header_len}")
+        for line in out:
+            print(line)
+        print(f"{'=' * header_len}\n")
 
 
 @dataclass

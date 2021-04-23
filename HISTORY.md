@@ -5,11 +5,12 @@ Release 1.0.6 (WIP)
 - Allow reading and analysis of multiple association requests in a single pcap
 - Make output to screen less noisy by default
 - Add output to JSON flat file to support backend
-- Remove draft label from 802.11ax detection
 - Fix listen only/passive mode (--noAP) which listens for any association request on a set channel
+- Remove draft label from 802.11ax detection
 - Add MCS detection for 802.11ac and 802.11ax
 - Add 160 MHz support for 802.11ac and 802.11ax
-- Add feature detection for 802.11ax TWT, Punctured Preamble, HE (ER) Extended Range, UORA (Uplink OFDMA Random Access), and BSR Control (Buffer Status Report)
+- Add feature detection for 802.11ax TWT, Punctured Preamble, HE SU Beamformer, HE SU Beamformee, HE (ER) Extended Range, UORA (Uplink OFDMA Random Access), and BSR Control (Buffer Status Report)
+- Basic Wi-Fi 6E client association pcap profiling
 
 Release 1.0.5
 

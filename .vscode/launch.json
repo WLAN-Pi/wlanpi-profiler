@@ -29,7 +29,7 @@
             ]
         },
         {
-            "name": "-i wlan1 verbose",
+            "name": "-i wlan2 verbose",
             "type": "python",
             "request": "launch",
             "sudo": true,
@@ -39,6 +39,20 @@
                 "wlan2",
                 "-c",
                 "36",
+                "--logging",
+                "debug"
+            ]
+        },
+        {
+            "name": "--noprep -i wlan1 verbose",
+            "type": "python",
+            "request": "launch",
+            "sudo": true,
+            "module": "profiler",
+            "args": [
+                "-i",
+                "wlan1",
+                "--noprep",
                 "--logging",
                 "debug"
             ]
@@ -54,7 +68,7 @@
                 "--logging",
                 "debug",
                 "-i",
-                "wlan2",
+                "wlan1",
                 "-c",
                 "165"
             ]

@@ -118,7 +118,7 @@ This version of wlanpi-profiler is only available in English.
 
 # AUTHORS
 
-wlanpi-profiler is developed and maintained by Josh Schmelzle, with assistance
+wlanpi-profiler is developed and maintained by Josh Schmelzle, with the assistance
 from a list of wonderful contributors.
 
 # REPORTING BUGS

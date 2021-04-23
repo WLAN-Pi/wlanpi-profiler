@@ -133,10 +133,11 @@ def anonymize_file(input_file: str, output_file: str) -> None:
                     crc_bytes = struct.pack(
                         "I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF
                     )
+                    frame_int = hex(frame_fcs)
                     crc_int = hex(int.from_bytes(crc_bytes, byteorder="little"))
                     logger.info("crc_int: %s", crc_int)
 
-                    fcs_match = frame_fcs == crc_int
+                    fcs_match = frame_int == crc_int
                     logger.info("fcs_match: %s", fcs_match)
 
                 else:
@@ -196,5 +197,4 @@ if __name__ == "__main__":
     logger.info("input file: %s", args.input_file)
     output_file = os.path.splitext(args.input_file)[0] + "-anonymized.pcap"
     logger.info("output file: %s", output_file)
-    logger.warning("THIS SEEMS BROKE ON SCAPY 2.4.4!!! VERIFY BEFORE TRUSTING!!!")
     anonymize_file(args.input_file, output_file)
