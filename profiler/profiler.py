@@ -437,7 +437,7 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
-        sanitize = {"intelwir": "Intel", "samsunge": "Samsung"}
+        sanitize = {"intelwir": "Intel", "intelcor": "Intel", "samsunge": "Samsung"}
 
         if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
             # inspect vendor specific IEs and see if there's an IE with
