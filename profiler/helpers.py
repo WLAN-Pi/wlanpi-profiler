@@ -146,16 +146,15 @@ def check_interface(interface: str) -> str:
                 discovered_interfaces.append(iface)
     if interface not in discovered_interfaces:
         log.warning(
-            "%s interface does not appear to support ieee80211: %s",
+            "%s interface does not claim ieee80211 support. here are some interfaces which do: %s",
             interface,
             ", ".join(discovered_interfaces),
         )
         raise ValueError(f"{interface} is not a valid interface")
     else:
         log.debug(
-            "%s appears to support ieee80211: %s",
-            interface,
-            ", ".join(discovered_interfaces),
+            "%s claims to support ieee80211",
+            interface
         )
         return interface
 
