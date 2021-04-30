@@ -43,7 +43,7 @@ except ModuleNotFoundError as error:
 
 
 def run_cli_cmd(cmd: List) -> str:
-    """ Run an arbitrary CLI command and return the results """
+    """Run an arbitrary CLI command and return the results"""
     cp = subprocess.run(
         cmd,
         encoding="utf-8",
@@ -87,7 +87,7 @@ FILES_PATH = "/var/www/html/profiler"
 
 
 def setup_logger(args) -> None:
-    """ Configure and set logging levels """
+    """Configure and set logging levels"""
     if args.logging:
         if args.logging == "debug":
             logging_level = logging.DEBUG
@@ -116,7 +116,7 @@ def setup_logger(args) -> None:
 
 
 def check_channel(value: str) -> int:
-    """ Check if channel is valid """
+    """Check if channel is valid"""
     channel = int(value)
     error_msg = "%s is not a valid channel value" % channel
     if channel <= 0:
@@ -128,31 +128,32 @@ def check_channel(value: str) -> int:
 
 
 def check_ssid(ssid: str) -> str:
-    """ Check if SSID is valid """
+    """Check if SSID is valid"""
     if len(ssid) > 32:
         raise ValueError("%s length is greater than 32" % ssid)
     return ssid
 
 
 def check_interface(interface: str) -> str:
-    """ Check that the interface we've been asked to run on actually exists """
+    """Check that the interface we've been asked to run on actually exists"""
     log = logging.getLogger(inspect.stack()[0][3])
     discovered_interfaces = []
     for iface in os.listdir("/sys/class/net"):
         iface_path = os.path.join("/sys/class/net", iface)
-        if os.path.isdir(iface_path):
-            if "phy80211" in os.listdir(iface_path):
+        device_path = os.path.join(iface_path, "device")
+        if os.path.isdir(device_path):
+            if "ieee80211" in os.listdir(device_path):
                 discovered_interfaces.append(iface)
     if interface not in discovered_interfaces:
         log.warning(
-            "%s interface not found in phy80211 interfaces: %s",
+            "%s interface does not appear to support ieee80211: %s",
             interface,
             ", ".join(discovered_interfaces),
         )
         raise ValueError(f"{interface} is not a valid interface")
     else:
         log.debug(
-            "%s is in discovered phy80211 interfaces: %s",
+            "%s appears to support ieee80211: %s",
             interface,
             ", ".join(discovered_interfaces),
         )
@@ -160,7 +161,7 @@ def check_interface(interface: str) -> str:
 
 
 def setup_parser() -> argparse.ArgumentParser:
-    """ Set default values and handle arg parser """
+    """Set default values and handle arg parser"""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler",
@@ -300,7 +301,7 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def files_cleanup(directory: str, acknowledged: bool) -> None:
-    """ Purge files recursively """
+    """Purge files recursively"""
     log = logging.getLogger(inspect.stack()[0][3])
 
     from pathlib import Path
@@ -327,7 +328,7 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
 
 
 def setup_config(args) -> Dict:
-    """ Create the configuration (SSID, channel, interface, etc) for the Profiler """
+    """Create the configuration (SSID, channel, interface, etc) for the Profiler"""
     log = logging.getLogger(inspect.stack()[0][3])
 
     config_found = False
@@ -408,14 +409,14 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> Dict:
 
 
 def load_config(config_file: str) -> configparser.ConfigParser:
-    """ Load in config from external file """
+    """Load in config from external file"""
     config = configparser.ConfigParser()
     config.read(config_file)
     return config
 
 
 def validate(config) -> bool:
-    """ Validate minimum config to run is OK """
+    """Validate minimum config to run is OK"""
     log = logging.getLogger(inspect.stack()[0][3])
 
     if not check_config_missing(config):
@@ -437,12 +438,12 @@ def validate(config) -> bool:
 
 
 def is_randomized(mac) -> bool:
-    """ Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned """
+    """Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned"""
     return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
 
 
 def check_reg_domain() -> None:
-    """ Check and report the set regulatory domain """
+    """Check and report the set regulatory domain"""
     log = logging.getLogger(inspect.stack()[0][3])
     regdomain_result = run_cli_cmd(["iw", "reg", "get"])
     regdomain = [line for line in regdomain_result.split("\n") if "country" in line]
@@ -459,7 +460,7 @@ def check_reg_domain() -> None:
 
 
 def stage_interface(iface: Interface) -> bool:
-    """ Prepare the interface for monitor mode and injection """
+    """Prepare the interface for monitor mode and injection"""
     log = logging.getLogger(inspect.stack()[0][3])
     if iface.mode in ("managed", "monitor"):
         commands = [
@@ -500,7 +501,7 @@ def stage_interface(iface: Interface) -> bool:
 
 
 def check_config_missing(config: Dict) -> bool:
-    """ Check that the minimal config items exist """
+    """Check that the minimal config items exist"""
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         if "GENERAL" not in config:
@@ -520,7 +521,7 @@ def check_config_missing(config: Dict) -> bool:
 
 
 def update_manuf() -> bool:
-    """ Manuf wrapper to update manuf OUI flat file from Internet """
+    """Manuf wrapper to update manuf OUI flat file from Internet"""
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         log.debug(
@@ -545,7 +546,7 @@ def update_manuf() -> bool:
 
 
 def verify_reporting_directories(config: Dict) -> None:
-    """ Check reporting directories exist and create if not """
+    """Check reporting directories exist and create if not"""
     log = logging.getLogger(inspect.stack()[0][3])
 
     if "GENERAL" in config:
@@ -565,7 +566,7 @@ def verify_reporting_directories(config: Dict) -> None:
 
 
 def get_frequency_bytes(channel: int) -> bytes:
-    """ Take a channel number, converts it to a frequency, and finally to bytes """
+    """Take a channel number, converts it to a frequency, and finally to bytes"""
     if channel == 14:
         freq = 2484
     if channel < 14:
@@ -577,19 +578,20 @@ def get_frequency_bytes(channel: int) -> bytes:
 
 
 class Base64Encoder(json.JSONEncoder):
-    """ A Base64 encoder for JSON """
+    """A Base64 encoder for JSON"""
+
     # example usage: json.dumps(bytes(frame), cls=Base64Encoder)
 
     # pylint: disable=method-hidden
     def default(self, obj):
-        """ Perform default Base64 encode """
+        """Perform default Base64 encode"""
         if isinstance(obj, bytes):
             return b64encode(obj).decode()
         return json.JSONEncoder.default(self, obj)
 
 
 def get_wlanpi_version() -> str:
-    """ Retrieve system image verson """
+    """Retrieve system image verson"""
     wlanpi_version = "unknown"
     try:
         with open("/etc/wlanpi-release") as _file:
@@ -605,7 +607,7 @@ def get_wlanpi_version() -> str:
 
 
 def flag_last_object(seq):
-    """ Treat the last object in an iterable differently """
+    """Treat the last object in an iterable differently"""
     seq = iter(seq)  # ensure seq is an iterator
     _a = next(seq)
     for _b in seq:
@@ -615,7 +617,7 @@ def flag_last_object(seq):
 
 
 def generate_run_message(config: Dict) -> None:
-    """ Create message to display to users screen """
+    """Create message to display to users screen"""
     if config["GENERAL"].get("listen_only") is True:
         out = []
         out.append("Starting profiler in listen only mode:")
@@ -641,9 +643,11 @@ def generate_run_message(config: Dict) -> None:
         interface = config["GENERAL"]["interface"]
         ssid = config["GENERAL"]["ssid"]
         if channel:
-            out.append(f"Starting profiler AP with {interface} on channel {channel}:")
+            out.append(
+                f"Starting profiler AP with interface {interface} on channel {channel}:"
+            )
         else:
-            out.append(f"Starting profiler AP with {interface}")
+            out.append(f"Starting profiler AP with interface {interface}")
         out.append(f" - Our fake AP SSID: {ssid}")
         out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
@@ -664,7 +668,7 @@ def generate_run_message(config: Dict) -> None:
 
 @dataclass
 class Capability:
-    """ Define custom fields for reporting """
+    """Define custom fields for reporting"""
 
     name: str = ""
     value: Union[str, int] = ""
@@ -673,5 +677,5 @@ class Capability:
 
 
 def get_bit(byteval, index) -> bool:
-    """ Retrieve bit value from byte at provided index """
+    """Retrieve bit value from byte at provided index"""
     return (byteval & (1 << index)) != 0

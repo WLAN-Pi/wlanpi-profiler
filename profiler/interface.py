@@ -22,7 +22,7 @@ from .helpers import run_cli_cmd
 
 
 class Interface:
-    """ WLAN Interface data class """
+    """WLAN Interface data class"""
 
     def __init__(self, interface, channel=None, no_interface_prep=False, initial=True):
         self.log = logging.getLogger(self.__class__.__name__.lower())
@@ -45,7 +45,7 @@ class Interface:
         self.log_debug()
 
     def checks(self) -> None:
-        """ Perform self checks and warn as neccessary """
+        """Perform self checks and warn as neccessary"""
         if self.no_interface_prep or not self.initial:
             if "monitor" not in self.mode:
                 self.log.warning(
@@ -63,7 +63,7 @@ class Interface:
                 )
 
     def log_debug(self) -> None:
-        """ Send debug information to logger """
+        """Send debug information to logger"""
         self.log.debug(
             "mac: %s, channel: %s, driver: %s, version: %s",
             self.mac,
@@ -73,19 +73,19 @@ class Interface:
         )
 
     def get_ethtool_info(self) -> str:
-        """ Gather ethtool information for interface """
+        """Gather ethtool information for interface"""
         ethtool = run_cli_cmd(["ethtool", "-i", f"{self.name}"])
         return ethtool.strip()
 
     def get_driver(self) -> str:
-        """ Gather driver information for interface """
+        """Gather driver information for interface"""
         driver = run_cli_cmd(
             ["readlink", "-f", f"/sys/class/net/{self.name}/device/driver"]
         )
         return driver.split("/")[-1].strip()
 
     def get_driver_version(self) -> str:
-        """ Gather driver version for interface """
+        """Gather driver version for interface"""
         out = ""
         for line in self.driver_info.lower().splitlines():
             if "version:" in line:
@@ -93,7 +93,7 @@ class Interface:
         return out
 
     def get_firmware_version(self) -> str:
-        """ Gather driver firmware version for interface """
+        """Gather driver firmware version for interface"""
         out = ""
         for line in self.driver_info.lower().splitlines():
             if "firmware-version:" in line:
@@ -101,12 +101,12 @@ class Interface:
         return out
 
     def get_mac(self) -> str:
-        """ Gather MAC address for a given interface """
+        """Gather MAC address for a given interface"""
         mac = run_cli_cmd(["cat", f"/sys/class/net/{self.name}/address"])
         return mac.strip()
 
     def get_channel(self):
-        """ Determine what channel the interface is set to """
+        """Determine what channel the interface is set to"""
         iwconfig = run_cli_cmd(["iwconfig"])
         for line in iwconfig.splitlines():
             line = line.lower()
@@ -135,7 +135,7 @@ class Interface:
         return operstate.strip()
 
     def get_mode(self) -> str:
-        """ Get the current mode of the interface """
+        """Get the current mode of the interface"""
         _interface_type: "str" = run_cli_cmd(
             ["cat", f"/sys/class/net/{self.name}/type"]
         )

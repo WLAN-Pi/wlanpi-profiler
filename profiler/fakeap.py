@@ -44,11 +44,11 @@ from .constants import (CHANNELS, DOT11_SUBTYPE_ASSOC_REQ,
 
 
 class _Utils:
-    """ Fake AP helper functions """
+    """Fake AP helper functions"""
 
     @staticmethod
     def build_fake_frame_ies(config) -> Dot11Elt:
-        """ Build base frame for beacon and probe resp """
+        """Build base frame for beacon and probe resp"""
         ssid: "str" = config.get("GENERAL").get("ssid")
         channel = int(config.get("GENERAL").get("channel"))
 
@@ -180,7 +180,7 @@ class _Utils:
 
     @staticmethod
     def get_mac(interface: str) -> str:
-        """ Get the mac address for a specified interface """
+        """Get the mac address for a specified interface"""
         try:
             mac = get_if_hwaddr(interface)
         except Scapy_Exception:
@@ -189,13 +189,13 @@ class _Utils:
 
     @staticmethod
     def next_sequence_number(sequence_number) -> int:
-        """ Update a sequence number of type multiprocessing Value """
+        """Update a sequence number of type multiprocessing Value"""
         sequence_number.value = (sequence_number.value + 1) % 4096
         return sequence_number.value
 
 
 class TxBeacons(multiprocessing.Process):
-    """ Handle Tx of fake AP frames """
+    """Handle Tx of fake AP frames"""
 
     def __init__(
         self,
@@ -239,14 +239,14 @@ class TxBeacons(multiprocessing.Process):
         self.every(self.beacon_interval, self.beacon)
 
     def every(self, interval: float, task) -> None:
-        """ Attempt to address beacon drift """
+        """Attempt to address beacon drift"""
         start_time = time()
         while True:
             task()
             sleep(interval - ((time() - start_time) % interval))
 
     def beacon(self) -> None:
-        """ Update and Tx Beacon Frame """
+        """Update and Tx Beacon Frame"""
         frame = self.beacon_frame
         with self.sequence_number.get_lock():
             frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
@@ -280,7 +280,7 @@ class TxBeacons(multiprocessing.Process):
 
 
 class Sniffer(multiprocessing.Process):
-    """ Handle sniffing probes and association requests """
+    """Handle sniffing probes and association requests"""
 
     def __init__(
         self,
@@ -346,7 +346,7 @@ class Sniffer(multiprocessing.Process):
         )
 
     def received_frame(self, packet) -> None:
-        """ Handle incoming packets for profiling """
+        """Handle incoming packets for profiling"""
         if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
             if packet.addr1 == self.mac:  # if we are the receiver
                 self.dot11_auth_cb(packet.addr2)
@@ -365,7 +365,7 @@ class Sniffer(multiprocessing.Process):
                 self.dot11_assoc_request_cb(packet)
 
     def probe_response(self, probe_request) -> None:
-        """ Send probe resp to assist with profiler discovery """
+        """Send probe resp to assist with profiler discovery"""
         frame = self.probe_response_frame
         with self.sequence_number.get_lock():
             frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
@@ -374,13 +374,13 @@ class Sniffer(multiprocessing.Process):
         # self.log.debug("sent probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame) -> None:
-        """ Put association request on queue for the Profiler """
+        """Put association request on queue for the Profiler"""
         self.assoc_reqs[frame.addr2] = frame
         self.log.debug("adding assoc req from %s to queue", frame.addr2)
         self.queue.put(frame)
 
     def auth(self, receiver) -> None:
-        """ Send authentication frame to get the station to prompt an assoc request """
+        """Send authentication frame to get the station to prompt an assoc request"""
         frame = self.auth_frame
         frame[Dot11].addr1 = receiver
         with self.sequence_number.get_lock():

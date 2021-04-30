@@ -36,14 +36,14 @@ from .interface import Interface
 
 
 def signal_handler(signum, frame):
-    """ Handle noisy keyboardinterrupt """
+    """Handle noisy keyboardinterrupt"""
     if signum == 2:
         print(f"profiler PID {os.getpid()} detected SIGINT or Control-C... exiting...")
         sys.exit(2)
 
 
 def are_we_root() -> bool:
-    """ Do we have root permissions? """
+    """Do we have root permissions?"""
     if os.geteuid() == 0:
         return True
     else:
@@ -51,7 +51,7 @@ def are_we_root() -> bool:
 
 
 def start(args: argparse.Namespace):
-    """ Begin work """
+    """Begin work"""
     log = logging.getLogger(inspect.stack()[0][3])
 
     if args.pytest:
