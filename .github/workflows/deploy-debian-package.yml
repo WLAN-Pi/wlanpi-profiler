@@ -1,0 +1,40 @@
+
+name: Build and Upload Debian Packages
+on:
+  push:
+    paths:
+      - 'debian/changelog'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        distro: [buster]
+        arch: [armhf,arm64]
+    
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build Debian package
+        uses: danielmundi/sbuild-debian-package@main
+        id: build-debian-package
+        with:
+          distro: ${{ matrix.distro }}
+          arch: ${{ matrix.arch }}
+
+      - name: Upload Artifact to GitHub
+        uses: actions/upload-artifact@v2
+        with:
+          name: wlanpi-webui_package
+          path: ${{ steps.build-debian-package.outputs.deb-package }}
+
+      - name: Upload Package to Gemfury
+        uses: danielmundi/upload-gemfury@main
+        with:
+          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
+          gemfury-username: ${{ secrets.GEMFURY_NAME }}
+          gemfury-token: ${{ secrets.GEMFURY_TOKEN }}
