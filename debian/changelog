@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.7-1~rc1) unstable; urgency=low
+
+  * Placeholder 
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 22 Jun 2021 23:53:30 -0400
+
 wlanpi-profiler (1.0.6) unstable; urgency=low
 
   * Initial development test release

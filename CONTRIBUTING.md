@@ -48,8 +48,6 @@ Please be aware of the following things when filing bug reports:
    fix your problem. If we ask you to clarify these and you never respond, we
    will close your issue without fixing it.
 
-## Code Contributions
-
 ### Development Environment
 
 Consider using PyCharm or Visual Studio Code with the official Python and Pylance extensions from Microsoft (recommended).
