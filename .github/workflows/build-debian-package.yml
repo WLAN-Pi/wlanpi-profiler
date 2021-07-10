@@ -29,5 +29,5 @@ jobs:
       - name: Upload Artifact to GitHub
         uses: actions/upload-artifact@v2
         with:
-          name: wlanpi-webui_package
+          name: wlanpi-profiler_package
           path: ${{ steps.build-debian-package.outputs.deb-package }}
