@@ -18,15 +18,21 @@ If you are using debchange, it is a good idea to set environment variables on yo
 
 ### debchange - usage
 
+#### Create a new version entry
+
 You can run debchange from the root of the repository as debchange will climb the directory tree until it finds a `debian/changelog` file.
 
 ```
 (venv) wlanpi@rbpi4b-8gb:[~/dev/profiler]: debchange
 ```
 
+#### Update an existing version entry
+
 You should minially use `dch -i` when adding a new changelog because `-i` increases the release number and adds a changelog entry.
 
 If you want to edit the changelog without changing the version or adding a new entry, use `-e` instead of `-i`.
+
+### debchange - versions
 
 On version numbers, from the Debian maintainers guide:
 

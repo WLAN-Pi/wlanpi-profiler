@@ -383,6 +383,9 @@ def setup_config(args) -> Dict:
     else:
         config["GENERAL"]["files_path"] = FILES_PATH
 
+    # ensure channel 1 is an integer and not a bool
+    config["GENERAL"]["channel"] = int(config["GENERAL"]["channel"])
+
     return config
 
 
