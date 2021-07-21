@@ -1,9 +1,6 @@
 
 name: Build Debian Packages
 on:
-  push:
-    paths:
-      - 'debian/changelog'
   pull_request:
     paths:
       - 'debian/changelog'
@@ -15,7 +12,8 @@ jobs:
     strategy:
       matrix:
         distro: [buster]
-        arch: [armhf]
+        arch: [armhf,arm64]
+    
 
     steps:
       - name: Checkout
@@ -28,9 +26,8 @@ jobs:
           distro: ${{ matrix.distro }}
           arch: ${{ matrix.arch }}
 
-      - name: Upload package
-        uses: danielmundi/upload-gemfury@main
+      - name: Upload Artifact to GitHub
+        uses: actions/upload-artifact@v2
         with:
-          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          gemfury-username: ${{ secrets.GEMFURY_NAME }}
-          gemfury-token: ${{ secrets.GEMFURY_TOKEN }}
+          name: wlanpi-profiler_package
+          path: ${{ steps.build-debian-package.outputs.deb-package }}

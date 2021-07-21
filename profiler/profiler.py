@@ -44,7 +44,7 @@ from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
 
 
 class Profiler(object):
-    """ Code handling analysis of client capablities """
+    """Code handling analysis of client capablities"""
 
     def __init__(self, config=None, queue=None):
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
@@ -77,7 +77,7 @@ class Profiler(object):
         self.run(queue)
 
     def run(self, queue) -> None:
-        """ Runner which performs checks prior to profiling an association request """
+        """Runner which performs checks prior to profiling an association request"""
         if queue:
             buffer: "Dict" = {}
             buffer_squelch = 3
@@ -113,7 +113,7 @@ class Profiler(object):
                         sys.exit(signal.SIGTERM)
 
     def profile(self, frame) -> None:
-        """ Handle profiling clients as they come into the queue """
+        """Handle profiling clients as they come into the queue"""
         # we to determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
         channel = _20MHZ_CHANNEL_LIST[freq]
@@ -201,7 +201,7 @@ class Profiler(object):
         ssid: str,
         listen_only: bool,
     ) -> str:
-        """ Generate a report for output """
+        """Generate a report for output"""
         # start report
         text_report = "-" * 45
         if listen_only:
@@ -243,7 +243,7 @@ class Profiler(object):
         channel,
         listen_only,
     ):
-        """ Write report files out to a directory on the WLAN Pi """
+        """Write report files out to a directory on the WLAN Pi"""
         log = logging.getLogger(inspect.stack()[0][3])
         # dump out the text to a file
         client_mac = frame.addr2.replace(":", "-", 5)
@@ -428,7 +428,7 @@ class Profiler(object):
         return information_elements
 
     def resolve_oui_manuf(self, mac: str, dot11_elt_dict) -> str:
-        """ Resolve client's manuf using manuf database and other heuristics """
+        """Resolve client's manuf using manuf database and other heuristics"""
         log = logging.getLogger(inspect.stack()[0][3])
 
         # log.debug("starting oui lookup for %s", mac)
@@ -437,7 +437,7 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
-        sanitize = {"intelwir": "Intel", "samsunge": "Samsung"}
+        sanitize = {"intelwir": "Intel", "intelcor": "Intel", "samsunge": "Samsung"}
 
         if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
             # inspect vendor specific IEs and see if there's an IE with
@@ -467,7 +467,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_ssid_ie(dot11_elt_dict) -> str:
-        """ Check the SSID parameter to determine network name """
+        """Check the SSID parameter to determine network name"""
         out = ""
         if SSID_PARAMETER_SET_IE_TAG in dot11_elt_dict.keys():
             ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
@@ -476,7 +476,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_ht_capabilities_ie(dot11_elt_dict) -> List:
-        """ Check for 802.11n support """
+        """Check for 802.11n support"""
         dot11n = Capability(
             name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
         )
@@ -502,7 +502,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_vht_capabilities_ie(dot11_elt_dict) -> List:
-        """ Check for 802.11ac support """
+        """Check for 802.11ac support"""
         dot11ac = Capability(
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
         )
@@ -583,7 +583,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_rm_capabilities_ie(dot11_elt_dict) -> List:
-        """ Check for 802.11k support """
+        """Check for 802.11k support"""
         dot11k = Capability(
             name="802.11k",
             value="Not reported* - treat with caution, many clients lie about this",
@@ -598,7 +598,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_ft_capabilities_ie(dot11_elt_dict, ft_disabled: bool) -> List:
-        """ Check for 802.11r support """
+        """Check for 802.11r support"""
         dot11r = Capability(
             name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
         )
@@ -614,7 +614,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_ext_capabilities_ie(dot11_elt_dict) -> List:
-        """ Check for 802.11v support """
+        """Check for 802.11v support"""
         dot11v = Capability(
             name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
         )
@@ -639,7 +639,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_rsn_capabilities_ie(dot11_elt_dict) -> List:
-        """ Check for 802.11w support """
+        """Check for 802.11w support"""
         dot11w = Capability(
             name="802.11w", value="Not reported", db_key="dot11w", db_value=0
         )
@@ -659,7 +659,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_power_capability_ie(dot11_elt_dict) -> List:
-        """ Check for supported power capabilities """
+        """Check for supported power capabilities"""
         max_power_cap = Capability(
             name="Max Power",
             value="Not reported",
@@ -694,7 +694,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_supported_channels_ie(dot11_elt_dict, is_6ghz: bool) -> List:
-        """ Check supported channels """
+        """Check supported channels"""
         supported_channels = Capability(
             name="Supported Channels",
             value="Not reported",
@@ -761,7 +761,7 @@ class Profiler(object):
 
     @staticmethod
     def analyze_extension_ies(dot11_elt_dict, he_disabled: bool) -> List:
-        """ Check for 802.11ax support """
+        """Check for 802.11ax support"""
         dot11ax = Capability(
             name="802.11ax",
             value="Not supported",
@@ -975,7 +975,7 @@ class Profiler(object):
         ]
 
     def analyze_assoc_req(self, frame, is_6ghz: bool) -> Tuple[str, str, list]:
-        """ Tear apart the association request for analysis """
+        """Tear apart the association request for analysis"""
         log = logging.getLogger(inspect.stack()[0][3])
 
         # log.debug("processing information elements for client MAC %s", frame.addr2)
