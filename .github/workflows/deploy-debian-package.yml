@@ -15,7 +15,8 @@ jobs:
       matrix:
         distro: [buster]
         arch: [armhf,arm64]
-    
+
+    environment: GEMFURY
 
     steps:
       - name: Checkout
