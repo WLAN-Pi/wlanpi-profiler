@@ -1,12 +1,15 @@
-wlanpi-profiler (1.0.7-1~rc1) unstable; urgency=low
+wlanpi-profiler (1.0.7-1) unstable; urgency=low
 
-  * Placeholder 
+  * 802.11ax profiling enhancements
+  * Improved pcap profiling
+  * Fix passive mode
+  * Client manufacturer detection heuristic improvements 
 
- -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 22 Jun 2021 23:53:30 -0400
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 20 Jul 2021 23:55:59 -0400
 
 wlanpi-profiler (1.0.6) unstable; urgency=low
 
-  * Initial development test release
+  * Initial development test release switching from pipx to debian packaging
 
  -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 02 Feb 2021 20:00:00 +0500
 
