@@ -132,8 +132,6 @@ def start(args: argparse.Namespace):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
-        helpers.check_reg_domain()
-
         if args.no_interface_prep:
             log.debug(
                 "user provided `--noprep` argument meaning profiler will not handle staging the interface"
@@ -142,11 +140,8 @@ def start(args: argparse.Namespace):
             config["GENERAL"]["channel"] = iface.channel
         else:
             channel = int(config.get("GENERAL").get("channel"))
-            iface = Interface(iface_name, channel, initial=True)
-            if not helpers.stage_interface(iface):
-                sys.exit(-1)
-            iface.initial = False
-            iface.checks()
+            iface = Interface(iface_name, channel)
+            iface.stage_interface()
             log.debug("finish interface prep...")
 
         helpers.generate_run_message(config)

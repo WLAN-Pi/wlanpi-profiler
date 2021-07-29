@@ -81,7 +81,6 @@ except OSError:
 # app imports
 from .__version__ import __version__
 from .constants import CHANNELS, CONFIG_FILE
-from .interface import Interface
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -132,31 +131,6 @@ def check_ssid(ssid: str) -> str:
     if len(ssid) > 32:
         raise ValueError("%s length is greater than 32" % ssid)
     return ssid
-
-
-def check_interface(interface: str) -> str:
-    """Check that the interface we've been asked to run on actually exists"""
-    log = logging.getLogger(inspect.stack()[0][3])
-    discovered_interfaces = []
-    for iface in os.listdir("/sys/class/net"):
-        iface_path = os.path.join("/sys/class/net", iface)
-        device_path = os.path.join(iface_path, "device")
-        if os.path.isdir(device_path):
-            if "ieee80211" in os.listdir(device_path):
-                discovered_interfaces.append(iface)
-    if interface not in discovered_interfaces:
-        log.warning(
-            "%s interface does not claim ieee80211 support. here are some interfaces which do: %s",
-            interface,
-            ", ".join(discovered_interfaces),
-        )
-        raise ValueError(f"{interface} is not a valid interface")
-    else:
-        log.debug(
-            "%s claims to support ieee80211",
-            interface
-        )
-        return interface
 
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -429,8 +403,6 @@ def validate(config) -> bool:
 
         check_channel(config.get("GENERAL").get("channel"))
 
-        check_interface(config.get("GENERAL").get("interface"))
-
         verify_reporting_directories(config)
     except ValueError:
         log.error("%s", sys.exc_info()[1])
@@ -442,64 +414,6 @@ def validate(config) -> bool:
 def is_randomized(mac) -> bool:
     """Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned"""
     return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
-
-
-def check_reg_domain() -> None:
-    """Check and report the set regulatory domain"""
-    log = logging.getLogger(inspect.stack()[0][3])
-    regdomain_result = run_cli_cmd(["iw", "reg", "get"])
-    regdomain = [line for line in regdomain_result.split("\n") if "country" in line]
-    if "UNSET" in "".join(regdomain):
-        log.warning(
-            "REG DOMAIN APPEARS TO BE UNSET! Please consider setting it with 'iw reg set XX'"
-        )
-        log.warning(
-            "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
-        )
-    else:
-        log.debug("reg domain set to %s", " ".join(regdomain))
-        log.debug("see 'iw reg get' for details")
-
-
-def stage_interface(iface: Interface) -> bool:
-    """Prepare the interface for monitor mode and injection"""
-    log = logging.getLogger(inspect.stack()[0][3])
-    if iface.mode in ("managed", "monitor"):
-        commands = [
-            ["wpa_cli", "-i", f"{iface.name}", "terminate"],
-            ["ip", "link", "set", f"{iface.name}", "down"],
-            ["iw", "dev", f"{iface.name}", "set", "monitor", "none"],
-            ["ip", "link", "set", f"{iface.name}", "up"],
-            ["iw", f"{iface.name}", "set", "channel", f"{iface.channel}", "HT20"],
-        ]
-        try:
-            for cmd in commands:
-                cp = subprocess.run(
-                    cmd, encoding="utf-8", shell=False, capture_output=True
-                )
-                if cp.stderr:
-                    if "monitor" in cmd:
-                        cp = subprocess.run(
-                            ["iw", "dev", f"{iface.name}", "set", "type", "monitor"],
-                            encoding="utf-8",
-                            shell=False,
-                            capture_output=True,
-                        )
-                    if "wpa_cli" not in cmd:
-                        raise OSError(f"problem running '{' '.join(cmd)}'\n{cp.stderr}")
-            return True
-        except OSError:
-            log.exception(
-                "error setting %s interface config: %s",
-                iface.name,
-                "\n".join(
-                    [line for line in cp.stderr.split("\n") if line.strip() != ""]
-                ),
-                exc_info=None,
-            )
-
-    log.error("failed to prepare the interface...")
-    return False
 
 
 def check_config_missing(config: Dict) -> bool:
@@ -526,19 +440,18 @@ def update_manuf() -> bool:
     """Manuf wrapper to update manuf OUI flat file from Internet"""
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        log.debug(
-            "manuf flat file located at %s", os.path.join(manuf.__path__[0], "manuf")
+        flat_file = os.path.join(manuf.__path__[0], "manuf")
+        log.info("manuf file is located at %s", flat_file)
+        log.info(
+            "manuf file last modified at: %s",
+            ctime(os.path.getmtime(flat_file)),
         )
-        log.debug(
-            "manuf last modified time: %s",
-            ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
-        )
-        log.debug("running 'sudo manuf --update'")
+        log.info("running 'sudo manuf --update'")
         cp = run_cli_cmd(["sudo", f"{sys.prefix}/bin/manuf", "--update"])
         log.info("%s", str(cp))
-        log.debug(
-            "manuf last modified time: %s",
-            ctime(os.path.getmtime(os.path.join(manuf.__path__[0], "manuf"))),
+        log.info(
+            "manuf file last modified at: %s",
+            ctime(os.path.getmtime(flat_file)),
         )
     except OSError:
         log.exception("problem updating manuf. make sure manuf is installed...")

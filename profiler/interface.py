@@ -12,9 +12,12 @@ profiler.interface
 wlan interface data class
 """
 
-# standard library imports
 import logging
+# standard library imports
+import os
 import re
+import subprocess
+import sys
 
 # app imports
 from .constants import _20MHZ_CHANNEL_LIST
@@ -24,29 +27,95 @@ from .helpers import run_cli_cmd
 class Interface:
     """WLAN Interface data class"""
 
-    def __init__(self, interface, channel=None, no_interface_prep=False, initial=True):
+    def __init__(self, interface, channel=None, no_interface_prep=False):
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = interface.lower()
-        self.mac = self.get_mac().lower()
         self.channel = channel
         self.no_interface_prep = no_interface_prep
-        self.initial = initial
         if not self.channel:
             self.channel = self.get_channel()
             if not self.channel:
                 self.log.warning("could not determine channel")
+        self.checks()
+        self.mac = self.get_mac().lower()
         self.mode = self.get_mode().lower()
         self.operstate = self.get_operstate().lower()
         self.driver = self.get_driver()
         self.driver_info = self.get_ethtool_info()
         self.driver_version = self.get_driver_version()
         self.firmware_version = self.get_firmware_version()
-        self.checks()
         self.log_debug()
+
+    def check_reg_domain(self) -> None:
+        """Check and report the set regulatory domain"""
+        regdomain_result = run_cli_cmd(["iw", "reg", "get"])
+        regdomain = [line for line in regdomain_result.split("\n") if "country" in line]
+        if "UNSET" in "".join(regdomain):
+            if "iwlwifi" not in self.driver:
+                self.log.warning(
+                    "reg domain appears unset. consider setting it with 'iw reg set XX'"
+                )
+                self.log.warning(
+                    "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
+                )
+        else:
+            self.log.debug("reg domain set to %s", " ".join(regdomain))
+            self.log.debug("see 'iw reg get' for details")
+
+    def stage_interface(self) -> None:
+        """Prepare the interface for monitor mode and injection"""
+        if self.mode in ("managed", "monitor"):
+            iwlwifi_scan_commands = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "managed"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                ["iw", f"{self.name}", "scan"],
+            ]
+            staging_commands = [
+                ["wpa_cli", "-i", f"{self.name}", "terminate"],
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "monitor", "none"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+            ]
+            if "iwlwifi" in self.driver:
+                commands = iwlwifi_scan_commands + staging_commands
+            else:
+                commands = staging_commands
+            try:
+                for cmd in commands:
+                    cp = subprocess.run(
+                        cmd, encoding="utf-8", shell=False, capture_output=True
+                    )
+                    if cp.stderr:
+                        if "monitor" in cmd:
+                            cp = subprocess.run(
+                                ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                                encoding="utf-8",
+                                shell=False,
+                                capture_output=True,
+                            )
+                        if "wpa_cli" not in cmd:
+                            raise OSError(
+                                f"problem running '{' '.join(cmd)}'\n{cp.stderr}"
+                            )
+                return True
+            except OSError:
+                self.log.exception(
+                    "error setting %s interface config: %s",
+                    self.name,
+                    "\n".join(
+                        [line for line in cp.stderr.split("\n") if line.strip() != ""]
+                    ),
+                    exc_info=None,
+                )
+
+        self.log.error("failed to prepare the interface...")
+        sys.exit(-1)
 
     def checks(self) -> None:
         """Perform self checks and warn as neccessary"""
-        if self.no_interface_prep or not self.initial:
+        if self.no_interface_prep:
             if "monitor" not in self.mode:
                 self.log.warning(
                     "%s mode is in %s mode when we expected monitor mode",
@@ -54,13 +123,36 @@ class Interface:
                     self.mode,
                 )
 
-        if self.no_interface_prep or not self.initial:
+        if self.no_interface_prep:
             if "up" not in self.operstate:
                 self.log.warning(
                     "%s operating state is %s when we expect up",
                     self.name,
                     self.operstate,
                 )
+
+        self.check_reg_domain()
+        self.check_interface(self.name)
+
+    def check_interface(self, interface: str) -> str:
+        """Check that the interface we've been asked to run on actually exists"""
+        discovered_interfaces = []
+        for iface in os.listdir("/sys/class/net"):
+            iface_path = os.path.join("/sys/class/net", iface)
+            device_path = os.path.join(iface_path, "device")
+            if os.path.isdir(device_path):
+                if "ieee80211" in os.listdir(device_path):
+                    discovered_interfaces.append(iface)
+        if interface not in discovered_interfaces:
+            self.log.warning(
+                "%s interface does not claim ieee80211 support. here are some interfaces which do: %s",
+                interface,
+                ", ".join(discovered_interfaces),
+            )
+            raise ValueError(f"{interface} is not a valid interface")
+        else:
+            self.log.debug("%s claims to support ieee80211", interface)
+            return interface
 
     def log_debug(self) -> None:
         """Send debug information to logger"""

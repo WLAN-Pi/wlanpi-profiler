@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.7~rc2) unstable; urgency=low
+
+  * Interface handling improvements for iwlwifi
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 29 Jul 2021 01:00:22 -0400
+
 wlanpi-profiler (1.0.7~rc1) unstable; urgency=low
 
   * 802.11ax profiling enhancements

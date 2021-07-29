@@ -452,7 +452,7 @@ class Profiler(object):
                     if oui_manuf_vendor is not None:
                         # Matches are vendor specific IEs we know are client specific
                         # e.g. Apple vendor specific IEs can only be found in Apple devices
-                        # Samsung may follow similar logic based on S10 5G testing, but unsure
+                        # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
                         matches = ("apple", "samsung", "intel")
                         if oui_manuf_vendor.lower().startswith(matches):
                             if oui_manuf_vendor.lower() in sanitize:

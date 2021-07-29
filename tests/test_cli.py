@@ -5,6 +5,7 @@ import pytest
 
 from profiler import helpers
 from profiler.__version__ import __version__
+from profiler.interface import Interface
 
 
 @pytest.fixture
@@ -65,13 +66,11 @@ class TestArgParsing:
         assert "invalid check_channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
-        with pytest.raises(SystemExit):
+       with pytest.raises(ValueError):
             config = helpers.setup_config(
                 parser.parse_args(["-i", "fakest_interface_ever"])
             )
-            helpers.validate(config)
-        out, err = capsys.readouterr()
-        assert err == ""
+            Interface("fakest_interface_ever")
 
     @pytest.mark.parametrize(
         "args,expected",

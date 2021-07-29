@@ -11,6 +11,7 @@ Release 1.0.7
 - Add feature detection for 802.11ax TWT, Punctured Preamble, HE SU Beamformer, HE SU Beamformee, HE (ER) Extended Range, UORA (Uplink OFDMA Random Access), and BSR Control (Buffer Status Report)
 - Basic Wi-Fi 6E client association pcap profiling
 - Add Intel to client manufacturer detection heuristic
+- Interface staging improvements
 
 Releaes 1.0.6
 
