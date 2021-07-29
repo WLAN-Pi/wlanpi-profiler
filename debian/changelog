@@ -7,7 +7,7 @@ wlanpi-profiler (1.0.7~rc2) unstable; urgency=low
 wlanpi-profiler (1.0.7~rc1) unstable; urgency=low
 
   * 802.11ax profiling enhancements
-  * Improved pcap profiling
+  * Improve pcap profiling
   * Fix passive mode
   * Client manufacturer detection heuristic improvements 
 
