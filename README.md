@@ -52,8 +52,17 @@ Saved results include a copy of the text report and the association frame in PCA
 
     2. Starting the service manually:
         - `sudo service wlanpi-profiler start|stop|status`
+
     3. Starting from the terminal:
         - `sudo profiler`
+
+
+    - How to view CLI usage and man page from the shell:
+
+    ```
+    profiler -h
+    man wlanpi-profiler
+    ```
 
 2. Profile the client:
 
