@@ -36,7 +36,6 @@ class Interface:
             self.channel = self.get_channel()
             if not self.channel:
                 self.log.warning("could not determine channel")
-        self.checks()
         self.mac = self.get_mac().lower()
         self.mode = self.get_mode().lower()
         self.operstate = self.get_operstate().lower()
@@ -44,6 +43,7 @@ class Interface:
         self.driver_info = self.get_ethtool_info()
         self.driver_version = self.get_driver_version()
         self.firmware_version = self.get_firmware_version()
+        self.checks()
         self.log_debug()
 
     def check_reg_domain(self) -> None:
