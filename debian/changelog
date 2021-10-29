@@ -1,6 +1,7 @@
 wlanpi-profiler (1.0.7~rc2) unstable; urgency=low
 
   * Interface handling improvements for iwlwifi
+  * Fix crash that happens when utf-8 decoding fails
 
  -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 29 Jul 2021 01:00:22 -0400
 

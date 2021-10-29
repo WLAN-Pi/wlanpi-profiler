@@ -10,6 +10,6 @@ Homepage: https://github.com/WLAN-Pi/profiler
 Package: wlanpi-profiler
 Architecture: any
 Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.7), python3-distutils, ${misc:Pre-Depends}
-Depends: ${python3:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}
 Description: A Wi-Fi client capabilities profiler
 

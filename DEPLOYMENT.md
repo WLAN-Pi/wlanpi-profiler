@@ -10,6 +10,34 @@ There are two workflows defined.
 
 ## Workflow Process
 
+### debian packaging
+
+On your build host, install the build tools (these are only needed on the device doing the build):
+
+```bash
+sudo apt-get install build-essential debhelper devscripts equivs python3-pip python3-all python3-dev python3-setuptools dh-virtualenv
+```
+
+Install Python depends so that the tooling doesn't fail when it tries to evaluate which tests to run.
+
+```bash
+python3 -m pip install mock
+```
+
+You are ready to build. From the root directory of this repository run the following command:
+
+```bash
+debuild
+```
+
+or 
+
+```bash
+dpkg-buildpackage -us -uc -b
+```
+
+Use `dpkg -i <file.deb>` to install and test the generated package.
+
 ### debchange - tool for maintaining the source package changelog file
 
 It is recommended to use `debchange` or its alias `dch` to assist in the modification of the changelog. You should 
