@@ -473,7 +473,9 @@ class Profiler(object):
             try:
                 ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
             except UnicodeDecodeError:
-                ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("latin-1")
+                ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode(
+                    "latin-1"
+                )
             out = f"{ssid}"
         return out
 

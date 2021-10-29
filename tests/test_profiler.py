@@ -28,6 +28,24 @@ class TestProfiler:
     @pytest.mark.parametrize(
         "expected,pcap",
         [
+            (   "non_utf-8_ssid",
+                "./tests/pcaps/0xc6.pcapng"
+            )
+        ])
+    def test_non_utf8_decode(self, expected, pcap):
+        p = profiler.Profiler()
+        p.ft_disabled = False
+        p.he_disabled = False
+        cap = rdpcap(pcap)
+        is_6ghz = False
+        ssid, oui, capabilities = p.analyze_assoc_req(cap[0], is_6ghz)
+        assert ssid is not None
+        assert oui is not None
+        assert capabilities is not None
+
+    @pytest.mark.parametrize(
+        "expected,pcap",
+        [
             (
                 "apple",
                 "./tests/pcaps/Apple_MXCU2LLA_PrivateMAC_76-32-e8-00-00-00_5.8GHz-anonymized.pcap",

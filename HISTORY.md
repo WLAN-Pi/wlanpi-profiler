@@ -1,4 +1,4 @@
-Release 1.0.7
+Releaes 1.0.7
 
 - Allow read of pcap file when no WLAN NICs are present
 - Allow reading and analysis of multiple association requests in a single pcap
@@ -12,8 +12,9 @@ Release 1.0.7
 - Basic Wi-Fi 6E client association pcap profiling
 - Add Intel to client manufacturer detection heuristic
 - Interface staging improvements
+- Fix crash that happens when utf-8 decoding fails
 
-Releaes 1.0.6
+Release 1.0.6
 
 - Replace pipx packaging with debian packaging
 

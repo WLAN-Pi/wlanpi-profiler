@@ -2,6 +2,7 @@
 
 
 import pytest
+import subprocess
 
 from profiler import helpers
 from profiler.__version__ import __version__
@@ -66,7 +67,7 @@ class TestArgParsing:
         assert "invalid check_channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
-       with pytest.raises(ValueError):
+       with pytest.raises(subprocess.CalledProcessError):
             config = helpers.setup_config(
                 parser.parse_args(["-i", "fakest_interface_ever"])
             )
