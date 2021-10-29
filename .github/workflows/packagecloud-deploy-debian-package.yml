@@ -1,0 +1,50 @@
+name: Build and deploy to packagecloud
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'debian/changelog'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'debian/changelog'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        distro: [buster]
+        arch: [armhf,arm64]
+
+    environment: PACKAGECLOUD
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build Debian package
+        uses: danielmundi/sbuild-debian-package@main
+        id: build-debian-package
+        with:
+          distro: ${{ matrix.distro }}
+          arch: ${{ matrix.arch }}
+
+      - name: Upload artifact to GitHub
+        uses: actions/upload-artifact@v2
+        with:
+          name: wlanpi-profiler_package
+          path: ${{ steps.build-debian-package.outputs.deb-package }}
+
+      - name: Upload package to packagecloud
+        uses: danielmundi/upload-packagecloud@main
+        with:
+          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
+          packagecloud-username: wlanpi
+          packagecloud-repo: dev
+          packagecloud-distrib: raspbian/${{ matrix.distro }}
+          packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
