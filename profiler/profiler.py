@@ -470,7 +470,10 @@ class Profiler(object):
         """Check the SSID parameter to determine network name"""
         out = ""
         if SSID_PARAMETER_SET_IE_TAG in dot11_elt_dict.keys():
-            ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
+            try:
+                ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("utf-8")
+            except UnicodeDecodeError:
+                ssid = bytes(dot11_elt_dict[SSID_PARAMETER_SET_IE_TAG]).decode("latin-1")
             out = f"{ssid}"
         return out
 
