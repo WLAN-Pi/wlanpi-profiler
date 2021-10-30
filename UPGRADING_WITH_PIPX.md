@@ -1,19 +1,22 @@
 
-# Upgrading profiler with pipx on NEO2 / WLAN Pi 2.0.1 
+# Upgrading profiler with pipx on NEO{1,2} with WLAN Pi OS v2
 
-If you'd like to upgrade profiler on your existing NEO 2 WLAN Pi which is running WLAN Pi 2.0.1, please follow these instructions.
+If you'd like to upgrade profiler on your existing NEO 1/2 WLAN Pi which is running WLAN Pi OS v2, please follow these instructions.
 
-Challenges:
+* *This does not work on v1 images or systems where pipx was not used to install profiler.*
 
-* The GitHub repo for profiler was changed from profiler2 to wlanpi-profiler in preparation for debian packaging. This means we need to uninstall profiler2 from pipx.
-* PATH complications with pipx. We need to pass some env variables to sudo.
+Additional notes to provide some context on this procedure:
+
+* The GitHub repo for profiler was changed from profiler2 to wlanpi-profiler in preparation for debian packaging. This means we need to first uninstall profiler2 from pipx on relevant systems.
+* PATH complications with pipx, which means we need to pass some env variables to sudo.
 
 ## Prerequisites:
 
+* Profiler is installed via pipx (our image handles this for you)
 * WLAN Pi must have Internet access (GitHub specifically)
 * You will need SSH/terminal access to the WLAN Pi
 
-## Step 1:
+## Step 1. Make sure pipx is updated
 
 Command:
 
@@ -21,7 +24,7 @@ Command:
 sudo python3 -m pip install -U pipx
 ```
 
-## Step 2:
+## Step 2. Uninstall profiler2
 
 Command:
 
@@ -36,7 +39,7 @@ wlanpi@wlanpi:~$ sudo PIPX_HOME=/opt/wlanpi/pipx PIPX_BIN_DIR=/opt/wlanpi/pipx/b
 uninstalled profiler2! ✨ 🌟 ✨
 ```
 
-## Step 3:
+## Step 3. Install wlanpi-profiler
 
 Command:
 
@@ -73,9 +76,7 @@ If you see the following, something went wrong.
 profiler (symlink missing or pointing to unexpected location)
 ```
 
-## Step 4 (optional):
-
-Migrate config file to new location.
+## Step 4 (optional). Migrate config file to new location:
 
 Command:
 
@@ -84,9 +85,7 @@ sudo mkdir /etc/wlanpi-profiler
 sudo cp /etc/profiler2/config.ini /etc/wlanpi-profiler/
 ```
 
-## Step 5 (optional):
-
-Fix permissions on pipx logs so that we can run `pipx list` without sudo and errors.
+## Step 5 (optional). Fix permissions on pipx logs so that we can run `pipx list` without sudo and errors:
 
 ```
 sudo chown -R wlanpi:wlanpi /opt/wlanpi/pipx/logs
