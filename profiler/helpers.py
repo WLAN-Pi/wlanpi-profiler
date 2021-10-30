@@ -65,18 +65,9 @@ try:
     result = run_cli_cmd(["tcpdump", "--version"])
 except OSError:
     print(
-        "problem checking tcpdump version. is tcpdump installed and functioning? exiting..."
+        "WARNING: problem checking tcpdump version. is tcpdump installed and functioning? did you run with elevated permissions?"
     )
-    sys.exit(signal.SIGABRT)
 
-# is netstat installed?
-try:
-    result = run_cli_cmd(["netstat", "--version"])
-except OSError:
-    print(
-        "problem checking netstat version. is netstat installed and functioning? exiting..."
-    )
-    sys.exit(signal.SIGABRT)
 
 # app imports
 from .__version__ import __version__
