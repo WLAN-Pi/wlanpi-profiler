@@ -162,7 +162,7 @@ class Interface:
             self.channel,
             self.driver,
             self.driver_version,
-            self.firmware_version
+            self.firmware_version,
         )
 
     def get_ethtool_info(self) -> str:
