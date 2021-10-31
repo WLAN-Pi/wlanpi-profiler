@@ -1,22 +1,14 @@
+# Updating profiler2 via pipx on NEO{1,2} running WLAN Pi OS v2
 
-# Upgrading profiler with pipx on NEO{1,2} with WLAN Pi OS v2
-
-If you'd like to upgrade profiler on your existing NEO 1/2 WLAN Pi which is running WLAN Pi OS v2, please follow these instructions.
-
-* *This does not work on v1 images or systems where pipx was not used to install profiler.*
-
-Additional notes to provide some context on this procedure:
-
-* The GitHub repo for profiler was changed from profiler2 to wlanpi-profiler in preparation for debian packaging. This means we need to first uninstall profiler2 from pipx on relevant systems.
-* PATH complications with pipx, which means we need to pass some env variables to sudo.
+If you would like to upgrade the shipped version of `profiler2` with WLAN Pi OS v2, please follow these instructions. Please note that these instructions do not work unless `profiler2` was installed via `pipx` either during the WLAN Pi image creation or you manually installed it that way.
 
 ## Prerequisites:
 
-* Profiler is installed via pipx (our image handles this for you)
+* Profiler is installed on your WLAN Pi via pipx
 * WLAN Pi must have Internet access (GitHub specifically)
 * You will need SSH/terminal access to the WLAN Pi
 
-## Step 1. Make sure pipx is updated
+### Step 1. Update pipx
 
 Command:
 
@@ -24,41 +16,41 @@ Command:
 sudo python3 -m pip install -U pipx
 ```
 
-## Step 2. Uninstall profiler2
+### Step 2. Uninstall profiler2
 
-Command:
+In preparation for Debian packaging, the GitHub repo name for profiler was changed from `profiler2` to `wlanpi-profiler`.
+
+This means `profiler2` must be first uninstalled before upgrading.
+
+You will need to launch root shell and use the `-p` option to preserve the environment variables which tie `pipx` to `/opt/wlanpi/pipx`. The `-p` option prevents `su` from resetting `$PATH`.
+
+Commands:
 
 ```
-sudo PIPX_HOME=/opt/wlanpi/pipx PIPX_BIN_DIR=/opt/wlanpi/pipx/bin pipx uninstall profiler2
+sudo su -p
+pipx list
+pipx uninstall profiler2
 ```
 
 Expected Result:
 
 ```
-wlanpi@wlanpi:~$ sudo PIPX_HOME=/opt/wlanpi/pipx PIPX_BIN_DIR=/opt/wlanpi/pipx/bin pipx uninstall profiler2
+wlanpi@wlanpi:~$ sudo su -p
+root@wlanpi:/home/wlanpi# pipx uninstall profiler2
 uninstalled profiler2! ✨ 🌟 ✨
 ```
 
-## Step 3. Install wlanpi-profiler
+### Step 3. Install latest version of wlanpi-profiler from the `main` branch.
 
-Command:
-
-```
-sudo PIPX_HOME=/opt/wlanpi/pipx PIPX_BIN_DIR=/opt/wlanpi/pipx/bin pipx install git+https://github.com/WLAN-Pi/wlanpi-profiler.git@main#egg=profiler
-```
-
-Expected Result:
+Commands:
 
 ```
-wlanpi@wlanpi:~$ sudo PIPX_HOME=/opt/wlanpi/pipx PIPX_BIN_DIR=/opt/wlanpi/pipx/bin pipx install git+https://github.com/WLAN-Pi/wlanpi-profiler.git@main#egg=profiler
-  installed package profiler 1.0.7, Python 3.7.3
-  These apps are now globally available
-    - profiler
-⚠️  Note: '/root/.local/bin' is not on your PATH environment variable. These apps will not be globally accessible until your PATH is updated. Run `pipx ensurepath` to automatically add it, or manually modify your PATH in your shell's config file (i.e. ~/.bashrc).
-done! ✨ 🌟 ✨
+sudo su -p
+pipx list
+pipx install git+https://github.com/WLAN-Pi/wlanpi-profiler.git@main#egg=profiler
 ```
 
-### Validation:
+#### Validation:
 
 You should see something like this in the output:
 
@@ -70,23 +62,41 @@ apps are exposed on your $PATH at /opt/wlanpi/pipx/bin
     - profiler
 ```
 
-If you see the following, something went wrong.
-
-```
-profiler (symlink missing or pointing to unexpected location)
-```
-
-## Step 4 (optional). Migrate config file to new location:
+### Step 4. Migrate config file to new location:
 
 Command:
 
 ```
-sudo mkdir /etc/wlanpi-profiler
-sudo cp /etc/profiler2/config.ini /etc/wlanpi-profiler/
+sudo mv /etc/profiler2 /etc/wlanpi-profiler
 ```
 
-## Step 5 (optional). Fix permissions on pipx logs so that we can run `pipx list` without sudo and errors:
+## Appendix
+
+### Future Upgrades for `wlanpi-profiler`
+
+Once you've uninstalled `profiler2` and installed `wlanpi-profiler`, future upgrades can be done with `pipx upgrade profiler` like so: 
 
 ```
-sudo chown -R wlanpi:wlanpi /opt/wlanpi/pipx/logs
+wlanpi@wlanpi:~$ sudo su -p
+root@wlanpi:/home/wlanpi# pipx upgrade profiler
+profiler is already at latest version 1.0.7 (location: /opt/wlanpi/pipx/venvs/profiler)
+```
+
+If you were to follow the previous `pipx install` instructions in attempt to upgrade `wlanpi-profiler`, you may see an error like this:
+
+```
+wlanpi@wlanpi:~$ sudo su -p
+root@wlanpi:/home/wlanpi# pipx install git+https://github.com/WLAN-Pi/wlanpi-profiler.git@main#egg=profiler
+'profiler' already seems to be installed. Not modifying existing installation in '/opt/wlanpi/pipx/venvs/profiler'. Pass '--force' to force installation.
+```
+
+### Install a specific version of wlanpi-profiler
+
+You can specify the branch or tag like when installing via pipx. You can find the [tags here](https://github.com/WLAN-Pi/wlanpi-profiler/tags).
+
+Here is an example for how we might install the v1.0.7rc2 tag:
+
+```
+sudo su -p
+pipx install git+https://github.com/WLAN-Pi/wlanpi-profiler.git@v1.0.7rc2#egg=profiler
 ```
