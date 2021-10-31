@@ -23,6 +23,8 @@ import sys
 from .constants import _20MHZ_CHANNEL_LIST
 from .helpers import run_cli_cmd
 
+class InterfaceError(Exception):
+    pass
 
 class Interface:
     """WLAN Interface data class"""
@@ -30,6 +32,7 @@ class Interface:
     def __init__(self, interface, channel=None, no_interface_prep=False):
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = interface.lower()
+        self.check_interface(self.name)
         self.channel = channel
         self.no_interface_prep = no_interface_prep
         if not self.channel:
@@ -132,7 +135,6 @@ class Interface:
                 )
 
         self.check_reg_domain()
-        self.check_interface(self.name)
 
     def check_interface(self, interface: str) -> str:
         """Check that the interface we've been asked to run on actually exists"""
@@ -149,7 +151,7 @@ class Interface:
                 interface,
                 ", ".join(discovered_interfaces),
             )
-            raise ValueError(f"{interface} is not a valid interface")
+            raise InterfaceError(f"{interface} is not a valid interface")
         else:
             self.log.debug("%s claims to support ieee80211", interface)
             return interface

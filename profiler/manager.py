@@ -32,7 +32,7 @@ from scapy.all import rdpcap
 # app imports
 from . import helpers
 from .__version__ import __version__
-from .interface import Interface
+from .interface import Interface, InterfaceError
 
 
 def signal_handler(signum, frame):
@@ -132,17 +132,21 @@ def start(args: argparse.Namespace):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
-        if args.no_interface_prep:
-            log.debug(
-                "user provided `--noprep` argument meaning profiler will not handle staging the interface"
-            )
-            iface = Interface(iface_name, no_interface_prep=True)
-            config["GENERAL"]["channel"] = iface.channel
-        else:
-            channel = int(config.get("GENERAL").get("channel"))
-            iface = Interface(iface_name, channel)
-            iface.stage_interface()
-            log.debug("finish interface prep...")
+        try:
+            if args.no_interface_prep:
+                log.debug(
+                    "user provided `--noprep` argument meaning profiler will not handle staging the interface"
+                )
+                iface = Interface(iface_name, no_interface_prep=True)
+                config["GENERAL"]["channel"] = iface.channel
+            else:
+                channel = int(config.get("GENERAL").get("channel"))
+                iface = Interface(iface_name, channel)
+                iface.stage_interface()
+                log.debug("finish interface prep...")
+        except InterfaceError as error:
+            log.warning("%s ... exiting ..." % error)
+            sys.exit(-1)
 
         helpers.generate_run_message(config)
 
