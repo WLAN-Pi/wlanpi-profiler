@@ -157,11 +157,12 @@ class Interface:
     def log_debug(self) -> None:
         """Send debug information to logger"""
         self.log.debug(
-            "mac: %s, channel: %s, driver: %s, version: %s",
+            "mac: %s, channel: %s, driver: %s, version: %s, firmware-version: %s",
             self.mac,
             self.channel,
             self.driver,
             self.driver_version,
+            self.firmware_version
         )
 
     def get_ethtool_info(self) -> str:
@@ -180,7 +181,7 @@ class Interface:
         """Gather driver version for interface"""
         out = ""
         for line in self.driver_info.lower().splitlines():
-            if "version:" in line:
+            if line.startswith("version:"):
                 out = line.split(" ")[1]
         return out
 
@@ -188,7 +189,7 @@ class Interface:
         """Gather driver firmware version for interface"""
         out = ""
         for line in self.driver_info.lower().splitlines():
-            if "firmware-version:" in line:
+            if line.startswith("firmware-version:"):
                 out = line.split(" ")[1]
         return out
 
