@@ -29,8 +29,11 @@ jobs:
         pip install tox
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
     - name: run tox linters
+      id: linters-run
+      continue-on-error: true
       run: |
         tox -e lint
     - name: Test with tox
+      id: tox-run
       run: |
         tox
