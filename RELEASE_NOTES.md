@@ -1,4 +1,9 @@
-Releaes 1.0.7
+Release 1.0.8
+
+- Improvements to interface staging
+- Refactoring of channel configuration by frequency rather than id (must update config.ini)
+
+Release 1.0.7
 
 - Allow read of pcap file when no WLAN NICs are present
 - Allow reading and analysis of multiple association requests in a single pcap

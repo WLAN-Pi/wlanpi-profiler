@@ -34,11 +34,18 @@ from . import helpers
 from .__version__ import __version__
 from .interface import Interface, InterfaceError
 
+__pids = []
+__pids.append(("main", os.getpid()))
+__iface = Interface()
+
 
 def signal_handler(signum, frame):
     """Handle noisy keyboardinterrupt"""
     if signum == 2:
-        print(f"profiler PID {os.getpid()} detected SIGINT or Control-C... exiting...")
+        for name, pid in __pids:
+            if name == "main" and os.getpid() == pid:
+                print("Detected SIGINT or Control-C ... Cleaning up and exiting ...")
+                __iface.restore_interface()
         sys.exit(2)
 
 
@@ -122,7 +129,6 @@ def start(args: argparse.Namespace):
             log.error("configuration validation failed... exiting...")
             sys.exit(-1)
 
-        iface_name = config.get("GENERAL").get("interface")
         listen_only = config.get("GENERAL").get("listen_only")
 
         from .fakeap import Sniffer, TxBeacons
@@ -132,20 +138,30 @@ def start(args: argparse.Namespace):
         lock = mp.Lock()
         sequence_number = mp.Value("i", 0)
 
+        iface_name = config.get("GENERAL").get("interface")
+        __iface.name = iface_name
+
         try:
             if args.no_interface_prep:
                 log.debug(
                     "user provided `--noprep` argument meaning profiler will not handle staging the interface"
                 )
-                iface = Interface(iface_name, no_interface_prep=True)
-                config["GENERAL"]["channel"] = iface.channel
+                __iface.no_interface_prep = True
             else:
-                channel = int(config.get("GENERAL").get("channel"))
-                iface = Interface(iface_name, channel)
-                iface.stage_interface()
+                frequency = int(config.get("GENERAL").get("frequency"))
+                __iface.frequency = frequency
+                __iface.setup()
+                log.debug(
+                    "(%s) now maps to (%s)",
+                    __iface.mon,
+                    __iface.name,
+                )
+                # we created a mon interfaces, update config so our subprocesses can find it
+                config["GENERAL"]["interface"] = __iface.mon
+                __iface.stage_interface(freq="5180")
                 log.debug("finish interface prep...")
         except InterfaceError as error:
-            log.warning("%s ... exiting ..." % error)
+            log.warning("%s ... exiting ...", error)
             sys.exit(-1)
 
         helpers.generate_run_message(config)
@@ -163,6 +179,7 @@ def start(args: argparse.Namespace):
             )
             processes.append(txbeacons)
             txbeacons.start()
+            __pids.append(("txbeacons", txbeacons.pid))
 
         log.debug("sniffer process")
         sniffer = mp.Process(
@@ -172,6 +189,7 @@ def start(args: argparse.Namespace):
         )
         processes.append(sniffer)
         sniffer.start()
+        __pids.append(("sniffer", sniffer.pid))
 
     from .profiler import Profiler
 
@@ -179,6 +197,7 @@ def start(args: argparse.Namespace):
     profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
     processes.append(profiler)
     profiler.start()
+    __pids.append(("profiler", profiler.pid))
 
     shutdown = False
 

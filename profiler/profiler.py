@@ -54,11 +54,11 @@ class Profiler(object):
         self.config = config
         if config:
 
-            channel = config.get("GENERAL").get("channel")
-            if channel:
-                self.channel = int(channel)
+            frequency = config.get("GENERAL").get("frequency")
+            if frequency:
+                self.frequency = int(frequency)
             else:
-                self.log.warning("profiler cannot determine channel from config")
+                self.log.warning("profiler cannot determine frequency from config")
 
             self.listen_only = config.get("GENERAL").get("listen_only")
             self.files_path = config.get("GENERAL").get("files_path")
@@ -114,7 +114,7 @@ class Profiler(object):
 
     def profile(self, frame) -> None:
         """Handle profiling clients as they come into the queue"""
-        # we to determine the channel from frame itself, not from the profiler config
+        # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
         channel = _20MHZ_CHANNEL_LIST[freq]
 

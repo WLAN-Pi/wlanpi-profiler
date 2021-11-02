@@ -52,19 +52,19 @@ class TestArgParsing:
         assert "invalid check_ssid value" in err
 
     @pytest.mark.parametrize(
-        "channel,expected",
-        [(["-c", "1"], ""), (["-c", "6"], ""), (["-c", "11"], ""), (["-c", "36"], "")],
+        "frequency,expected",
+        [(["-f", "5180"], ""), (["-c", "2412"], ""), (["-c", "2462"], ""), (["-c", "6135"], "")],
     )
-    def test_valid_channel(self, channel, expected, parser, capsys):
-        parser.parse_args(channel)
+    def test_valid_frequency(self, frequency, expected, parser, capsys):
+        parser.parse_args(frequency)
         out, err = capsys.readouterr()
         assert err == expected
 
-    def test_invalid_channel(self, parser, capsys):
+    def test_invalid_frequency(self, parser, capsys):
         with pytest.raises(SystemExit):
-            parser.parse_args(["", "-c", "15"])
+            parser.parse_args(["", "-f", "5170"])
         err = capsys.readouterr().err
-        assert "invalid check_channel value" in err
+        assert "invalid check_frequency value" in err
 
     def test_invalid_interface(self, parser, capsys):
        with pytest.raises(InterfaceError):

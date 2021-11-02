@@ -71,7 +71,7 @@ except OSError:
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS, CONFIG_FILE
+from .constants import _20MHZ_CHANNEL_LIST, CONFIG_FILE
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -105,16 +105,13 @@ def setup_logger(args) -> None:
     logging.config.dictConfig(default_logging)
 
 
-def check_channel(value: str) -> int:
+def check_frequency(value: str) -> None:
     """Check if channel is valid"""
-    channel = int(value)
-    error_msg = "%s is not a valid channel value" % channel
-    if channel <= 0:
-        raise ValueError(error_msg)
-    if any(channel in band for band in CHANNELS.values()):
-        return channel
+    frequency = int(value)
+    if frequency in _20MHZ_CHANNEL_LIST.keys():
+        pass
     else:
-        raise ValueError(error_msg)
+        raise ValueError("%s is not a valid frequency value" % frequency)
 
 
 def check_ssid(ssid: str) -> str:
@@ -138,10 +135,10 @@ def setup_parser() -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "-c",
-        dest="channel",
-        type=check_channel,
-        help="set the operating channel to broadcast on",
+        "-f",
+        dest="frequency",
+        type=check_frequency,
+        help="set the center channel frequency to broadcast on",
     )
     parser.add_argument(
         "-i",
@@ -313,7 +310,7 @@ def setup_config(args) -> Dict:
     # set defaults if configuration file was not found
     if not config_found:
         config["GENERAL"]["ssid"] = "WLAN Pi"
-        config["GENERAL"]["channel"] = 36
+        config["GENERAL"]["frequency"] = 5180
         config["GENERAL"]["interface"] = "wlan0"
 
     # handle special config.ini settings
@@ -323,8 +320,8 @@ def setup_config(args) -> Dict:
     # handle args
     #  - args passed in take precedent over config.ini values
     #  - did user pass in options that over-ride defaults?
-    if args.channel:
-        config["GENERAL"]["channel"] = args.channel
+    if args.frequency:
+        config["GENERAL"]["frequency"] = args.frequency
     if args.interface:
         config["GENERAL"]["interface"] = args.interface
     if args.ssid:
@@ -347,9 +344,6 @@ def setup_config(args) -> Dict:
         config["GENERAL"]["files_path"] = args.files_path
     else:
         config["GENERAL"]["files_path"] = FILES_PATH
-
-    # ensure channel 1 is an integer and not a bool
-    config["GENERAL"]["channel"] = int(config["GENERAL"]["channel"])
 
     return config
 
@@ -392,7 +386,7 @@ def validate(config) -> bool:
     try:
         check_ssid(config.get("GENERAL").get("ssid"))
 
-        check_channel(config.get("GENERAL").get("channel"))
+        check_frequency(config.get("GENERAL").get("frequency"))
 
         verify_reporting_directories(config)
     except ValueError:
@@ -416,8 +410,8 @@ def check_config_missing(config: Dict) -> bool:
         options = config["GENERAL"].keys()
         if "interface" not in options:
             raise KeyError("missing interface from config")
-        if "channel" not in options:
-            raise KeyError("missing channel from config")
+        if "frequency" not in options:
+            raise KeyError("missing frequency from config")
         if "ssid" not in options:
             raise KeyError("missing ssid from config")
 
@@ -528,13 +522,13 @@ def generate_run_message(config: Dict) -> None:
         out = []
         out.append("Starting profiler in listen only mode:")
         out.append(
-            f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
+            f" - Listening for association frames with {config['GENERAL']['interface']} on frequency {config['GENERAL']['frequency']}"
         )
         out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(
-            f" - Associate your Wi-Fi client to any AP on channel {config['GENERAL']['channel']}"
+            f" - Associate your Wi-Fi client to any AP on frequency {config['GENERAL']['frequency']}"
         )
         out.append(" - We should passively detect the association request")
         header_len = len(max(out, key=len))
@@ -545,12 +539,12 @@ def generate_run_message(config: Dict) -> None:
         print(f"{'~' * header_len}\n")
     else:
         out = []
-        channel = config["GENERAL"]["channel"]
+        frequency = config["GENERAL"]["frequency"]
         interface = config["GENERAL"]["interface"]
         ssid = config["GENERAL"]["ssid"]
-        if channel:
+        if frequency:
             out.append(
-                f"Starting profiler AP with interface {interface} on channel {channel}:"
+                f"Starting profiler AP with interface {interface} on frequency {frequency}:"
             )
         else:
             out.append(f"Starting profiler AP with interface {interface}")
