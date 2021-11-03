@@ -131,6 +131,43 @@ class Interface:
         self.log.debug("performing scan on %s", self.name)
         self.run_commands(iwlwifi_scan_commands)
 
+    def stage_interface(self, freq: str) -> None:
+        """Prepare the interface for monitor mode and injection"""
+        wpa_cli_version = self.run_command(["wpa_cli", "-v"])
+        self.log.debug("%s", wpa_cli_version.splitlines()[0])
+
+        # if channel is disabled, a scan may enable it (iwlwifi like AX210)
+        for _band, channels in self.get_channels_status().items():
+            for ch in channels:
+                if freq == ch.freq:
+                    if ch.disabled or ch.no_ir:
+                        self.scan()
+                    break
+            else:
+                continue
+            break
+
+        staging_commands = [
+            ["wpa_cli", "-i", f"{self.name}", "terminate"],
+            ["ip", "link", "set", f"{self.name}", "down"],
+            [
+                "iw",
+                f"{self.phy}",
+                "interface",
+                "add",
+                f"{self.mon}",
+                "type",
+                "monitor",
+                "flags",
+                "none",
+            ],
+            ["ip", "link", "set", f"{self.mon}", "up"],
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", f"{self.mon}", "set", "freq", f"{freq}", "HT20"],
+        ]
+        self.run_commands(staging_commands)
+
+
     def get_channels_status(self) -> Dict:
         iw_version = self.run_command(["iw", "--version"])
         ip_version = self.run_command(["ip", "-V"])
@@ -189,42 +226,6 @@ class Interface:
                 channels.append(channel(freq, ch, no_ir, disabled))
                 bands[band] = channels
         return bands
-
-    def stage_interface(self, freq: str) -> None:
-        """Prepare the interface for monitor mode and injection"""
-        wpa_cli_version = self.run_command(["wpa_cli", "-v"])
-        self.log.debug("%s", wpa_cli_version.splitlines()[0])
-
-        # if channel is disabled, a scan may enable it (iwlwifi like AX210)
-        for _band, channels in self.get_channels_status().items():
-            for ch in channels:
-                if freq == ch.freq:
-                    if ch.disabled:
-                        self.scan()
-                    break
-            else:
-                continue
-            break
-
-        staging_commands = [
-            ["wpa_cli", "-i", f"{self.name}", "terminate"],
-            ["ip", "link", "set", f"{self.name}", "down"],
-            [
-                "iw",
-                f"{self.phy}",
-                "interface",
-                "add",
-                f"{self.mon}",
-                "type",
-                "monitor",
-                "flags",
-                "none",
-            ],
-            ["ip", "link", "set", f"{self.mon}", "up"],
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", f"{self.mon}", "set", "freq", f"{freq}", "HT20"],
-        ]
-        self.run_commands(staging_commands)
 
     def checks(self) -> None:
         """Perform self checks and warn as neccessary"""
