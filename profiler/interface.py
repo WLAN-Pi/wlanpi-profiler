@@ -114,9 +114,9 @@ class Interface:
         commands = [
             ["iw", "dev", f"{self.mon}", "del"],
             # ["iw", "phy", f"{self.phy}", "interface", "add", f"{self.name}", "type", "managed"],
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
-            ["ip", "link", "set", f"{self.name}", "up"],
+            # ["ip", "link", "set", f"{self.name}", "down"],
+            # ["iw", "dev", f"{self.name}", "set", "type", "managed"],
+            # ["ip", "link", "set", f"{self.name}", "up"],
         ]
         self.run_commands(commands)
 
@@ -149,7 +149,6 @@ class Interface:
 
         staging_commands = [
             ["wpa_cli", "-i", f"{self.name}", "terminate"],
-            ["ip", "link", "set", f"{self.name}", "down"],
             [
                 "iw",
                 f"{self.phy}",
