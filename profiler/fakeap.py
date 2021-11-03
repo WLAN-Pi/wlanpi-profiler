@@ -371,7 +371,13 @@ class Sniffer(multiprocessing.Process):
         with self.sequence_number.get_lock():
             frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-        self.l2socket.send(frame)
+        try:                                                         
+            self.l2socket.send(frame)                                
+        except OSError as error:                                     
+            for event in ("Network is down", "No such device"):      
+                if event in error.strerror:                          
+                    self.log.exception("exiting...")                 
+                    sys.exit(signal.SIGTERM)                         
         # self.log.debug("sent probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame) -> None:
@@ -390,4 +396,11 @@ class Sniffer(multiprocessing.Process):
             )
 
         # self.log.debug("sending authentication (0x0B) to %s", receiver)
-        self.l2socket.send(frame)
+        
+        try:                                                         
+            self.l2socket.send(frame)                                
+        except OSError as error:                                     
+            for event in ("Network is down", "No such device"):      
+                if event in error.strerror:
+                    self.log.exception("exiting...")
+                    sys.exit(signal.SIGTERM)

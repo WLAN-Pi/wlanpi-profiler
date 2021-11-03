@@ -114,7 +114,6 @@ class Profiler(object):
         """Handle profiling clients as they come into the queue"""
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
-        self.log.debug(frame)
         self.log.debug("freq is %s", freq)
         channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
         self.log.debug("ch is %s", channel)

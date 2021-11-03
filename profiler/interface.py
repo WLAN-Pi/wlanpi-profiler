@@ -92,11 +92,12 @@ class Interface:
             self.log.debug("reg domain set to %s", " ".join(regdomain))
             self.log.debug("see 'iw reg get' for details")
 
-    def run_command(self, command) -> str:
+    def run_command(self, cmd) -> str:
         """Run a single CLI command with subprocess and return stdout response"""
         try:
+            self.log.debug("run: %s", " ".join(cmd))
             cp = subprocess.run(
-                command, encoding="utf-8", shell=False, capture_output=True
+                cmd, encoding="utf-8", shell=False, capture_output=True
             )
             return cp.stdout
         except OSError:
@@ -106,17 +107,18 @@ class Interface:
         """Run a set of CLI commands and do not return anything"""
         try:
             for cmd in commands:
+                self.log.debug("run: %s", " ".join(cmd)) 
                 cp = subprocess.run(
                     cmd, encoding="utf-8", shell=False, capture_output=True
                 )
-                if cp.stderr:
-                    if "monitor" in cmd:
-                        cp = subprocess.run(
-                            ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
-                            encoding="utf-8",
-                            shell=False,
-                            capture_output=True,
-                        )
+                #if cp.stderr:
+                #    if "monitor" in cmd:
+                #        cp = subprocess.run(
+                #            ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                #            encoding="utf-8",
+                #            shell=False,
+                #            capture_output=True,
+                #        )
         except OSError:
             msg = (
                 "error setting %s interface config: %s",
@@ -155,19 +157,22 @@ class Interface:
         wpa_cli_version = self.run_command(["wpa_cli", "-v"])
         self.log.debug("%s", wpa_cli_version.splitlines()[0])
 
+        wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+        self.run_command(wpa_cli_cmd)
+        
         # if channel is disabled, a scan may enable it (iwlwifi like AX200/AX210)
-        for _band, channels in self.get_channels_status().items():
+        # self.scan()
+        channels_status = self.get_channels_status()
+        self.log.debug(channels_status)
+        for _band, channels in channels_status.items():
             for ch in channels:
+                self.log.debug("%s: ch: %s %s %s", self.frequency, ch.freq, ch.disabled, ch.no_ir)
                 if self.frequency == ch.freq:
                     if ch.disabled or ch.no_ir:
                         self.scan()
                     break
-            else:
-                continue
-            break
 
         staging_commands = [
-            ["wpa_cli", "-i", f"{self.name}", "terminate"],
             [
                 "iw",
                 f"{self.phy}",
@@ -216,6 +221,9 @@ class Interface:
                     freq = line.split()[1]
                     ch = line.split()[3].replace("[", "").replace("]", "")
                     continue
+            if line.startswith("no ir"):
+                no_ir = True
+                continue
             if line.startswith("*"):
                 channels.append(channel(freq, ch, no_ir, disabled))
                 # reset vars
@@ -237,8 +245,6 @@ class Interface:
                 disabled = False
                 first_channel_in_band = True
                 band = line.split(" ")[1]
-            if line.startswith("no ir"):
-                no_ir = True
                 continue
             if last_line:
                 channels.append(channel(freq, ch, no_ir, disabled))
