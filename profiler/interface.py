@@ -56,6 +56,7 @@ class Interface:
                     break
             # we're going to create a monitor interface
             self.mon = f"mon{self.phy_id}"
+            self.log.debug("%s maps to phy%s", self.mon, self.phy_id)
             self.is_mon = True
         self.log.debug(
             "frequency is set as %s and channel as %s", self.frequency, self.channel
@@ -439,7 +440,7 @@ class Interface:
         phy_id = ""
         for phy in phys:
             if self.name in phy.phy_name:
-                self.log.debug("interface %s maps to %s", self.name, phy.phy_name)
+                self.log.debug("phy%s maps to %s", phy.phy_id, self.name)
                 phy_id = phy.phy_id
         return phy_id
 
