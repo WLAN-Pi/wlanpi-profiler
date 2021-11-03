@@ -37,7 +37,7 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 # app imports
-from .constants import (_20MHZ_CHANNEL_LIST, DOT11_SUBTYPE_ASSOC_REQ,
+from .constants import (CHANNELS, DOT11_SUBTYPE_ASSOC_REQ,
                         DOT11_SUBTYPE_AUTH_REQ, DOT11_SUBTYPE_BEACON,
                         DOT11_SUBTYPE_PROBE_REQ, DOT11_SUBTYPE_PROBE_RESP,
                         DOT11_SUBTYPE_REASSOC_REQ, DOT11_TYPE_MANAGEMENT)
@@ -50,10 +50,10 @@ class _Utils:
     def build_fake_frame_ies(config) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid: "str" = config.get("GENERAL").get("ssid")
-        frequency = int(config.get("GENERAL").get("frequency"))
+        channel = int(config.get("GENERAL").get("channel"))
 
         is_6ghz = False
-        if frequency > 5950 and frequency < 7126:
+        if channel in CHANNELS["6G"]:
             is_6ghz = True
 
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
@@ -65,7 +65,7 @@ class _Utils:
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
 
-        channel = bytes([_20MHZ_CHANNEL_LIST.get(frequency, 0)])
+        channel = bytes([channel])
         dsset = Dot11Elt(ID="DSset", info=channel)
 
         dtim_data = b"\x05\x04\x00\x03\x00\x00"
@@ -84,7 +84,7 @@ class _Utils:
         rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
         ht_info_data = (
-            channel
+            bytes(channel)
             + b"\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         )
         ht_information = Dot11Elt(ID=0x3D, info=ht_info_data)
@@ -212,10 +212,10 @@ class TxBeacons(multiprocessing.Process):
         self.sequence_number = sequence_number
         self.ssid: "str" = config.get("GENERAL").get("ssid")
         self.interface: "str" = config.get("GENERAL").get("interface")
-        frequency: "str" = config.get("GENERAL").get("frequency")
-        if not frequency:
-            raise ValueError("cannot determine frequency to beacon on")
-        self.frequency = int(frequency)
+        channel: "str" = config.get("GENERAL").get("channel")
+        if not channel:
+            raise ValueError("cannot determine channel to beacon on")
+        self.channel = int(channel)
         scapyconf.iface = self.interface
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
@@ -301,10 +301,10 @@ class Sniffer(multiprocessing.Process):
         self.sequence_number = sequence_number
         self.ssid: "str" = config.get("GENERAL").get("ssid")
         self.interface: "str" = config.get("GENERAL").get("interface")
-        frequency: "str" = config.get("GENERAL").get("frequency")
-        if not frequency:
-            raise ValueError("cannot determine frequency to sniff")
-        self.frequency: "int" = int(frequency)
+        channel: "str" = config.get("GENERAL").get("channel")
+        if not channel:
+            raise ValueError("cannot determine channel to sniff")
+        self.channel = int(channel)
         self.listen_only: "bool" = config.get("GENERAL").get("listen_only")
         self.assoc_reqs: "Dict" = {}
 
@@ -314,7 +314,7 @@ class Sniffer(multiprocessing.Process):
         # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
-        self.log.debug(scapyconf.ifaces)
+        # self.log.debug(scapyconf.ifaces)
         self.l2socket = scapyconf.L2socket(iface=self.interface)
         self.log.debug(self.l2socket.outs)
 

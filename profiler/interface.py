@@ -17,7 +17,7 @@ import os
 import subprocess
 # standard library imports
 from collections import namedtuple
-from copy import copy
+# from copy import copy
 from typing import Dict, List
 
 # app imports
@@ -26,7 +26,7 @@ from .helpers import flag_last_object, run_cli_cmd
 
 
 class InterfaceError(Exception):
-    pass
+    """Custom exception used when there are problems staging the interface for injection"""
 
 
 class Interface:
@@ -38,12 +38,28 @@ class Interface:
         self.frequency = ""
         self.is_mon = False
         self.no_interface_prep = False
-        #self.channel = self.get_channel()
+        self.channel = None
 
     def setup(self):
+        """Perform setup for the interface"""
         self.check_interface(self.name)
-        self.frequency = self.get_frequency()
-        self.channel = self.get_channel()
+        self.phy_id = self.get_phy_id()
+        self.phy = f"phy{self.phy_id}"
+        # if we're not managing interface prep, we need to get freq and channel from iw.
+        if self.no_interface_prep:
+            self.frequency = self.get_frequency()
+            self.channel = self.get_channel()
+        else:
+            for f, c in _20MHZ_CHANNEL_LIST.items():
+                if self.channel == c:
+                    self.frequency = f
+                    break
+            # we're going to create a monitor interface
+            self.mon = f"mon{self.phy_id}"
+            self.is_mon = True
+        self.log.debug(
+            "frequency is set as %s and channel as %s", self.frequency, self.channel
+        )
         if not self.channel:
             self.log.warning("could not determine channel")
         self.mac = self.get_mac().lower()
@@ -51,16 +67,11 @@ class Interface:
         if self.mode not in ("managed", "monitor"):
             raise InterfaceError("%s is mode is not managed or monitor" % self.name)
         self.operstate = self.get_operstate().lower()
-        self.phy_id = self.get_phy_id()
-        self.phy = f"phy{self.phy_id}"
-        if not self.no_interface_prep: 
-            self.mon = f"mon{self.phy_id}"
-            self.is_mon = True
         self.driver = self.get_driver()
         self.driver_info = self.get_ethtool_info()
         self.driver_version = self.get_driver_version()
         self.firmware_version = self.get_firmware_version()
-        self.copy = copy(self)
+        # self.copy = copy(self)
         self.checks()
         self.log_debug()
 
@@ -81,6 +92,7 @@ class Interface:
             self.log.debug("see 'iw reg get' for details")
 
     def run_command(self, command) -> str:
+        """Run a single CLI command with subprocess and return stdout response"""
         try:
             cp = subprocess.run(
                 command, encoding="utf-8", shell=False, capture_output=True
@@ -90,6 +102,7 @@ class Interface:
             raise InterfaceError("problem running %s: %s", command, cp.stderr)
 
     def run_commands(self, commands) -> None:
+        """Run a set of CLI commands and do not return anything"""
         try:
             for cmd in commands:
                 cp = subprocess.run(
@@ -136,15 +149,15 @@ class Interface:
         self.log.debug("performing scan on %s", self.name)
         self.run_commands(iwlwifi_scan_commands)
 
-    def stage_interface(self, freq: str) -> None:
+    def stage_interface(self) -> None:
         """Prepare the interface for monitor mode and injection"""
         wpa_cli_version = self.run_command(["wpa_cli", "-v"])
         self.log.debug("%s", wpa_cli_version.splitlines()[0])
 
-        # if channel is disabled, a scan may enable it (iwlwifi like AX210)
+        # if channel is disabled, a scan may enable it (iwlwifi like AX200/AX210)
         for _band, channels in self.get_channels_status().items():
             for ch in channels:
-                if freq == ch.freq:
+                if self.frequency == ch.freq:
                     if ch.disabled or ch.no_ir:
                         self.scan()
                     break
@@ -167,12 +180,12 @@ class Interface:
             ],
             ["ip", "link", "set", f"{self.mon}", "up"],
             ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", f"{self.mon}", "set", "freq", f"{freq}", "HT20"],
+            ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
         ]
         self.run_commands(staging_commands)
 
-
     def get_channels_status(self) -> Dict:
+        """Run `iw phy phyX channels` and analyze channel information"""
         iw_version = self.run_command(["iw", "--version"])
         ip_version = self.run_command(["ip", "-V"])
         self.log.debug("%s", iw_version.strip())
@@ -326,9 +339,9 @@ class Interface:
     def parse_iw_dev_iface_info(self, get_frequency=False, get_channel=False):
         """Determine what channel or frequency the interface is set to"""
         if get_frequency:
-            self.log.debug("getting frequency from iw dev <iface> info")
+            self.log.debug("getting frequency from `iw dev %s info`")
         if get_channel:
-            self.log.debug("getting channel from iw dev <iface> info")
+            self.log.debug("getting channel from `iw dev %s info`")
         iw_dev_iface_info = self.run_command(["iw", "dev", f"{self.name}", "info"])
         for line in iw_dev_iface_info.splitlines():
             line = line.lower().strip()
@@ -338,7 +351,8 @@ class Interface:
                 resp = _20MHZ_CHANNEL_LIST.get(freq, 0)
                 if channel != resp:
                     self.log.warning(
-                        "iw reported a different channel (%s) than our lookup (%s)", channel,
+                        "iw reported a different channel (%s) than our lookup (%s)",
+                        channel,
                         resp,
                     )
                 if get_frequency:
@@ -347,7 +361,7 @@ class Interface:
                 if get_channel:
                     self.log.debug("get_channel is %s", channel)
                     return channel
-        #return _20MHZ_CHANNEL_LIST.get(self.frequency, 0)
+        return None
 
     def get_operstate(self) -> str:
         """
@@ -368,6 +382,7 @@ class Interface:
         return operstate.strip()
 
     def build_iw_phy_list(self) -> List:
+        """Create map of phy to iface"""
         iw_devs = run_cli_cmd(["iw", "dev", f"{self.name}", "info"])
         phy = namedtuple("phy", ["phy_id", "phy_name", "ifindex", "addr", "type"])
         phys = []
@@ -405,9 +420,9 @@ class Interface:
             if line.startswith("phy#"):
                 phys.append(phy(phy_id, phy_name, ifindex, addr, _type))
                 # reset vars
-                phy_id = None
+                phy_id = ""
                 phy_name = ""
-                ifindex = None
+                ifindex = ""
                 addr = ""
                 _type = ""
                 # new phy
@@ -419,10 +434,12 @@ class Interface:
         return phys
 
     def get_phy_id(self) -> str:
+        """Check and determines the phy# for the interface name of this object"""
         phys = self.build_iw_phy_list()
         phy_id = ""
         for phy in phys:
             if self.name in phy.phy_name:
+                self.log.debug("interface %s maps to %s", self.name, phy.phy_name)
                 phy_id = phy.phy_id
         return phy_id
 

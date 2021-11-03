@@ -1,7 +1,7 @@
 Release 1.0.8
 
-- Improvements to interface staging
-- Refactoring of channel configuration by frequency rather than id (must update config.ini)
+- Interface staging changes (management of a monitor interface) for Intel AX2XX.
+- Bump manuf from 1.1.1 to 1.1.3 to resolve URL changes
 
 Release 1.0.7
 

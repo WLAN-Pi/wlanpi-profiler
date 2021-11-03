@@ -148,27 +148,22 @@ def start(args: argparse.Namespace):
                     "user provided `--noprep` argument meaning profiler will not handle staging the interface"
                 )
                 __iface.no_interface_prep = True
-                # get frequency from `iw`
+                # get channel from `iw`
                 __iface.setup()
-                if __iface.frequency:
-                    config["GENERAL"]["frequency"] = __iface.frequency
+                if __iface.channel:
+                    config["GENERAL"]["channel"] = __iface.channel
                 log.debug("finish interface setup with no staging ...")
             else:
-                # get frequency from config (CLI option or config.ini)
-                frequency = int(config.get("GENERAL").get("frequency"))
-                __iface.frequency = frequency
+                # get channel from config (CLI option or config.ini)
+                channel = int(config.get("GENERAL").get("channel"))
+                __iface.channel = channel
                 __iface.setup()
-                log.debug(
-                    "(%s) now maps to (%s)",
-                    __iface.mon,
-                    __iface.name,
-                )
                 # we created a mon interfaces, update config so our subprocesses can find it
                 config["GENERAL"]["interface"] = __iface.mon
                 __iface.stage_interface()
                 log.debug("finish interface setup and staging ...")
-        except InterfaceError as error:
-            log.warning("%s ... exiting ...", error)
+        except InterfaceError:
+            log.error("could not setup interface .... exiting ...")
             sys.exit(-1)
 
         helpers.generate_run_message(config)
