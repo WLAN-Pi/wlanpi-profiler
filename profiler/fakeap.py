@@ -217,7 +217,14 @@ class TxBeacons(multiprocessing.Process):
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
         scapyconf.iface = self.interface
-        self.l2socket = scapyconf.L2socket(iface=self.interface)
+        try:
+            self.l2socket = scapyconf.L2socket(iface=self.interface)
+        except OSError as error:
+            if "No such device" in error.strerror:
+                self.log.warning(
+                    "TxBeacons: No such device (%s) ... exiting ...", self.interface
+                )
+                sys.exit(signal.SIGTERM)
         self.log.debug(self.l2socket.outs)
         self.beacon_interval = 0.102_400
 
@@ -315,7 +322,14 @@ class Sniffer(multiprocessing.Process):
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
         # self.log.debug(scapyconf.ifaces)
-        self.l2socket = scapyconf.L2socket(iface=self.interface)
+        try:
+            self.l2socket = scapyconf.L2socket(iface=self.interface)
+        except OSError as error:
+            if "No such device" in error.strerror:
+                self.log.warning(
+                    "Sniffer: No such device (%s) ... exiting ...", self.interface
+                )
+                sys.exit(signal.SIGTERM)
         self.log.debug(self.l2socket.outs)
 
         self.received_frame_cb = self.received_frame
@@ -371,13 +385,13 @@ class Sniffer(multiprocessing.Process):
         with self.sequence_number.get_lock():
             frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
         frame[Dot11].addr1 = probe_request.addr2
-        try:                                                         
-            self.l2socket.send(frame)                                
-        except OSError as error:                                     
-            for event in ("Network is down", "No such device"):      
-                if event in error.strerror:                          
-                    self.log.exception("exiting...")                 
-                    sys.exit(signal.SIGTERM)                         
+        try:
+            self.l2socket.send(frame)
+        except OSError as error:
+            for event in ("Network is down", "No such device"):
+                if event in error.strerror:
+                    self.log.exception("exiting...")
+                    sys.exit(signal.SIGTERM)
         # self.log.debug("sent probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame) -> None:
@@ -396,11 +410,11 @@ class Sniffer(multiprocessing.Process):
             )
 
         # self.log.debug("sending authentication (0x0B) to %s", receiver)
-        
-        try:                                                         
-            self.l2socket.send(frame)                                
-        except OSError as error:                                     
-            for event in ("Network is down", "No such device"):      
+
+        try:
+            self.l2socket.send(frame)
+        except OSError as error:
+            for event in ("Network is down", "No such device"):
                 if event in error.strerror:
                     self.log.exception("exiting...")
                     sys.exit(signal.SIGTERM)

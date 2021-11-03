@@ -46,7 +46,7 @@ def signal_handler(signum, frame):
             if name == "main" and os.getpid() == pid:
                 print("Detected SIGINT or Control-C ... Cleaning up and exiting ...")
                 if __iface.is_mon:
-                    __iface.restore_interface()
+                    __iface.reset_interface()
         sys.exit(2)
 
 

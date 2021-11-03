@@ -48,16 +48,16 @@ def run_cli_cmd(cmd: List) -> str:
         cmd,
         encoding="utf-8",
         shell=False,
-        check=True,
+        check=False,
         capture_output=True,
     )
 
-    if cp.returncode == 0:
-        if cp.stdout:
-            return cp.stdout
-        if cp.stderr:
-            return cp.stderr
-    return "completed process return code is non-zero"
+    if cp.stdout:
+        return cp.stdout
+    if cp.stderr:
+        return cp.stderr
+
+    return "completed process return code is non-zero with no stdout or stderr"
 
 
 # is tcpdump installed?
@@ -105,15 +105,15 @@ def setup_logger(args) -> None:
     logging.config.dictConfig(default_logging)
 
 
-def check_channel(value: str) -> int:
+def channel(value: str) -> int:
     """Check if channel is valid"""
-    channel = int(value)
-    if any(channel in band for band in CHANNELS.values()):
-        return channel
-    raise ValueError("%s is not a valid channel", channel)
+    ch = int(value)
+    if any(ch in band for band in CHANNELS.values()):
+        return ch
+    raise ValueError("%s is not a valid channel", ch)
 
 
-def check_ssid(ssid: str) -> str:
+def ssid(ssid: str) -> str:
     """Check if SSID is valid"""
     if len(ssid) > 32:
         raise ValueError("%s length is greater than 32" % ssid)
@@ -136,7 +136,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-c",
         dest="channel",
-        type=check_channel,
+        type=channel,
         help="set the channel to broadcast on",
     )
     parser.add_argument(
@@ -145,9 +145,7 @@ def setup_parser() -> argparse.ArgumentParser:
         help="set network interface for profiler",
     )
     ssid_group = parser.add_mutually_exclusive_group()
-    ssid_group.add_argument(
-        "-s", dest="ssid", type=check_ssid, help="set profiler SSID name"
-    )
+    ssid_group.add_argument("-s", dest="ssid", type=ssid, help="set profiler SSID name")
     parser.add_argument(
         "--config",
         type=str,
@@ -291,11 +289,8 @@ def setup_config(args):
     """Create the configuration (SSID, channel, interface, etc) for the Profiler"""
     log = logging.getLogger(inspect.stack()[0][3])
 
-    config_found = False
-
     # load in config (a: from default location "/etc/wlanpi-profiler/config.ini" or b: from provided)
     if os.path.isfile(args.config):
-        config_found = True
         parser = load_config(args.config)
         # we want to work with a dict whether we have config.ini or not
         config = convert_configparser_to_dict(parser)
@@ -306,10 +301,13 @@ def setup_config(args):
     if "GENERAL" not in config:
         config["GENERAL"] = {}
 
-    # set defaults if configuration file was not found
-    if not config_found:
-        config["GENERAL"]["ssid"] = "WLAN Pi"
+    if "channel" not in config["GENERAL"]:
         config["GENERAL"]["channel"] = 36
+
+    if "ssid" not in config["GENERAL"]:
+        config["GENERAL"]["ssid"] = "WLAN Pi"
+
+    if "interface" not in config["GENERAL"]:
         config["GENERAL"]["interface"] = "wlan0"
 
     # handle special config.ini settings
@@ -345,7 +343,13 @@ def setup_config(args):
         config["GENERAL"]["files_path"] = FILES_PATH
 
     # ensure channel 1 is an integer and not a bool
-    config["GENERAL"]["channel"] = int(config["GENERAL"]["channel"])
+    try:
+        ch = config.get("GENERAL").get("channel")
+        if ch:
+            ch = int(ch)
+        config["GENERAL"]["channel"] = ch
+    except KeyError:
+        log.warning("config.ini does not have channel defined")
 
     return config
 
@@ -386,9 +390,13 @@ def validate(config) -> bool:
         return False
 
     try:
-        check_ssid(config.get("GENERAL").get("ssid"))
+        s = config.get("GENERAL").get("ssid")
+        if s:
+            ssid(s)
 
-        check_channel(config.get("GENERAL").get("channel"))
+        ch = config.get("GENERAL").get("channel")
+        if ch:
+            channel(ch)
 
         verify_reporting_directories(config)
     except ValueError:
@@ -428,18 +436,21 @@ def update_manuf() -> bool:
     log = logging.getLogger(inspect.stack()[0][3])
     try:
         flat_file = os.path.join(manuf.__path__[0], "manuf")
-        log.info("manuf file is located at %s", flat_file)
+        manuf_location = f"{sys.prefix}/bin/manuf"
+        log.info("OUI database is located at %s", flat_file)
+        log.info("manuf is located at %s", manuf_location)
         log.info(
             "manuf file last modified at: %s",
             ctime(os.path.getmtime(flat_file)),
         )
         log.info("running 'sudo manuf --update'")
-        cp = run_cli_cmd(["sudo", f"{sys.prefix}/bin/manuf", "--update"])
-        log.info("%s", str(cp))
-        log.info(
-            "manuf file last modified at: %s",
-            ctime(os.path.getmtime(flat_file)),
-        )
+        out = run_cli_cmd(["sudo", manuf_location, "--update"])
+        log.info("%s", str(out))
+        if not "URLError" in out:
+            log.info(
+                "manuf file last modified at: %s",
+                ctime(os.path.getmtime(flat_file)),
+            )
     except OSError:
         log.exception("problem updating manuf. make sure manuf is installed...")
         print("exiting...")

@@ -14,7 +14,9 @@
                 "-i",
                 "wlan0",
                 "--logging",
-                "debug"
+                "debug",
+                "-c",
+                "40",
             ]
         },
         {
