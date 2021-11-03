@@ -109,7 +109,7 @@ def check_frequency(value: str) -> None:
     """Check if channel is valid"""
     frequency = int(value)
     if frequency in _20MHZ_CHANNEL_LIST.keys():
-        pass
+        return int(value)
     else:
         raise ValueError("%s is not a valid frequency value" % frequency)
 
@@ -386,7 +386,7 @@ def validate(config) -> bool:
     try:
         check_ssid(config.get("GENERAL").get("ssid"))
 
-        check_frequency(config.get("GENERAL").get("frequency"))
+        print(check_frequency(config.get("GENERAL").get("frequency")))
 
         verify_reporting_directories(config)
     except ValueError:

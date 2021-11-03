@@ -45,7 +45,8 @@ def signal_handler(signum, frame):
         for name, pid in __pids:
             if name == "main" and os.getpid() == pid:
                 print("Detected SIGINT or Control-C ... Cleaning up and exiting ...")
-                __iface.restore_interface()
+                if __iface.is_mon:
+                    __iface.restore_interface()
         sys.exit(2)
 
 
@@ -147,7 +148,13 @@ def start(args: argparse.Namespace):
                     "user provided `--noprep` argument meaning profiler will not handle staging the interface"
                 )
                 __iface.no_interface_prep = True
+                # get frequency from `iw`
+                __iface.setup()
+                if __iface.frequency:
+                    config["GENERAL"]["frequency"] = __iface.frequency
+                log.debug("finish interface setup with no staging ...")
             else:
+                # get frequency from config (CLI option or config.ini)
                 frequency = int(config.get("GENERAL").get("frequency"))
                 __iface.frequency = frequency
                 __iface.setup()
@@ -158,8 +165,8 @@ def start(args: argparse.Namespace):
                 )
                 # we created a mon interfaces, update config so our subprocesses can find it
                 config["GENERAL"]["interface"] = __iface.mon
-                __iface.stage_interface(freq="5180")
-                log.debug("finish interface prep...")
+                __iface.stage_interface()
+                log.debug("finish interface setup and staging ...")
         except InterfaceError as error:
             log.warning("%s ... exiting ...", error)
             sys.exit(-1)

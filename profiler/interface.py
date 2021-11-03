@@ -36,10 +36,13 @@ class Interface:
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = ""
         self.frequency = ""
+        self.is_mon = False
         self.no_interface_prep = False
+        #self.channel = self.get_channel()
 
     def setup(self):
         self.check_interface(self.name)
+        self.frequency = self.get_frequency()
         self.channel = self.get_channel()
         if not self.channel:
             self.log.warning("could not determine channel")
@@ -50,7 +53,9 @@ class Interface:
         self.operstate = self.get_operstate().lower()
         self.phy_id = self.get_phy_id()
         self.phy = f"phy{self.phy_id}"
-        self.mon = f"mon{self.phy_id}"
+        if not self.no_interface_prep: 
+            self.mon = f"mon{self.phy_id}"
+            self.is_mon = True
         self.driver = self.get_driver()
         self.driver_info = self.get_ethtool_info()
         self.driver_version = self.get_driver_version()
@@ -310,8 +315,20 @@ class Interface:
         mac = run_cli_cmd(["cat", f"/sys/class/net/{self.name}/address"])
         return mac.strip()
 
+    def get_frequency(self):
+        """Determine which frequency the interfac is set to"""
+        return self.parse_iw_dev_iface_info(get_frequency=True)
+
     def get_channel(self):
-        """Determine what channel the interface is set to"""
+        """Determine which channel the interface is set to"""
+        return self.parse_iw_dev_iface_info(get_channel=True)
+
+    def parse_iw_dev_iface_info(self, get_frequency=False, get_channel=False):
+        """Determine what channel or frequency the interface is set to"""
+        if get_frequency:
+            self.log.debug("getting frequency from iw dev <iface> info")
+        if get_channel:
+            self.log.debug("getting channel from iw dev <iface> info")
         iw_dev_iface_info = self.run_command(["iw", "dev", f"{self.name}", "info"])
         for line in iw_dev_iface_info.splitlines():
             line = line.lower().strip()
@@ -324,9 +341,13 @@ class Interface:
                         "iw reported a different channel (%s) than our lookup (%s)", channel,
                         resp,
                     )
-                self.log.debug("channel is %s and freq is %s ", resp, freq)
-                return resp
-        return _20MHZ_CHANNEL_LIST.get(self.frequency, 0)
+                if get_frequency:
+                    self.log.debug("get_frequency is %s", freq)
+                    return freq
+                if get_channel:
+                    self.log.debug("get_channel is %s", channel)
+                    return channel
+        #return _20MHZ_CHANNEL_LIST.get(self.frequency, 0)
 
     def get_operstate(self) -> str:
         """
