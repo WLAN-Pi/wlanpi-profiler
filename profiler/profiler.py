@@ -114,6 +114,7 @@ class Profiler(object):
         """Handle profiling clients as they come into the queue"""
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
+        self.log.debug(frame)
         self.log.debug("freq is %s", freq)
         channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
         self.log.debug("ch is %s", channel)
@@ -281,9 +282,15 @@ class Profiler(object):
         data["schema_version"] = 1
         data["profiler_version"] = __version__
 
-        text_filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+        # if there is a malformed radiotap header
+        if band == "unknown":
+            band = ""
+        else:
+            band = f"_{band}"
 
-        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
+        text_filename = os.path.join(dest, f"{client_mac}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}.json")
 
         try:
             same = False
