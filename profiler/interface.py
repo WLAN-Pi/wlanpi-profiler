@@ -136,7 +136,9 @@ class Interface:
     def reset_interface(self) -> None:
         """Delete monitor interface and restore interface"""
         commands = [
+            ["ip", "link", "set", f"{self.mon}", "down"], 
             ["iw", "dev", f"{self.mon}", "del"],
+            ["ip", "link", "set", f"{self.name}", "up"],
         ]
         self.run_commands(commands, verbose=True)
 
