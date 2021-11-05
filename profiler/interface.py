@@ -136,7 +136,7 @@ class Interface:
     def reset_interface(self) -> None:
         """Delete monitor interface and restore interface"""
         commands = [
-            ["ip", "link", "set", f"{self.mon}", "down"], 
+            ["ip", "link", "set", f"{self.mon}", "down"],
             ["iw", "dev", f"{self.mon}", "del"],
             ["ip", "link", "set", f"{self.name}", "up"],
         ]
@@ -245,7 +245,6 @@ class Interface:
                     continue
             if line.startswith("no ir"):
                 no_ir = True
-                continue
             if line.startswith("*"):
                 channels.append(channel(freq, ch, no_ir, disabled))
                 # reset vars
@@ -257,7 +256,6 @@ class Interface:
                     disabled = True
                 freq = line.split()[1]
                 ch = line.split()[3].replace("[", "").replace("]", "")
-                continue
             if line.startswith("band "):
                 channels.append(channel(freq, ch, no_ir, disabled))
                 bands[band] = channels
@@ -267,10 +265,10 @@ class Interface:
                 disabled = False
                 first_channel_in_band = True
                 band = line.split(" ")[1]
-                continue
             if last_line:
                 channels.append(channel(freq, ch, no_ir, disabled))
                 bands[band] = channels
+        self.log.debug("bands: %s", bands)
         return bands
 
     def checks(self) -> None:
@@ -416,7 +414,7 @@ class Interface:
 
     def build_iw_phy_list(self) -> List:
         """Create map of phy to iface"""
-        iw_devs = run_cli_cmd(["iw", "dev", f"{self.name}", "info"])
+        iw_devs = run_cli_cmd(["iw", "dev"])
         phy = namedtuple("phy", ["phy_id", "phy_name", "ifindex", "addr", "type"])
         phys = []
         first = True
@@ -464,6 +462,7 @@ class Interface:
             # last phy
             if last_line:
                 phys.append(phy(phy_id, phy_name, ifindex, addr, _type))
+        self.log.debug("phys: %s", phys)
         return phys
 
     def get_phy_id(self) -> str:
