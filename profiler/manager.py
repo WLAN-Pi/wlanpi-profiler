@@ -43,10 +43,15 @@ def signal_handler(signum, frame):
     """Handle noisy keyboardinterrupt"""
     if signum == 2:
         for name, pid in __pids:
+            # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
-                print("Detected SIGINT or Control-C ... Cleaning up and exiting ...")
-                if __iface.is_mon:
+                if __iface.requires_monitor_interface:
                     __iface.reset_interface()
+                    print(
+                        "Detected SIGINT or Control-C ... Removing monitor interface ... Exiting ..."
+                    )
+                else:
+                    print("Detected SIGINT or Control-C ... Exiting ...")
         sys.exit(2)
 
 
@@ -144,11 +149,11 @@ def start(args: argparse.Namespace):
 
         try:
             if args.no_interface_prep:
-                log.debug(
+                log.warning(
                     "user provided `--noprep` argument meaning profiler will not handle staging the interface"
                 )
-                __iface.no_interface_prep = True
                 # get channel from `iw`
+                __iface.no_interface_prep = True
                 __iface.setup()
                 if __iface.channel:
                     config["GENERAL"]["channel"] = __iface.channel
@@ -158,8 +163,9 @@ def start(args: argparse.Namespace):
                 channel = int(config.get("GENERAL").get("channel"))
                 __iface.channel = channel
                 __iface.setup()
-                # we created a mon interfaces, update config so our subprocesses can find it
-                config["GENERAL"]["interface"] = __iface.mon
+                if __iface.requires_monitor_interface:
+                    # we require using a mon interface, update config so our subprocesses know to use it
+                    config["GENERAL"]["interface"] = __iface.mon
                 __iface.stage_interface()
                 log.debug("finish interface setup and staging ...")
         except InterfaceError:
@@ -203,6 +209,7 @@ def start(args: argparse.Namespace):
 
     shutdown = False
 
+    # keep main process alive until all subprocesses are finished or closed
     while processes:
         for process in processes:
             if shutdown:

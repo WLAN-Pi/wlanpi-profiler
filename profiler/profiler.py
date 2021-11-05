@@ -287,9 +287,9 @@ class Profiler(object):
         else:
             band = f"_{band}"
 
-        text_filename = os.path.join(dest, f"{client_mac}.txt")
+        text_filename = os.path.join(dest, f"{client_mac}{band}.txt")
 
-        json_filename = os.path.join(dest, f"{client_mac}.json")
+        json_filename = os.path.join(dest, f"{client_mac}{band}.json")
 
         try:
             same = False
@@ -309,6 +309,7 @@ class Profiler(object):
                         ".json", f"_diff.{write_time}.json"
                     )
 
+            log.debug("writing json report to %s", json_filename)
             with open(json_filename, "w") as write_json_file:
                 json.dump(data, write_json_file)
 
@@ -329,6 +330,7 @@ class Profiler(object):
                     )
                     text_report = "\n".join(text_report)
 
+            log.debug("writing to %s", text_filename)
             with open(text_filename, "w") as file_writer:
                 file_writer.write(text_report)
 
@@ -353,6 +355,7 @@ class Profiler(object):
 
         # dump out the frame to a file
         pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
+        log.debug("writing to %s", pcap_filename)
         wrpcap(pcap_filename, [frame])
 
         # check if csv file exists

@@ -390,9 +390,9 @@ def validate(config) -> bool:
         return False
 
     try:
-        s = config.get("GENERAL").get("ssid")
-        if s:
-            ssid(s)
+        _ssid = config.get("GENERAL").get("ssid")
+        if _ssid:
+            ssid(_ssid)
 
         ch = config.get("GENERAL").get("channel")
         if ch:
@@ -446,7 +446,7 @@ def update_manuf() -> bool:
         log.info("running 'sudo manuf --update'")
         out = run_cli_cmd(["sudo", manuf_location, "--update"])
         log.info("%s", str(out))
-        if not "URLError" in out:
+        if "URLError" not in out:
             log.info(
                 "manuf file last modified at: %s",
                 ctime(os.path.getmtime(flat_file)),

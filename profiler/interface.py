@@ -12,12 +12,11 @@ profiler.interface
 wlan interface data class
 """
 
+# standard library imports
 import logging
 import os
 import subprocess
-# standard library imports
 from collections import namedtuple
-# from copy import copy
 from typing import Dict, List
 
 # app imports
@@ -36,12 +35,18 @@ class Interface:
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = ""
         self.frequency = ""
-        self.is_mon = False
+        self.requires_monitor_interface = False
         self.no_interface_prep = False
         self.channel = None
 
     def setup(self):
         """Perform setup for the interface"""
+        if not self.name:
+            raise InterfaceError("interface name not set")
+        self.driver = self.get_driver()
+        self.driver_info = self.get_ethtool_info()
+        self.driver_version = self.get_driver_version()
+        self.firmware_version = self.get_firmware_version()
         self.check_interface(self.name)
         self.phy_id = self.get_phy_id()
         self.phy = f"phy{self.phy_id}"
@@ -50,29 +55,27 @@ class Interface:
             self.frequency = self.get_frequency()
             self.channel = self.get_channel()
         else:
-            for f, c in _20MHZ_CHANNEL_LIST.items():
-                if self.channel == c:
-                    self.frequency = f
+            # we're using channel provided by user, we need to map it to a frequence for interface staging
+            for freq, ch in _20MHZ_CHANNEL_LIST.items():
+                if self.channel == ch:
+                    self.frequency = freq
                     break
-            # we're going to create a monitor interface
-            self.mon = f"mon{self.phy_id}"
-            self.log.debug("%s maps to phy%s", self.mon, self.phy_id)
-            self.is_mon = True
+            # iwlwifi needs a different set of staging commands than mt76x2u or rtl88XXau
+            if "iwlwifi" in self.driver:
+                # we're going to create a monitor interface
+                self.mon = f"mon{self.phy_id}"
+                self.log.debug("%s maps to phy%s", self.mon, self.phy_id)
+                self.requires_monitor_interface = True
+        if not self.channel:
+            raise InterfaceError("could not determine channel for %s", self.name)
         self.log.debug(
             "frequency is set as %s and channel as %s", self.frequency, self.channel
         )
-        if not self.channel:
-            self.log.warning("could not determine channel")
         self.mac = self.get_mac().lower()
         self.mode = self.get_mode().lower()
         if self.mode not in ("managed", "monitor"):
-            raise InterfaceError("%s is mode is not managed or monitor" % self.name)
+            raise InterfaceError("%s is mode is not managed or monitor", self.name)
         self.operstate = self.get_operstate().lower()
-        self.driver = self.get_driver()
-        self.driver_info = self.get_ethtool_info()
-        self.driver_version = self.get_driver_version()
-        self.firmware_version = self.get_firmware_version()
-        # self.copy = copy(self)
         self.checks()
         self.log_debug()
 
@@ -100,7 +103,7 @@ class Interface:
             cp = subprocess.run(cmd, encoding="utf-8", shell=False, capture_output=True)
             return cp.stdout
         except OSError:
-            raise InterfaceError("problem running %s: %s", command, cp.stderr)
+            raise InterfaceError("problem running %s: %s", cmd, cp.stderr)
 
     def run_commands(self, commands, verbose=False) -> None:
         """Run a set of CLI commands and do not return anything"""
@@ -148,25 +151,18 @@ class Interface:
         self.log.info("performing scan on %s", self.name)
         self.run_commands(iwlwifi_scan_commands, verbose=True)
 
-    def stage_interface(self) -> None:
-        """Prepare the interface for monitor mode and injection"""
-        wpa_cli_version = self.run_command(["wpa_cli", "-v"])
-        self.log.debug("%s", wpa_cli_version.splitlines()[0])
+    def get_staging_commands(self) -> List:
+        """Retrieve generic interface staging commands"""
+        return [
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", "dev", f"{self.name}", "set", "monitor", "none"],
+            ["ip", "link", "set", f"{self.name}", "up"],
+            ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+        ]
 
-        wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
-        self.run_command(wpa_cli_cmd)
-
-        # if channel is disabled, a scan may enable it (iwlwifi like AX200/AX210)
-        # self.scan()
-        channels_status = self.get_channels_status()
-        for _band, channels in channels_status.items():
-            for ch in channels:
-                if int(self.frequency) == int(ch.freq):
-                    if ch.disabled or ch.no_ir:
-                        self.scan()
-                    break
-
-        staging_commands = [
+    def get_iwlwifi_staging_commands(self) -> List:
+        """Retrieve interface staging commands for iwlwifi cards"""
+        return [
             [
                 "iw",
                 f"{self.phy}",
@@ -182,14 +178,44 @@ class Interface:
             ["ip", "link", "set", f"{self.name}", "down"],
             ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
         ]
-        self.run_commands(staging_commands, verbose=True)
 
-    def get_channels_status(self) -> Dict:
-        """Run `iw phy phyX channels` and analyze channel information"""
+    def stage_interface(self) -> None:
+        """Prepare the interface for monitor mode and injection"""
+        wpa_cli_version = self.run_command(["wpa_cli", "-v"])
+        self.log.debug(
+            "wpa_cli version is %s",
+            wpa_cli_version.splitlines()[0].replace("wpa_cli ", ""),
+        )
+
         iw_version = self.run_command(["iw", "--version"])
         ip_version = self.run_command(["ip", "-V"])
         self.log.debug("%s", iw_version.strip())
         self.log.debug("%s", ip_version.strip())
+
+        # always run wpa_cli no matter driver detected
+        wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+        self.run_command(wpa_cli_cmd)
+
+        cmds = []
+        # if interface is iwlwifi we need to handle it differently
+        if "iwlwifi" in self.driver:
+            cmds = self.get_iwlwifi_staging_commands()
+            channels_status = self.get_channels_status()
+            for _band, channels in channels_status.items():
+                for ch in channels:
+                    if int(self.frequency) == int(ch.freq):
+                        # if channel we want to use is disabled or No IR, scan to enable it
+                        if ch.disabled or ch.no_ir:
+                            self.scan()
+                        break
+        else:
+            # if interface is not iwlwifi we can use the generic staging commands
+            cmds = self.get_staging_commands()
+
+        self.run_commands(cmds, verbose=True)
+
+    def get_channels_status(self) -> Dict:
+        """Run `iw phy phyX channels` and analyze channel information"""
         iw_phy_channels = self.run_command(["iw", "phy", f"{self.phy}", "channels"])
         freq = ""
         ch = ""
