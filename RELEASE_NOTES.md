@@ -1,4 +1,10 @@
-Releaes 1.0.7
+Release 1.0.8
+
+- Interface staging changes (management of a monitor interface) for Intel AX2XX
+- Bump manuf from 1.1.1 to 1.1.3 to resolve URL changes and prevent URL redirection problems
+- Print more helpful information to the screen when updating manuf (--oui_update) from profiler
+
+Release 1.0.7
 
 - Allow read of pcap file when no WLAN NICs are present
 - Allow reading and analysis of multiple association requests in a single pcap

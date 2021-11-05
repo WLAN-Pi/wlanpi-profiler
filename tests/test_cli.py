@@ -49,7 +49,7 @@ class TestArgParsing:
         with pytest.raises(SystemExit):
             parser.parse_args(["-s", "this_is_a_really_long_string_really_too_long!!!"])
         err = capsys.readouterr().err
-        assert "invalid check_ssid value" in err
+        assert "invalid ssid value" in err
 
     @pytest.mark.parametrize(
         "channel,expected",
@@ -57,21 +57,23 @@ class TestArgParsing:
     )
     def test_valid_channel(self, channel, expected, parser, capsys):
         parser.parse_args(channel)
-        out, err = capsys.readouterr()
+        _out, err = capsys.readouterr()
         assert err == expected
 
     def test_invalid_channel(self, parser, capsys):
         with pytest.raises(SystemExit):
-            parser.parse_args(["", "-c", "15"])
+            parser.parse_args(["", "-c", "22"])
         err = capsys.readouterr().err
-        assert "invalid check_channel value" in err
+        assert "invalid channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
        with pytest.raises(InterfaceError):
             config = helpers.setup_config(
                 parser.parse_args(["-i", "fakest_interface_ever"])
             )
-            Interface("fakest_interface_ever")
+            iface = Interface()
+            iface.name = "fakest_iface_ever"
+            iface.setup()
 
     @pytest.mark.parametrize(
         "args,expected",

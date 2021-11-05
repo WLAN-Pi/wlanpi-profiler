@@ -14,7 +14,9 @@
                 "-i",
                 "wlan0",
                 "--logging",
-                "debug"
+                "debug",
+                "-c",
+                "40",
             ]
         },
         {
@@ -81,7 +83,7 @@
             "module": "profiler",
             "args": [
                 "--read",
-                "~/dev/profiler/tests/pcaps/ax210_and_iphone12promax.pcap",
+                "tests/pcaps/ax210_and_iphone12promax.pcap",
                 "--logging",
                 "debug",
                 "-i",

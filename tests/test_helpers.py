@@ -137,11 +137,11 @@ class TestHelpers:
     def test_channel(self, channel, expected):
         if channel == "0":
             with pytest.raises(ValueError) as exc_info:
-                channel = helpers.check_channel(channel)
+                channel = helpers.channel(channel)
                 print(exc_info)
                 assert "not a valid channel" in exc_info
         else:
-            channel = helpers.check_channel(channel)
+            channel = helpers.channel(channel)
             assert channel == expected
 
     def test_config(self):

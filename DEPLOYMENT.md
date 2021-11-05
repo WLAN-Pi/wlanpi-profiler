@@ -30,7 +30,7 @@ You are ready to build. From the root directory of this repository run the follo
 debuild
 ```
 
-or 
+or if you don''t want to satisfy build depends:
 
 ```bash
 dpkg-buildpackage -us -uc -b
@@ -92,3 +92,77 @@ export DEBEMAIL="Josh Schmelzle <josh@joshschmelzle.com>"
 For more information on debchange review the manpages by running `man debchange` from your terminal.
 
 Additionally review the [Debian maintainers guide Chapter 8](https://www.debian.org/doc/manuals/maint-guide/update.en.html).
+
+
+## APPENDIX
+
+### Debian Packaging Breakdown
+
+#### changelog
+
+Contains changelog information and sets the version of the package
+
+#### control
+
+provides dependencies, package name, and other package meta data.
+
+#### compat
+
+sets compatibility level for debhelper
+
+#### rules
+
+this is the build recipe for make
+
+#### wlanpi-profiler.install
+
+this handles placing our config file in /etc
+
+#### wlanpi-profiler.links
+
+handles symlinks
+
+#### wlanpi-profiler.postinst.debhelper
+
+`dh-virtualenv` has an autoscript which handles this for us.
+
+#### wlanpi-profiler.postrm.debhelper
+
+`dh-virtualenv` has an autoscript which handles this for us.
+#### wlanpi-profiler.service
+
+`dh` automatically picks up and installs this systemd service
+
+#### wlanpi-profiler.triggers
+
+tells dpkg what packages we're interested in
+
+### Installing dh-virtualenv
+
+Some OS repositories have packages already. 
+
+```
+sudo apt install dh-virtualenv
+```
+
+If not available, you can build it from source:
+
+```
+cd ~
+
+# Install needed packages
+sudo apt-get install devscripts python3-virtualenv python3-sphinx \
+                     python3-sphinx-rtd-theme git equivs
+# Clone git repository
+git clone https://github.com/spotify/dh-virtualenv.git
+# Change into working directory
+cd dh-virtualenv
+# This will install build dependencies
+sudo mk-build-deps -ri
+# Build the *dh-virtualenv* package
+dpkg-buildpackage -us -uc -b
+
+# And finally, install it (you might have to solve some
+# dependencies when doing this)
+sudo dpkg -i ../dh-virtualenv_<version>.deb
+```

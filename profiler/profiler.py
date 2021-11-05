@@ -53,13 +53,11 @@ class Profiler(object):
         self.analyzed_hash = {}
         self.config = config
         if config:
-
             channel = config.get("GENERAL").get("channel")
             if channel:
                 self.channel = int(channel)
             else:
                 self.log.warning("profiler cannot determine channel from config")
-
             self.listen_only = config.get("GENERAL").get("listen_only")
             self.files_path = config.get("GENERAL").get("files_path")
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
@@ -114,9 +112,11 @@ class Profiler(object):
 
     def profile(self, frame) -> None:
         """Handle profiling clients as they come into the queue"""
-        # we to determine the channel from frame itself, not from the profiler config
+        # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
-        channel = _20MHZ_CHANNEL_LIST[freq]
+        self.log.debug("freq is %s", freq)
+        channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
+        self.log.debug("ch is %s", channel)
 
         is_6ghz = False
         if freq > 2411 and freq < 2485:
@@ -281,9 +281,15 @@ class Profiler(object):
         data["schema_version"] = 1
         data["profiler_version"] = __version__
 
-        text_filename = os.path.join(dest, f"{client_mac}_{band}.txt")
+        # if there is a malformed radiotap header
+        if band == "unknown":
+            band = ""
+        else:
+            band = f"_{band}"
 
-        json_filename = os.path.join(dest, f"{client_mac}_{band}.json")
+        text_filename = os.path.join(dest, f"{client_mac}{band}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}{band}.json")
 
         try:
             same = False
@@ -303,6 +309,7 @@ class Profiler(object):
                         ".json", f"_diff.{write_time}.json"
                     )
 
+            log.debug("writing json report to %s", json_filename)
             with open(json_filename, "w") as write_json_file:
                 json.dump(data, write_json_file)
 
@@ -323,6 +330,7 @@ class Profiler(object):
                     )
                     text_report = "\n".join(text_report)
 
+            log.debug("writing to %s", text_filename)
             with open(text_filename, "w") as file_writer:
                 file_writer.write(text_report)
 
@@ -347,6 +355,7 @@ class Profiler(object):
 
         # dump out the frame to a file
         pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
+        log.debug("writing to %s", pcap_filename)
         wrpcap(pcap_filename, [frame])
 
         # check if csv file exists
