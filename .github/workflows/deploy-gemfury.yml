@@ -1,12 +1,7 @@
-name: Build and deploy to packagecloud
+name: Gemfury Build CI
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'debian/changelog'
-  pull_request:
     branches:
       - main
     paths:
@@ -21,7 +16,7 @@ jobs:
         distro: [buster]
         arch: [armhf,arm64]
 
-    environment: PACKAGECLOUD
+    environment: GEMFURY
 
     steps:
       - name: Checkout
@@ -34,17 +29,15 @@ jobs:
           distro: ${{ matrix.distro }}
           arch: ${{ matrix.arch }}
 
-      - name: Upload artifact to GitHub
+      - name: Upload Artifact to GitHub
         uses: actions/upload-artifact@v2
         with:
           name: wlanpi-profiler_package
           path: ${{ steps.build-debian-package.outputs.deb-package }}
 
-      - name: Upload package to packagecloud
-        uses: danielmundi/upload-packagecloud@main
+      - name: Upload Package to Gemfury
+        uses: danielmundi/upload-gemfury@main
         with:
           package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          packagecloud-username: wlanpi
-          packagecloud-repo: dev
-          packagecloud-distrib: raspbian/${{ matrix.distro }}
-          packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          gemfury-username: ${{ secrets.GEMFURY_NAME }}
+          gemfury-token: ${{ secrets.GEMFURY_TOKEN }}

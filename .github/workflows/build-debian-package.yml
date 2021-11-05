@@ -1,5 +1,6 @@
 
-name: Build Debian Packages
+name: Build Debian Package On PR
+
 on:
   pull_request:
     paths:
