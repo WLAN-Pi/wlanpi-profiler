@@ -1,0 +1,3 @@
+README.md should be updated to reflect the latest changes which include better interface handling and support for iwlwifi cards like the AX200 and AX210. Currently, the documentation only refers to mt76x2u and rtl88XXau adapters.
+
+Additionally, for manual installation, we're still referring to pipx. For context with NEO{1,2} running WLAN Pi OS v2 images, pipx is used. Other than that, we have sunset the pipx approach for Debian packages. For development, we don't need to use pipx. Perhaps flush this out in documentation.
