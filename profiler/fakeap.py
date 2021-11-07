@@ -28,10 +28,12 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 # third party imports
 try:
-    from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt,
-                           Dot11ProbeResp, RadioTap, Scapy_Exception)
-    from scapy.all import conf as scapyconf
-    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff
+    from scapy.all import Dot11Beacon  # type: ignore
+    from scapy.all import Dot11Elt  # type: ignore
+    from scapy.all import Dot11ProbeResp  # type: ignore
+    from scapy.all import Dot11, Dot11Auth, RadioTap, Scapy_Exception  # type: ignore
+    from scapy.all import conf as scapyconf  # type: ignore
+    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff  # type: ignore
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print("required module scapy not found.")
@@ -40,10 +42,16 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 # app imports
-from .constants import (CHANNELS, DOT11_SUBTYPE_ASSOC_REQ,
-                        DOT11_SUBTYPE_AUTH_REQ, DOT11_SUBTYPE_BEACON,
-                        DOT11_SUBTYPE_PROBE_REQ, DOT11_SUBTYPE_PROBE_RESP,
-                        DOT11_SUBTYPE_REASSOC_REQ, DOT11_TYPE_MANAGEMENT)
+from .constants import (
+    CHANNELS,
+    DOT11_SUBTYPE_ASSOC_REQ,
+    DOT11_SUBTYPE_AUTH_REQ,
+    DOT11_SUBTYPE_BEACON,
+    DOT11_SUBTYPE_PROBE_REQ,
+    DOT11_SUBTYPE_PROBE_RESP,
+    DOT11_SUBTYPE_REASSOC_REQ,
+    DOT11_TYPE_MANAGEMENT,
+)
 
 
 class _Utils:
@@ -68,7 +76,7 @@ class _Utils:
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
 
-        channel = bytes([channel])
+        channel = bytes([channel])  # type: ignore
         dsset = Dot11Elt(ID="DSset", info=channel)
 
         dtim_data = b"\x05\x04\x00\x03\x00\x00"

@@ -26,21 +26,29 @@ from time import strftime
 from typing import Dict, List, Tuple
 
 # third party imports
-from manuf import manuf
-from scapy.all import Dot11, RadioTap, wrpcap
+from manuf import manuf  # type: ignore
+from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 
 # app imports
 from .__version__ import __version__
-from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
-                        FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-                        HE_CAPABILITIES_IE_EXT_TAG,
-                        HE_SPATIAL_REUSE_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
-                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
-                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SSID_PARAMETER_SET_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
-                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
-from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
-                      is_randomized)
+from .constants import (
+    _20MHZ_CHANNEL_LIST,
+    EXT_CAPABILITIES_IE_TAG,
+    FT_CAPABILITIES_IE_TAG,
+    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+    HE_CAPABILITIES_IE_EXT_TAG,
+    HE_SPATIAL_REUSE_IE_EXT_TAG,
+    HT_CAPABILITIES_IE_TAG,
+    IE_EXT_TAG,
+    POWER_MIN_MAX_IE_TAG,
+    RM_CAPABILITIES_IE_TAG,
+    RSN_CAPABILITIES_IE_TAG,
+    SSID_PARAMETER_SET_IE_TAG,
+    SUPPORTED_CHANNELS_IE_TAG,
+    VENDOR_SPECIFIC_IE_TAG,
+    VHT_CAPABILITIES_IE_TAG,
+)
+from .helpers import Base64Encoder, Capability, flag_last_object, get_bit, is_randomized
 
 
 class Profiler(object):
@@ -842,7 +850,7 @@ class Profiler(object):
                                     continue
 
                         mcs = sorted(set(mcs))
-                        mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
+                        mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]  # type: ignore
                         dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
                         dot11ax_nss.db_value = nss
