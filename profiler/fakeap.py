@@ -23,6 +23,9 @@ import sys
 from time import sleep, time
 from typing import Dict
 
+# suppress scapy warnings
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
 # third party imports
 try:
     from scapy.all import (Dot11, Dot11Auth, Dot11Beacon, Dot11Elt,
