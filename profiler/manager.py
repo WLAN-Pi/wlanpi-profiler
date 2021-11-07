@@ -46,10 +46,11 @@ def signal_handler(signum, frame):
             # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
                 if __iface.requires_monitor_interface:
-                    __iface.reset_interface()
                     print(
-                        "Detected SIGINT or Control-C ... Removing monitor interface ... Exiting ..."
+                        "Detected SIGINT or Control-C ... Removing monitor interface ..."
                     )
+                    __iface.reset_interface()
+                    print("Exiting ...")
                 else:
                     print("Detected SIGINT or Control-C ... Exiting ...")
         sys.exit(2)
@@ -168,8 +169,8 @@ def start(args: argparse.Namespace):
                     config["GENERAL"]["interface"] = __iface.mon
                 __iface.stage_interface()
                 log.debug("finish interface setup and staging ...")
-        except InterfaceError:
-            log.error("could not setup interface .... exiting ...")
+        except InterfaceError as error:
+            log.error("%s ... exiting ...", error)
             sys.exit(-1)
 
         helpers.generate_run_message(config)

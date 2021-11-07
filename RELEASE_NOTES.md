@@ -1,3 +1,7 @@
+Release 1.0.8-1
+
+- Interface staging improvements
+
 Release 1.0.8
 
 - Interface staging changes (management of a monitor interface) for Intel AX2XX
