@@ -261,9 +261,8 @@ class Interface:
         self.run_commands(cmds, verbose=True)
 
         # check if the interface is in monitor mode and operstate up
-        self.operstate = self.get_operstate(iface=self.mon)
+        # self.operstate = self.get_operstate(iface=self.mon)
         self.mode = self.get_mode(iface=self.mon)
-        self.checks(staged=True)
         if "monitor" not in self.mode:
             raise InterfaceError("interface is not in monitor mode")
 
