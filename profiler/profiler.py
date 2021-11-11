@@ -125,18 +125,20 @@ class Profiler(object):
         self.log.debug("detected freq from assoc is %s", freq)
         channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
         """
-        All radio tap headers are malformed from some adapters on certain kernels. 
+        All radio tap headers are malformed from some adapters on certain kernels.
         This has been observed in 5.15rc2 up to 5.15.1 with MediaTek adapters for example.
         If that is the case, we are unable to detect the frequency/channel from the association.
----------------------------------------------
- - Client MAC: 6e:1d:8a:28:32:51
- - OUI manufacturer lookup: Apple (Randomized MAC)
- - Frequency band: Unknown
- - Capture channel: 0
----------------------------------------------
+        ---------------------------------------------
+        - Client MAC: 6e:1d:8a:28:32:51
+        - OUI manufacturer lookup: Apple (Randomized MAC)
+        - Frequency band: Unknown
+        - Capture channel: 0
+        ---------------------------------------------
         """
         if channel == 0:
-            self.log.warning("COULD NOT MAP FREQUENCY FROM RADIO TAP HEADER FOUND IN ASSOCIATION FRAME")
+            self.log.warning(
+                "COULD NOT MAP FREQUENCY FROM RADIO TAP HEADER FOUND IN ASSOCIATION FRAME"
+            )
         else:
             self.log.debug("detected freq from assoc maps to channel %s", channel)
 

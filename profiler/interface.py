@@ -83,7 +83,9 @@ class Interface:
         if not self.channel:
             raise InterfaceError("could not determine channel for %s", self.name)
         self.log.debug(
-            "requested frequency is set to %s which maps to channel %s", self.frequency, self.channel
+            "requested frequency is set to %s which maps to channel %s",
+            self.frequency,
+            self.channel,
         )
         self.mac = self.get_mac()
         self.mode = self.get_mode()
@@ -97,8 +99,7 @@ class Interface:
         """Print wiphys to the screen"""
         self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
         self.log.debug("phys: %s", self.phys)
-        phy_id = ""
-        print(f"phy, interface, mode, mac, driver, driver version, chipset")
+        print("phy, interface, mode, mac, driver, driver version, chipset")
         for phy in self.phys:
             for iface in phy.interfaces:
                 eth_tool_info = self.get_ethtool_info(iface.name)
@@ -106,7 +107,9 @@ class Interface:
                 driver_version = self.get_driver_version(eth_tool_info)
                 chipset = self.get_chipset(iface.name)
                 mode = self.get_mode(iface=iface.name)
-                print(f"phy#{phy.phy_id}, {iface.name}, {mode}, {iface.addr}, {driver}, {driver_version}, {chipset}")
+                print(
+                    f"phy#{phy.phy_id}, {iface.name}, {mode}, {iface.addr}, {driver}, {driver_version}, {chipset}"
+                )
 
     def check_reg_domain(self) -> None:
         """Check and report the set regulatory domain"""
@@ -225,7 +228,9 @@ class Interface:
                 if "non-zero" not in stdout:
                     self.log.info(stdout)
                     if "not supported" in stdout:
-                        raise InterfaceError(f"{self.name} does not appear to support monitor mode")
+                        raise InterfaceError(
+                            f"{self.name} does not appear to support monitor mode"
+                        )
             else:
                 run_command(cmd)
 
@@ -376,7 +381,13 @@ class Interface:
         return out
 
     def cleanup_chipset(self, chipset) -> str:
-        words = ["Wireless LAN Controllers", "Network Connection", "Wireless Adapter", "WLAN Adapter"]
+        """Remove extraneous words"""
+        words = [
+            "Wireless LAN Controllers",
+            "Network Connection",
+            "Wireless Adapter",
+            "WLAN Adapter",
+        ]
         for word in words:
             if word in chipset:
                 chipset = chipset.replace(word, "")
@@ -394,21 +405,28 @@ class Interface:
             chipset = self.cleanup_chipset(chipset)
             return chipset
         if bus == "pci":
-            vendor = run_command(["cat", f"/sys/class/net/{iface}/device/vendor"]).strip()
-            device = run_command(["cat", f"/sys/class/net/{iface}/device/device"]).strip()
+            vendor = run_command(
+                ["cat", f"/sys/class/net/{iface}/device/vendor"]
+            ).strip()
+            device = run_command(
+                ["cat", f"/sys/class/net/{iface}/device/device"]
+            ).strip()
             chipset = run_command(["lspci", "-d", f"{vendor}:{device}", "-q"])
             chipset = chipset.split(":")[2].strip().splitlines()[0]
             chipset = self.cleanup_chipset(chipset)
             return chipset
         if bus == "sdio":
-            vendor = run_command(["cat", f"/sys/class/net/{iface}/device/vendor"]).strip()
-            device = run_command(["cat", f"/sys/class/net/{iface}/device/device"]).strip()
-            if f"{vendor}:{device}" == '0x02d0:0xa9a6':
-                chipset = 'Broadcom 43430'
+            vendor = run_command(
+                ["cat", f"/sys/class/net/{iface}/device/vendor"]
+            ).strip()
+            device = run_command(
+                ["cat", f"/sys/class/net/{iface}/device/device"]
+            ).strip()
+            if f"{vendor}:{device}" == "0x02d0:0xa9a6":
+                chipset = "Broadcom 43430"
         else:
-            chipset="Unknown"
+            chipset = "Unknown"
         return chipset
-        
 
     def get_mac(self) -> str:
         """Gather MAC address for a given interface"""

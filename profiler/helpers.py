@@ -42,7 +42,17 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 
-__tools = ["tcpdump", "iw", "ip", "ethtool", "lspci", "lsusb", "modprobe", "modinfo", "wpa_cli"]
+__tools = [
+    "tcpdump",
+    "iw",
+    "ip",
+    "ethtool",
+    "lspci",
+    "lsusb",
+    "modprobe",
+    "modinfo",
+    "wpa_cli",
+]
 
 # are the required tools installed?
 for tool in __tools:
