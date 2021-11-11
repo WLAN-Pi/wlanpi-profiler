@@ -44,10 +44,11 @@ class Interface:
         """Perform setup for the interface"""
         if not self.name:
             raise InterfaceError("interface name not set")
-        self.driver = self.get_driver()
-        self.driver_info = self.get_ethtool_info()
-        self.driver_version = self.get_driver_version()
-        self.firmware_version = self.get_firmware_version()
+        self.driver = self.get_driver(self.name)
+        eth_tool_info = self.get_ethtool_info(self.name)
+        self.driver_version = self.get_driver_version(eth_tool_info)
+        self.firmware_version = self.get_firmware_version(eth_tool_info)
+        self.chipset = self.get_chipset(self.name)
         self.check_interface_stack(self.name)
         self.phy_id = self.get_phy_id()
         self.phy = f"phy{self.phy_id}"
@@ -62,10 +63,10 @@ class Interface:
                 if self.channel == ch:
                     self.frequency = freq
                     break
-            # iwlwifi needs a different set of staging commands than mt76x2u or rtl88XXau
-            if "iwlwifi" in self.driver:
-                # if monX is not already created. we will create it.
-                self.mon = f"mon{self.phy_id}"
+            # the rtl88XXau is crap and doesn't support vifs, otherwise lets create a mon interface for iwlwifi, mt76x2u, etc
+            if "88XXau" not in self.driver:
+                # if <iface>mon is not already created. we will create it.
+                self.mon = f"{self.name}mon"
                 if self.mon == self.name:
                     self.log.warning(
                         "proposed %s interface matches provided %s and already maps to phy%s",
@@ -82,7 +83,7 @@ class Interface:
         if not self.channel:
             raise InterfaceError("could not determine channel for %s", self.name)
         self.log.debug(
-            "frequency is set as %s and channel as %s", self.frequency, self.channel
+            "requested frequency is set to %s which maps to channel %s", self.frequency, self.channel
         )
         self.mac = self.get_mac()
         self.mode = self.get_mode()
@@ -91,6 +92,21 @@ class Interface:
         self.operstate = self.get_operstate()
         self.checks()
         self.log_debug()
+
+    def print_interface_information(self) -> None:
+        """Print wiphys to the screen"""
+        self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
+        self.log.debug("phys: %s", self.phys)
+        phy_id = ""
+        print(f"phy, interface, mode, mac, driver, driver version, chipset")
+        for phy in self.phys:
+            for iface in phy.interfaces:
+                eth_tool_info = self.get_ethtool_info(iface.name)
+                driver = self.get_driver(iface.name)
+                driver_version = self.get_driver_version(eth_tool_info)
+                chipset = self.get_chipset(iface.name)
+                mode = self.get_mode(iface=iface.name)
+                print(f"phy#{phy.phy_id}, {iface.name}, {mode}, {iface.addr}, {driver}, {driver_version}, {chipset}")
 
     def check_reg_domain(self) -> None:
         """Check and report the set regulatory domain"""
@@ -182,32 +198,34 @@ class Interface:
         run_command(wpa_cli_cmd)
 
         cmds = []
-        # if interface driver is iwlwifi we need to handle it differently
-        if "iwlwifi" in self.driver:
+        # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
+        if "88XXau" in self.driver:
+            # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
+            cmds = self.get_generic_staging_commands()
+        else:
             cmds = self.get_iwlwifi_staging_commands()
             # get channels from iw phy phyX channels
             channels_status = self.get_channels_status()
-            # loop through channels and check if we need to do a scan before staging
+            # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
             if channels_status:
                 for _band, channels in channels_status.items():
+                    # loop through channels and check if we need to do a scan before staging
                     for ch in channels:
                         if int(self.frequency) == int(ch.freq):
-                            # if channel we want to use is disabled or No IR, scan to enable it
+                            # if channel we want to use is disabled or No IR, attempt scan to enable it
                             if ch.disabled or ch.no_ir:
                                 self.scan()
                             break
-        else:
-            # if interface is not iwlwifi we can use more generic staging commands
-            # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
-            cmds = self.get_generic_staging_commands()
 
         # run the staging commands
         for cmd in cmds:
             self.log.info("run: %s", " ".join(cmd))
             if "monitor" in cmd:
-                stdout = run_command(cmd)
+                stdout = run_command(cmd).strip()
                 if "non-zero" not in stdout:
                     self.log.info(stdout)
+                    if "not supported" in stdout:
+                        raise InterfaceError(f"{self.name} does not appear to support monitor mode")
             else:
                 run_command(cmd)
 
@@ -321,41 +339,76 @@ class Interface:
     def log_debug(self) -> None:
         """Send debug information to logger"""
         self.log.debug(
-            "mac: %s, channel: %s, driver: %s, version: %s, firmware-version: %s",
+            "mac: %s, channel: %s, driver: %s, driver-version: %s, chipset: %s",
             self.mac,
             self.channel,
             self.driver,
             self.driver_version,
-            self.firmware_version,
+            self.chipset,
         )
 
-    def get_ethtool_info(self) -> str:
+    def get_ethtool_info(self, iface) -> str:
         """Gather ethtool information for interface"""
-        ethtool = run_command(["ethtool", "-i", f"{self.name}"])
+        ethtool = run_command(["ethtool", "-i", f"{iface}"])
         return ethtool.strip()
 
-    def get_driver(self) -> str:
+    def get_driver(self, iface) -> str:
         """Gather driver information for interface"""
         driver = run_command(
-            ["readlink", "-f", f"/sys/class/net/{self.name}/device/driver"]
+            ["readlink", "-f", f"/sys/class/net/{iface}/device/driver"]
         )
         return driver.split("/")[-1].strip()
 
-    def get_driver_version(self) -> str:
+    def get_driver_version(self, eth_tool_info) -> str:
         """Gather driver version for interface"""
         out = ""
-        for line in self.driver_info.lower().splitlines():
+        for line in eth_tool_info.lower().splitlines():
             if line.startswith("version:"):
                 out = line.split(" ")[1]
         return out
 
-    def get_firmware_version(self) -> str:
+    def get_firmware_version(self, eth_tool_info) -> str:
         """Gather driver firmware version for interface"""
         out = ""
-        for line in self.driver_info.lower().splitlines():
+        for line in eth_tool_info.lower().splitlines():
             if line.startswith("firmware-version:"):
                 out = line.split(" ")[1]
         return out
+
+    def cleanup_chipset(self, chipset) -> str:
+        words = ["Wireless LAN Controllers", "Network Connection", "Wireless Adapter", "WLAN Adapter"]
+        for word in words:
+            if word in chipset:
+                chipset = chipset.replace(word, "")
+        return chipset
+
+    def get_chipset(self, iface) -> str:
+        """Gather chipset information for interface"""
+        modalias = run_command(["cat", f"/sys/class/net/{iface}/device/modalias"])
+        bus = modalias.split(":")[0]
+        chipset = ""
+        if bus == "usb":
+            businfo = modalias.split(":")[1][1:10].replace("p", ":")
+            chipset = run_command(["lsusb", "-d", f"{businfo}"])
+            chipset = chipset.split(":")[2][5:].strip()
+            chipset = self.cleanup_chipset(chipset)
+            return chipset
+        if bus == "pci":
+            vendor = run_command(["cat", f"/sys/class/net/{iface}/device/vendor"]).strip()
+            device = run_command(["cat", f"/sys/class/net/{iface}/device/device"]).strip()
+            chipset = run_command(["lspci", "-d", f"{vendor}:{device}", "-q"])
+            chipset = chipset.split(":")[2].strip()
+            chipset = self.cleanup_chipset(chipset)
+            return chipset
+        if bus == "sdio":
+            vendor = run_command(["cat", f"/sys/class/net/{iface}/device/vendor"]).strip()
+            device = run_command(["cat", f"/sys/class/net/{iface}/device/device"]).strip()
+            if f"{vendor}:{device}" == '0x02d0:0xa9a6':
+                chipset = 'Broadcom 43430'
+        else:
+            chipset="Unknown"
+        return chipset
+        
 
     def get_mac(self) -> str:
         """Gather MAC address for a given interface"""
@@ -489,7 +542,7 @@ class Interface:
     def get_phy_id(self) -> str:
         """Check and determines the phy# for the interface name of this object"""
         self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
-        self.log.debug("phys: %s", self.phys)
+        # self.log.debug("phys: %s", self.phys)
         phy_id = ""
         for phy in self.phys:
             for iface in phy.interfaces:

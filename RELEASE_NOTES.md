@@ -1,6 +1,8 @@
 Release 1.0.8-1
 
-- Interface staging improvements
+- Improvements to interface staging and diagnostics.
+- Add `--list_interfaces` option to print out interfaces with their respective information
+- For monitor mode, default behavior is to create a vif, except for rtl88XXau cards.
 
 Release 1.0.8
 

@@ -103,6 +103,10 @@ def start(args: argparse.Namespace):
         helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
+    if args.list_interfaces:
+        __iface.print_interface_information()
+        sys.exit(0)
+
     signal(SIGINT, signal_handler)
 
     processes = []

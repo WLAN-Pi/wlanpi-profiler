@@ -122,9 +122,23 @@ class Profiler(object):
         """Handle profiling clients as they come into the queue"""
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
-        self.log.debug("freq is %s", freq)
+        self.log.debug("detected freq from assoc is %s", freq)
         channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
-        self.log.debug("ch is %s", channel)
+        """
+        All radio tap headers are malformed from some adapters on certain kernels. 
+        This has been observed in 5.15rc2 up to 5.15.1 with MediaTek adapters for example.
+        If that is the case, we are unable to detect the frequency/channel from the association.
+---------------------------------------------
+ - Client MAC: 6e:1d:8a:28:32:51
+ - OUI manufacturer lookup: Apple (Randomized MAC)
+ - Frequency band: Unknown
+ - Capture channel: 0
+---------------------------------------------
+        """
+        if channel == 0:
+            self.log.warning("COULD NOT MAP FREQUENCY FROM RADIO TAP HEADER FOUND IN ASSOCIATION FRAME")
+        else:
+            self.log.debug("detected freq from assoc maps to channel %s", channel)
 
         is_6ghz = False
         if freq > 2411 and freq < 2485:

@@ -293,7 +293,7 @@ class TxBeacons(multiprocessing.Process):
         except OSError as error:
             for event in ("Network is down", "No such device"):
                 if event in error.strerror:
-                    self.log.exception("exiting...")
+                    self.log.info("exiting...")
                     sys.exit(signal.SIGTERM)
 
 
@@ -427,5 +427,5 @@ class Sniffer(multiprocessing.Process):
         except OSError as error:
             for event in ("Network is down", "No such device"):
                 if event in error.strerror:
-                    self.log.exception("exiting...")
+                    self.log.info("exiting...")
                     sys.exit(signal.SIGTERM)

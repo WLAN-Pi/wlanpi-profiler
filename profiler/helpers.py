@@ -42,7 +42,7 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 
-__tools = ["tcpdump", "iw", "ip", "ethtool"]
+__tools = ["tcpdump", "iw", "ip", "ethtool", "lspci", "lsusb", "modprobe", "modinfo", "wpa_cli"]
 
 # are the required tools installed?
 for tool in __tools:
@@ -236,6 +236,13 @@ def setup_parser() -> argparse.ArgumentParser:
         metavar="PCAP",
         dest="pcap_analysis",
         help="read and analyze association request frames from pcap",
+    )
+    parser.add_argument(
+        "--list_interfaces",
+        dest="list_interfaces",
+        action="store_true",
+        default=False,
+        help="print out a list of interfaces with an 80211 stack",
     )
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
