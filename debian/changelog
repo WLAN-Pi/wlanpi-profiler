@@ -1,3 +1,11 @@
+wlanpi-profiler (1.0.8-1) unstable; urgency=medium
+
+  * Use a vif by default unless rtl88xxau is detected
+  * Suppress some warnings and minor improvements 
+  * Add --list_interfaces option
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 11 Nov 2021 16:31:59 -0500
+
 wlanpi-profiler (1.0.8) unstable; urgency=medium
 
   * Update manuf from 1.1.1 to 1.1.3 to fix URL changes and URL redirection
