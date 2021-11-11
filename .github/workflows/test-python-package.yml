@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install ethtool iw
+        sudo apt install ethtool iw tcpdump wpasupplicant
         python -m pip install --upgrade pip
         pip install tox
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
