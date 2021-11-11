@@ -26,8 +26,8 @@ from multiprocessing import Queue
 from signal import SIGINT, signal
 
 # third party imports
-import scapy
-from scapy.all import rdpcap
+import scapy  # type: ignore
+from scapy.all import rdpcap  # type: ignore
 
 # app imports
 from . import helpers
@@ -46,10 +46,11 @@ def signal_handler(signum, frame):
             # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
                 if __iface.requires_monitor_interface:
-                    __iface.reset_interface()
                     print(
-                        "Detected SIGINT or Control-C ... Removing monitor interface ... Exiting ..."
+                        "Detected SIGINT or Control-C ... Removing monitor interface ..."
                     )
+                    __iface.reset_interface()
+                    print("Exiting ...")
                 else:
                     print("Detected SIGINT or Control-C ... Exiting ...")
         sys.exit(2)
@@ -102,6 +103,10 @@ def start(args: argparse.Namespace):
         helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
+    if args.list_interfaces:
+        __iface.print_interface_information()
+        sys.exit(0)
+
     signal(SIGINT, signal_handler)
 
     processes = []
@@ -124,8 +129,10 @@ def start(args: argparse.Namespace):
             sys.exit(-1)
 
         for frame in frames:
-            # extract frames that are Dot11
-            if frame.haslayer(scapy.layers.dot11.Dot11AssoReq):
+            # extract frames that are Association or Reassociation Request frames
+            if frame.haslayer(scapy.layers.dot11.Dot11AssoReq) or frame.haslayer(
+                scapy.layers.dot11.Dot11ReassoReq
+            ):
                 # put frame into the multiprocessing queue for the profiler to analyze
                 queue.put(frame)
     else:
@@ -169,7 +176,7 @@ def start(args: argparse.Namespace):
                 __iface.stage_interface()
                 log.debug("finish interface setup and staging ...")
         except InterfaceError:
-            log.error("could not setup interface .... exiting ...")
+            log.exception("problem interface staging ... exiting ...", exc_info=True)
             sys.exit(-1)
 
         helpers.generate_run_message(config)
@@ -187,7 +194,7 @@ def start(args: argparse.Namespace):
             )
             processes.append(txbeacons)
             txbeacons.start()
-            __pids.append(("txbeacons", txbeacons.pid))
+            __pids.append(("txbeacons", txbeacons.pid))  # type: ignore
 
         log.debug("sniffer process")
         sniffer = mp.Process(
@@ -197,7 +204,7 @@ def start(args: argparse.Namespace):
         )
         processes.append(sniffer)
         sniffer.start()
-        __pids.append(("sniffer", sniffer.pid))
+        __pids.append(("sniffer", sniffer.pid))  # type: ignore
 
     from .profiler import Profiler
 
@@ -205,7 +212,7 @@ def start(args: argparse.Namespace):
     profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
     processes.append(profiler)
     profiler.start()
-    __pids.append(("profiler", profiler.pid))
+    __pids.append(("profiler", profiler.pid))  # type: ignore
 
     shutdown = False
 

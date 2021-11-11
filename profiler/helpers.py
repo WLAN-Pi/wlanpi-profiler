@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Union
 
 # third party imports
 try:
-    import manuf
+    import manuf  # type: ignore
 except ModuleNotFoundError as error:
     if error.name == "manuf":
         print("required module manuf not found.")
@@ -42,31 +42,24 @@ except ModuleNotFoundError as error:
     sys.exit(signal.SIGABRT)
 
 
-def run_cli_cmd(cmd: List) -> str:
-    """Run an arbitrary CLI command and return the results"""
-    cp = subprocess.run(
-        cmd,
-        encoding="utf-8",
-        shell=False,
-        check=False,
-        capture_output=True,
-    )
+__tools = [
+    "tcpdump",
+    "iw",
+    "ip",
+    "ethtool",
+    "lspci",
+    "lsusb",
+    "modprobe",
+    "modinfo",
+    "wpa_cli",
+]
 
-    if cp.stdout:
-        return cp.stdout
-    if cp.stderr:
-        return cp.stderr
-
-    return "completed process return code is non-zero with no stdout or stderr"
-
-
-# is tcpdump installed?
-try:
-    result = run_cli_cmd(["tcpdump", "--version"])
-except OSError:
-    print(
-        "WARNING: problem checking tcpdump version. is tcpdump installed and functioning? did you run with elevated permissions?"
-    )
+# are the required tools installed?
+for tool in __tools:
+    if shutil.which(tool) is None:
+        print(f"It looks like you do not have {tool} installed.")
+        print("Please install using your distro's package manager.")
+        sys.exit(signal.SIGABRT)
 
 
 # app imports
@@ -254,6 +247,13 @@ def setup_parser() -> argparse.ArgumentParser:
         dest="pcap_analysis",
         help="read and analyze association request frames from pcap",
     )
+    parser.add_argument(
+        "--list_interfaces",
+        dest="list_interfaces",
+        action="store_true",
+        default=False,
+        help="print out a list of interfaces with an 80211 stack",
+    )
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
     return parser
 
@@ -368,7 +368,7 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> Dict:
         _dict[section] = {}
         for key, _value in config.items(section):
             try:
-                _value = bool(strtobool(_value))
+                _value = bool(strtobool(_value))  # type: ignore
             except ValueError:
                 pass
             _dict[section][key] = _value
@@ -431,6 +431,25 @@ def check_config_missing(config: Dict) -> bool:
     return True
 
 
+def run_command(cmd: list, suppress_output=False) -> str:
+    """Run a single CLI command with subprocess and return stdout or stderr response"""
+    cp = subprocess.run(
+        cmd,
+        encoding="utf-8",
+        shell=False,
+        check=False,
+        capture_output=True,
+    )
+
+    if not suppress_output:
+        if cp.stdout:
+            return cp.stdout
+        if cp.stderr:
+            return cp.stderr
+
+    return "completed process return code is non-zero with no stdout or stderr"
+
+
 def update_manuf() -> bool:
     """Manuf wrapper to update manuf OUI flat file from Internet"""
     log = logging.getLogger(inspect.stack()[0][3])
@@ -444,7 +463,7 @@ def update_manuf() -> bool:
             ctime(os.path.getmtime(flat_file)),
         )
         log.info("running 'sudo manuf --update'")
-        out = run_cli_cmd(["sudo", manuf_location, "--update"])
+        out = run_command(["sudo", manuf_location, "--update"])
         log.info("%s", str(out))
         if "URLError" not in out:
             log.info(
@@ -465,17 +484,17 @@ def verify_reporting_directories(config: Dict) -> None:
     if "GENERAL" in config:
         files_path = config["GENERAL"].get("files_path")
         if not os.path.isdir(files_path):
-            log.debug(os.makedirs(files_path))
+            log.debug(os.makedirs(files_path))  # type: ignore
 
         clients_dir = os.path.join(files_path, "clients")
 
         if not os.path.isdir(clients_dir):
-            log.debug(os.makedirs(clients_dir))
+            log.debug(os.makedirs(clients_dir))  # type: ignore
 
         reports_dir = os.path.join(files_path, "reports")
 
         if not os.path.isdir(reports_dir):
-            log.debug(os.makedirs(reports_dir))
+            log.debug(os.makedirs(reports_dir))  # type: ignore
 
 
 def get_frequency_bytes(channel: int) -> bytes:

@@ -26,21 +26,29 @@ from time import strftime
 from typing import Dict, List, Tuple
 
 # third party imports
-from manuf import manuf
-from scapy.all import Dot11, RadioTap, wrpcap
+from manuf import manuf  # type: ignore
+from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 
 # app imports
 from .__version__ import __version__
-from .constants import (_20MHZ_CHANNEL_LIST, EXT_CAPABILITIES_IE_TAG,
-                        FT_CAPABILITIES_IE_TAG, HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
-                        HE_CAPABILITIES_IE_EXT_TAG,
-                        HE_SPATIAL_REUSE_IE_EXT_TAG, HT_CAPABILITIES_IE_TAG,
-                        IE_EXT_TAG, POWER_MIN_MAX_IE_TAG,
-                        RM_CAPABILITIES_IE_TAG, RSN_CAPABILITIES_IE_TAG,
-                        SSID_PARAMETER_SET_IE_TAG, SUPPORTED_CHANNELS_IE_TAG,
-                        VENDOR_SPECIFIC_IE_TAG, VHT_CAPABILITIES_IE_TAG)
-from .helpers import (Base64Encoder, Capability, flag_last_object, get_bit,
-                      is_randomized)
+from .constants import (
+    _20MHZ_CHANNEL_LIST,
+    EXT_CAPABILITIES_IE_TAG,
+    FT_CAPABILITIES_IE_TAG,
+    HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
+    HE_CAPABILITIES_IE_EXT_TAG,
+    HE_SPATIAL_REUSE_IE_EXT_TAG,
+    HT_CAPABILITIES_IE_TAG,
+    IE_EXT_TAG,
+    POWER_MIN_MAX_IE_TAG,
+    RM_CAPABILITIES_IE_TAG,
+    RSN_CAPABILITIES_IE_TAG,
+    SSID_PARAMETER_SET_IE_TAG,
+    SUPPORTED_CHANNELS_IE_TAG,
+    VENDOR_SPECIFIC_IE_TAG,
+    VHT_CAPABILITIES_IE_TAG,
+)
+from .helpers import Base64Encoder, Capability, flag_last_object, get_bit, is_randomized
 
 
 class Profiler(object):
@@ -114,9 +122,25 @@ class Profiler(object):
         """Handle profiling clients as they come into the queue"""
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
-        self.log.debug("freq is %s", freq)
+        self.log.debug("detected freq from assoc is %s", freq)
         channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
-        self.log.debug("ch is %s", channel)
+        """
+        All radio tap headers are malformed from some adapters on certain kernels.
+        This has been observed in 5.15rc2 up to 5.15.1 with MediaTek adapters for example.
+        If that is the case, we are unable to detect the frequency/channel from the association.
+        ---------------------------------------------
+        - Client MAC: 6e:1d:8a:28:32:51
+        - OUI manufacturer lookup: Apple (Randomized MAC)
+        - Frequency band: Unknown
+        - Capture channel: 0
+        ---------------------------------------------
+        """
+        if channel == 0:
+            self.log.warning(
+                "COULD NOT MAP FREQUENCY FROM RADIO TAP HEADER FOUND IN ASSOCIATION FRAME"
+            )
+        else:
+            self.log.debug("detected freq from assoc maps to channel %s", channel)
 
         is_6ghz = False
         if freq > 2411 and freq < 2485:
@@ -842,7 +866,7 @@ class Profiler(object):
                                     continue
 
                         mcs = sorted(set(mcs))
-                        mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]
+                        mcs = ", ".join(mcs) if len(mcs) > 1 else mcs[0]  # type: ignore
                         dot11ax.value = f"Supported ({nss}ss), MCS {mcs}"
                         dot11ax_mcs.db_value = mcs
                         dot11ax_nss.db_value = nss
