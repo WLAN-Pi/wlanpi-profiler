@@ -397,7 +397,7 @@ class Interface:
             vendor = run_command(["cat", f"/sys/class/net/{iface}/device/vendor"]).strip()
             device = run_command(["cat", f"/sys/class/net/{iface}/device/device"]).strip()
             chipset = run_command(["lspci", "-d", f"{vendor}:{device}", "-q"])
-            chipset = chipset.split(":")[2].strip()
+            chipset = chipset.split(":")[2].strip().splitlines()[0]
             chipset = self.cleanup_chipset(chipset)
             return chipset
         if bus == "sdio":
