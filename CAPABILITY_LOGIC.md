@@ -116,3 +116,18 @@ values to determine client capabilities.
                 - Y - Check OUI matches our heuristic
                     - Y - Return match
                     - N - Unable to match
+
+14. Detecting 6 GHz Capability Out-of-band via Alternative Operating Class
+    - a. is Supported Operating Classes tagged parameter present?
+        - N - not supported
+        - Y - may be supported
+            - is 131 in alternative class list?
+                - Y - 20 MHz channel spacing in 6 GHz operating class supported
+            - is 132 in alternative class list?
+                - Y - 40 MHz channel spacing in 6 GHz operating class supported
+            - is 133 in alternative class list?
+                - Y - 80 MHz channel spacing in 6 GHz operating class supported
+            - is 134 in alternative class list?
+                - Y - 160 MHz channel spacing in 6 GHz operating class supported
+            - is 135 in alternative class list?
+                - Y - 80+80 MHz channel spacing in 6 GHz operating class supported

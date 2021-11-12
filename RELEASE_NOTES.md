@@ -1,3 +1,8 @@
+Release 1.0.9
+
+- Add detection for 6 GHz out-of-band as a supported alternative operating class
+- Add detection for 6 GHz in-band for band capabilities found when the client associations in 6 GHz
+
 Release 1.0.8-2
 
 - Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed

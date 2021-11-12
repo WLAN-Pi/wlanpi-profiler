@@ -67,3 +67,26 @@ class TestProfiler:
         assert dot11_elt_dict is not None
         manuf = p.resolve_oui_manuf(cap[0].addr2, dot11_elt_dict)
         assert expected in manuf.lower()
+
+    def test_6e_pcap(self):
+        pcap = "./tests/pcaps/IntelAX210_Windows10_10-3d-1c-00-00-00_6.0GHz-anonymized.pcap"
+        p = profiler.Profiler()
+        p.ft_disabled = False
+        p.he_disabled = False
+        cap = rdpcap(pcap)
+        # dot11_elt_dict = self.get_dot11_elt_dict(cap[0], p)
+
+        ssid, oui_manuf, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=True)
+        assert ssid == "WLANPI_1"
+        assert oui_manuf == "Intel"
+        for capability in capabilities:
+            if capability.name == "802.11n":
+                assert "Not reported" in capability.value
+            if capability.name == "802.11ac":
+                assert "Not reported" in capability.value
+            if capability.name == "802.11ax":
+                assert True
+            if capability.name == "6 GHz Operating Class":
+                assert "Supported" in capability.value
+            if capability.name == "6 GHz Capability":
+                assert "Supported" in capability.value

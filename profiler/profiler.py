@@ -45,6 +45,7 @@ from .constants import (
     RSN_CAPABILITIES_IE_TAG,
     SSID_PARAMETER_SET_IE_TAG,
     SUPPORTED_CHANNELS_IE_TAG,
+    SUPPORTED_OPERATING_CLASSES_IE_TAG,
     VENDOR_SPECIFIC_IE_TAG,
     VHT_CAPABILITIES_IE_TAG,
 )
@@ -247,7 +248,7 @@ class Profiler(object):
         text_report += "\n"
         for capability in capabilities:
             if capability.name and capability.value:
-                out = "{0:<20} {1:<20}".format(capability.name, capability.value)
+                out = "{0:<22} {1:<22}".format(capability.name, capability.value)
                 if out.strip():
                     text_report += out + "\n"
 
@@ -798,6 +799,35 @@ class Profiler(object):
         return [supported_channels, number_of_supported_channels]
 
     @staticmethod
+    def analyze_operating_classes(dot11_elt_dict) -> List:
+        """Check if 6 GHz is a supported alternative operating class"""
+        six_ghz_operating_class_cap = Capability(
+            db_key="six_ghz_operating_class_supported",
+            db_value=0,
+        )
+
+        supported_6ghz_alternative_operating_classes = []
+        six_ghz_alternative_operating_classes = [131, 132, 133, 134, 135]
+        if SUPPORTED_OPERATING_CLASSES_IE_TAG in dot11_elt_dict.keys():
+            supported_operating_classes = dot11_elt_dict[
+                SUPPORTED_OPERATING_CLASSES_IE_TAG
+            ]
+            # pop current operating class from list
+            supported_operating_classes.pop()
+            for alternative_operating_class in supported_operating_classes:
+                if alternative_operating_class in six_ghz_alternative_operating_classes:
+                    supported_6ghz_alternative_operating_classes.append(
+                        alternative_operating_class
+                    )
+
+        if supported_6ghz_alternative_operating_classes:
+            six_ghz_operating_class_cap.name = "6 GHz Operating Class"
+            six_ghz_operating_class_cap.value = "Supported"
+            six_ghz_operating_class_cap.db_value = 1
+
+        return [six_ghz_operating_class_cap]
+
+    @staticmethod
     def analyze_extension_ies(dot11_elt_dict, he_disabled: bool) -> List:
         """Check for 802.11ax support"""
         dot11ax = Capability(
@@ -994,7 +1024,8 @@ class Profiler(object):
                         dot11ax_spatial_reuse.db_value = 1
 
                     if ext_ie_id == HE_6_GHZ_BAND_CAP_IE_EXT_TAG:
-                        # dot11ax_six_ghz.value = "Supported"
+                        dot11ax_six_ghz.name = "6 GHz Capability"
+                        dot11ax_six_ghz.value = "Supported"
                         dot11ax_six_ghz.db_value = 1
 
         return [
@@ -1068,8 +1099,11 @@ class Profiler(object):
         # check for 11ac support
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
-        # check for Ext tags (e.g. 802.11ax draft support)
+        # check for ext tags (e.g. 802.11ax draft support)
         capabilities += self.analyze_extension_ies(dot11_elt_dict, self.he_disabled)
+
+        # check supported operating classes for 6 GHz
+        capabilities += self.analyze_operating_classes(dot11_elt_dict)
 
         # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)
