@@ -20,7 +20,7 @@ from collections import namedtuple
 from typing import Dict, List
 
 # app imports
-from .constants import _20MHZ_CHANNEL_LIST
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .helpers import flag_last_object, run_command
 
 
@@ -34,11 +34,11 @@ class Interface:
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = ""
-        self.frequency = ""
-        self.requires_monitor_interface = False
+        self.channel = None
+        self.frequency = None
+        self.requires_vif = False
         self.phys = []
         self.no_interface_prep = False
-        self.channel = None
 
     def setup(self):
         """Perform setup for the interface"""
@@ -55,14 +55,10 @@ class Interface:
         self.mon = ""
         # if we're not managing interface prep, we need to get freq and channel from iw.
         if self.no_interface_prep:
-            self.frequency = self.get_frequency()
-            self.channel = self.get_channel()
+            iw_dev_iface_info = run_command(["iw", "dev", f"{self.name}", "info"])
+            self.frequency = self.get_frequency(iw_dev_iface_info, self.name)
+            self.channel = self.get_channel(iw_dev_iface_info, self.name)
         else:
-            # we're using channel provided by user, we need to map it to a frequence for interface staging
-            for freq, ch in _20MHZ_CHANNEL_LIST.items():
-                if self.channel == ch:
-                    self.frequency = freq
-                    break
             # the rtl88XXau is crap and doesn't support vifs, otherwise lets create a mon interface for iwlwifi, mt76x2u, etc
             if "88XXau" not in self.driver:
                 # if <iface>mon is not already created. we will create it.
@@ -79,11 +75,13 @@ class Interface:
                     )
                 else:
                     self.log.debug("new %s will map to phy%s", self.mon, self.phy_id)
-                self.requires_monitor_interface = True
+                self.requires_vif = True
         if not self.channel:
-            raise InterfaceError("could not determine channel for %s", self.name)
+            raise InterfaceError("unknown channel setting for %s", self.name)
+        if not self.frequency:
+            raise InterfaceError("unknown frequency setting for %s", self.name)
         self.log.debug(
-            "requested frequency is set to %s which maps to channel %s",
+            "frequency is set to %s which maps to channel %s",
             self.frequency,
             self.channel,
         )
@@ -208,7 +206,9 @@ class Interface:
         else:
             cmds = self.get_iwlwifi_staging_commands()
             # get channels from iw phy phyX channels
-            channels_status = self.get_channels_status()
+            cmd = ["iw", "phy", f"{self.phy}", "channels"]
+            iw_phy_channels = run_command(cmd)
+            channels_status = self.get_channels_status(iw_phy_channels)
             # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
             if channels_status:
                 for _band, channels in channels_status.items():
@@ -240,12 +240,12 @@ class Interface:
         if "monitor" not in self.mode:
             raise InterfaceError("interface is not in monitor mode")
 
-    def get_channels_status(self) -> Dict:
+    @staticmethod
+    def get_channels_status(iw_phy_channels) -> Dict:
         """Run `iw phy phyX channels` and analyze channel information"""
-        cmd = ["iw", "phy", f"{self.phy}", "channels"]
-        iw_phy_channels = run_command(cmd)
+        log = logging.getLogger(inspect.stack()[0][3])
         if not iw_phy_channels or "command failed" in iw_phy_channels:
-            self.log.warning("unable to detect valid channels from: %s", " ".join(cmd))
+            log.warning("unable to detect valid channels from")
             return {}
         freq = ""
         ch = ""
@@ -310,7 +310,7 @@ class Interface:
 
         if self.no_interface_prep or staged:
             name = self.name
-            if self.requires_monitor_interface:
+            if self.requires_vif:
                 name = self.mon
             if "up" not in self.operstate:
                 self.log.warning(
@@ -433,41 +433,50 @@ class Interface:
         mac = run_command(["cat", f"/sys/class/net/{self.name}/address"])
         return mac.strip().lower()
 
-    def get_frequency(self):
+    @staticmethod
+    def get_frequency(iw_dev_iface_info, iface):
         """Determine which frequency the interfac is set to"""
-        return self.parse_iw_dev_iface_info(get_frequency=True)
+        return Interface.parse_iw_dev_iface_info(
+            iw_dev_iface_info, iface, get_frequency=True
+        )
 
-    def get_channel(self):
+    @staticmethod
+    def get_channel(iw_dev_iface_info, iface):
         """Determine which channel the interface is set to"""
-        return self.parse_iw_dev_iface_info(get_channel=True)
+        return Interface.parse_iw_dev_iface_info(
+            iw_dev_iface_info, iface, get_channel=True
+        )
 
-    def parse_iw_dev_iface_info(self, get_frequency=False, get_channel=False):
+    @staticmethod
+    def parse_iw_dev_iface_info(
+        iw_dev_iface_info, iface, get_frequency=False, get_channel=False
+    ):
         """Determine what channel or frequency the interface is set to"""
-        iw_dev_iface_info = run_command(["iw", "dev", f"{self.name}", "info"])
+        log = logging.getLogger(inspect.stack()[0][3])
         for line in iw_dev_iface_info.splitlines():
             line = line.lower().strip()
             if "channel" in line:
                 channel = int(line.split(",")[0].split(" ")[1])
                 freq = int(line.split(",")[0].split(" ")[2].replace("(", ""))
-                resp = _20MHZ_CHANNEL_LIST.get(freq, 0)
+                resp = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
                 if channel != resp:
-                    self.log.warning(
+                    log.warning(
                         "iw reported a different channel (%s) than our lookup (%s)",
                         channel,
                         resp,
                     )
                 if get_frequency:
-                    self.log.debug(
+                    log.debug(
                         "get_frequency returns %s from `iw dev %s info`",
                         freq,
-                        self.name,
+                        iface,
                     )
                     return freq
                 if get_channel:
-                    self.log.debug(
+                    log.debug(
                         "get_channel returns %s from `iw dev %s info`",
                         channel,
-                        self.name,
+                        iface,
                     )
                     return channel
         return None

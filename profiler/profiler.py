@@ -32,7 +32,7 @@ from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 # app imports
 from .__version__ import __version__
 from .constants import (
-    _20MHZ_CHANNEL_LIST,
+    _20MHZ_FREQUENCY_CHANNEL_MAP,
     EXT_CAPABILITIES_IE_TAG,
     FT_CAPABILITIES_IE_TAG,
     HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
@@ -123,7 +123,7 @@ class Profiler(object):
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
         self.log.debug("detected freq from assoc is %s", freq)
-        channel = _20MHZ_CHANNEL_LIST.get(freq, 0)
+        channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
         """
         All radio tap headers are malformed from some adapters on certain kernels.
         This has been observed in 5.15rc2 up to 5.15.1 with MediaTek adapters for example.

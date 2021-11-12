@@ -32,24 +32,25 @@ from scapy.all import rdpcap  # type: ignore
 # app imports
 from . import helpers
 from .__version__ import __version__
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .interface import Interface, InterfaceError
 
-__pids = []
-__pids.append(("main", os.getpid()))
-__iface = Interface()
+__PIDS = []
+__PIDS.append(("main", os.getpid()))
+__IFACE = Interface()
 
 
 def signal_handler(signum, frame):
     """Handle noisy keyboardinterrupt"""
     if signum == 2:
-        for name, pid in __pids:
+        for name, pid in __PIDS:
             # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
-                if __iface.requires_monitor_interface:
+                if __IFACE.requires_vif:
                     print(
                         "Detected SIGINT or Control-C ... Removing monitor interface ..."
                     )
-                    __iface.reset_interface()
+                    __IFACE.reset_interface()
                     print("Exiting ...")
                 else:
                     print("Detected SIGINT or Control-C ... Exiting ...")
@@ -104,7 +105,7 @@ def start(args: argparse.Namespace):
         sys.exit(0)
 
     if args.list_interfaces:
-        __iface.print_interface_information()
+        __IFACE.print_interface_information()
         sys.exit(0)
 
     signal(SIGINT, signal_handler)
@@ -152,7 +153,7 @@ def start(args: argparse.Namespace):
         sequence_number = mp.Value("i", 0)
 
         iface_name = config.get("GENERAL").get("interface")
-        __iface.name = iface_name
+        __IFACE.name = iface_name
 
         try:
             if args.no_interface_prep:
@@ -160,20 +161,45 @@ def start(args: argparse.Namespace):
                     "user provided `--noprep` argument meaning profiler will not handle staging the interface"
                 )
                 # get channel from `iw`
-                __iface.no_interface_prep = True
-                __iface.setup()
-                if __iface.channel:
-                    config["GENERAL"]["channel"] = __iface.channel
+                __IFACE.no_interface_prep = True
+                __IFACE.setup()
+                if __IFACE.channel:
+                    config["GENERAL"]["channel"] = __IFACE.channel
                 log.debug("finish interface setup with no staging ...")
             else:
-                # get channel from config (CLI option or config.ini)
+                # get channel from config setup by helpers.py (either passed in via CLI option or config.ini)
                 channel = int(config.get("GENERAL").get("channel"))
-                __iface.channel = channel
-                __iface.setup()
-                if __iface.requires_monitor_interface:
-                    # we require using a mon interface, update config so our subprocesses know to use it
-                    config["GENERAL"]["interface"] = __iface.mon
-                __iface.stage_interface()
+                freq = int(config.get("GENERAL").get("frequency"))
+                if channel != 0:
+                    # channel was provided, map it:
+                    for freq, ch in _20MHZ_FREQUENCY_CHANNEL_MAP.items():
+                        if channel == ch:
+                            __IFACE.frequency = freq
+                            __IFACE.channel = ch
+                            break
+                if freq != 0:
+                    # freq was provided
+                    __IFACE.channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
+                    if __IFACE.channel != 0:
+                        __IFACE.frequency = freq
+                    else:
+                        raise InterfaceError(
+                            "could not determine channel from frequency (%s)", freq
+                        )
+                # if we made it here, make sure the config matches up
+                config["GENERAL"]["channel"] = __IFACE.channel
+                config["GENERAL"]["frequency"] = __IFACE.frequency
+
+                # run interface setup
+                __IFACE.setup()
+
+                # setup should have detected a mac address
+                config["GENERAL"]["mac"] = __IFACE.mac
+
+                if __IFACE.requires_vif:
+                    # we require using a mon interface, update config so our subprocesses find it
+                    config["GENERAL"]["interface"] = __IFACE.mon
+                __IFACE.stage_interface()
                 log.debug("finish interface setup and staging ...")
         except InterfaceError:
             log.exception("problem interface staging ... exiting ...", exc_info=True)
@@ -194,7 +220,7 @@ def start(args: argparse.Namespace):
             )
             processes.append(txbeacons)
             txbeacons.start()
-            __pids.append(("txbeacons", txbeacons.pid))  # type: ignore
+            __PIDS.append(("txbeacons", txbeacons.pid))  # type: ignore
 
         log.debug("sniffer process")
         sniffer = mp.Process(
@@ -204,7 +230,7 @@ def start(args: argparse.Namespace):
         )
         processes.append(sniffer)
         sniffer.start()
-        __pids.append(("sniffer", sniffer.pid))  # type: ignore
+        __PIDS.append(("sniffer", sniffer.pid))  # type: ignore
 
     from .profiler import Profiler
 
@@ -212,7 +238,7 @@ def start(args: argparse.Namespace):
     profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
     processes.append(profiler)
     profiler.start()
-    __pids.append(("profiler", profiler.pid))  # type: ignore
+    __PIDS.append(("profiler", profiler.pid))  # type: ignore
 
     shutdown = False
 

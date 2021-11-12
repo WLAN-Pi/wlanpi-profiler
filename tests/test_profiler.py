@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from scapy.all import rdpcap
-
 from profiler import profiler
+from scapy.all import rdpcap
 
 
 class TestProfiler:
@@ -26,12 +25,8 @@ class TestProfiler:
         return dot11_elt_dict
 
     @pytest.mark.parametrize(
-        "expected,pcap",
-        [
-            (   "non_utf-8_ssid",
-                "./tests/pcaps/0xc6.pcapng"
-            )
-        ])
+        "expected,pcap", [("non_utf-8_ssid", "./tests/pcaps/0xc6.pcapng")]
+    )
     def test_non_utf8_decode(self, expected, pcap):
         p = profiler.Profiler()
         p.ft_disabled = False
