@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 
-import pytest
 import subprocess
 
+import pytest
 from profiler import helpers
 from profiler.__version__ import __version__
 from profiler.interface import Interface, InterfaceError
@@ -67,7 +67,7 @@ class TestArgParsing:
         assert "invalid channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
-       with pytest.raises(InterfaceError):
+        with pytest.raises(InterfaceError):
             config = helpers.setup_config(
                 parser.parse_args(["-i", "fakest_interface_ever"])
             )

@@ -113,6 +113,23 @@ def ssid(ssid: str) -> str:
     return ssid
 
 
+def frequency(freq) -> int:
+    """Check if the provided frequency is valid"""
+    try:
+        # make sure freq is an int
+        freq = int(freq)
+    except ValueError:
+        raise ValueError("%s is not a number")
+
+    freq_ranges = [(2412, 2484), (5180, 5905), (5955, 7115)]
+
+    for band in freq_ranges:
+        if band[0] <= freq <= band[1]:
+            return freq
+
+    raise ValueError("%s not found in these frequency ranges: %s", freq, freq_ranges)
+
+
 def setup_parser() -> argparse.ArgumentParser:
     """Set default values and handle arg parser"""
     parser = argparse.ArgumentParser(
@@ -126,11 +143,18 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         help=argparse.SUPPRESS,
     )
-    parser.add_argument(
+    frequency_group = parser.add_mutually_exclusive_group()
+    frequency_group.add_argument(
         "-c",
         dest="channel",
         type=channel,
         help="set the channel to broadcast on",
+    )
+    frequency_group.add_argument(
+        "-f",
+        dest="freq",
+        type=frequency,
+        help="set the frequency to broadcast on",
     )
     parser.add_argument(
         "-i",
@@ -319,6 +343,12 @@ def setup_config(args):
     #  - did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
+    if args.freq:
+        config["GENERAL"]["frequency"] = args.freq
+        # user gave us freq, do not set value from config.ini
+        config["GENERAL"]["channel"] = 0
+    else:
+        config["GENERAL"]["frequency"] = 0
     if args.interface:
         config["GENERAL"]["interface"] = args.interface
     if args.ssid:
@@ -397,6 +427,10 @@ def validate(config) -> bool:
         ch = config.get("GENERAL").get("channel")
         if ch:
             channel(ch)
+
+        freq = config.get("GENERAL").get("frequency")
+        if freq:
+            frequency(freq)
 
         verify_reporting_directories(config)
     except ValueError:
@@ -550,19 +584,19 @@ def flag_last_object(seq):
 
 def generate_run_message(config: Dict) -> None:
     """Create message to display to users screen"""
+    interface = config["GENERAL"]["interface"]
     if config["GENERAL"].get("listen_only") is True:
         out = []
-        out.append("Starting profiler in listen only mode:")
         out.append(
-            f" - Listening for association frames with {config['GENERAL']['interface']} on channel {config['GENERAL']['channel']}"
+            f"Starting profiler in listen only mode using {interface} on {config['GENERAL']['channel']} ({config['GENERAL']['frequency']}):"
         )
-        out.append(" - Results are saved locally and printed to screen")
         out.append(" ")
         out.append("Instructions:")
         out.append(
-            f" - Associate your Wi-Fi client to any AP on channel {config['GENERAL']['channel']}"
+            " - Associate your Wi-Fi client to *any* SSID on the listening frequency above"
         )
-        out.append(" - We should passively detect the association request")
+        out.append(" - We should hear and passively receive any association requests")
+        out.append(" - Results are saved locally and printed to screen")
         header_len = len(max(out, key=len))
 
         print(f"\n{'~' * header_len}")
@@ -571,31 +605,25 @@ def generate_run_message(config: Dict) -> None:
         print(f"{'~' * header_len}\n")
     else:
         out = []
-        channel = config["GENERAL"]["channel"]
-        interface = config["GENERAL"]["interface"]
         ssid = config["GENERAL"]["ssid"]
-        if channel:
-            out.append(
-                f"Starting profiler AP with interface {interface} on channel {channel}:"
-            )
-        else:
-            out.append(f"Starting profiler AP with interface {interface}")
-        out.append(f" - Our fake AP SSID: {ssid}")
-        out.append(" - Results are saved locally and printed to screen")
+        out.append(
+            f"Starting the profiler fake AP using {interface} on channel {config['GENERAL']['channel']} ({config['GENERAL']['frequency']})"
+        )
         out.append(" ")
         out.append("Instructions:")
-        out.append(f" - Associate your Wi-Fi client to our SSID: {ssid}")
+        out.append(f" - Associate your Wi-Fi client to *our* SSID: {ssid}")
         out.append(" - Enter any random password to connect")
-        out.append(" ")
+        out.append(" - Authentication will fail, which is OK")
         out.append(
-            "The client will fail authentication but should send an association request"
+            f" - We should receive an association request to {config['GENERAL']['mac']}"
         )
+        out.append(" - Profiled results are saved locally and sent to stdout")
         header_len = len(max(out, key=len))
 
-        print(f"\n{'=' * header_len}")
+        print(f"\n{'~' * header_len}")
         for line in out:
             print(line)
-        print(f"{'=' * header_len}\n")
+        print(f"{'~' * header_len}\n")
 
 
 @dataclass

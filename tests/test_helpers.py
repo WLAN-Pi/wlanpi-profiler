@@ -4,7 +4,6 @@ import logging
 import multiprocessing as mp
 
 import pytest
-
 from profiler import helpers
 
 
@@ -29,6 +28,8 @@ class TestHelpers:
             "GENERAL": {
                 "ssid": "WLAN Pi",
                 "channel": 36,
+                "frequency": 5180,
+                "mac": "80:02:11:11:02:08",
                 "interface": "wlan1",
                 "files_path": "/var/www/html/profiler",
             }
@@ -37,6 +38,8 @@ class TestHelpers:
             "GENERAL": {
                 "ssid": "WLAN Pi",
                 "channel": 36,
+                "frequency": 5180,
+                "mac": "80:02:11:11:02:08",
                 "interface": "wlan1",
                 "listen_only": True,
                 "files_path": "/var/www/html/profiler",
@@ -50,7 +53,7 @@ class TestHelpers:
         [
             ("EE-C7-3B-59-EE-DD", True),
             ("3A:CC:DD:BB:CC:AA", True),
-            ("68-F7-28-F1-23-A9", False)
+            ("68-F7-28-F1-23-A9", False),
         ],
     )
     def test_is_randomized(self, mac, expected):
@@ -89,7 +92,6 @@ class TestHelpers:
     def test_get_frequency_bytes(self, channel, expected):
         resp = helpers.get_frequency_bytes(channel)
         assert resp == expected
-
 
     @pytest.mark.parametrize(
         "channel,expected",
@@ -163,12 +165,13 @@ class TestHelpers:
             assert _ in config["GENERAL"].keys()
 
     def test_defaults_no_config_found(self):
-        """ test the default values which are set when no config is present """
+        """test the default values which are set when no config is present"""
         parser = helpers.setup_parser()
         config = helpers.setup_config(parser.parse_args(["--config", "fake.ini"]))
         assert config == dict(
             GENERAL=dict(
                 channel=36,
+                frequency=0,
                 files_path="/var/www/html/profiler",
                 interface="wlan0",
                 ssid="WLAN Pi",
@@ -176,7 +179,7 @@ class TestHelpers:
         )
 
     def test_no_config_found(self):
-        """ test the default values which are set when no config is present """
+        """test the default values which are set when no config is present"""
         parser = helpers.setup_parser()
         config = helpers.setup_config(
             parser.parse_args(
@@ -197,6 +200,7 @@ class TestHelpers:
         assert config == dict(
             GENERAL=dict(
                 channel=1,
+                frequency=0,
                 files_path="/nope/profiler",
                 interface="wlan999",
                 ssid="Jerry Can You Hear Me",

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import pytest
-
 import multiprocessing as mp
+
+import pytest
 from profiler import fakeap
 
 
