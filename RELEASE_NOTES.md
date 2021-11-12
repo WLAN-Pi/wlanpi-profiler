@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Release 1.0.8-2
 
 - Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed
@@ -7,6 +8,13 @@ Release 1.0.8-1
 - Improvements to interface staging and diagnostics
 - Add `--list_interfaces` option to print out interfaces with their respective information
 - For monitor mode, default behavior is to create a vif, except for rtl88XXau cards
+=======
+Release 1.0.8-1
+
+- Improvements to interface staging and diagnostics.
+- Add `--list_interfaces` option to print out interfaces with their respective information
+- For monitor mode, default behavior is to create a vif, except for rtl88XXau cards.
+>>>>>>> main
 
 Release 1.0.8
 

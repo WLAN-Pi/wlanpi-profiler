@@ -1,9 +1,12 @@
+<<<<<<< HEAD
 wlanpi-profiler (1.0.8-2) unstable; urgency=medium
 
   * Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed
 
  -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 11 Nov 2021 23:06:59 -0500
 
+=======
+>>>>>>> main
 wlanpi-profiler (1.0.8-1) unstable; urgency=medium
 
   * Use a vif by default unless rtl88xxau is detected
