@@ -607,7 +607,7 @@ def generate_run_message(config: Dict) -> None:
         out = []
         ssid = config["GENERAL"]["ssid"]
         out.append(
-            f"Starting the profiler fake AP using {interface} on channel {config['GENERAL']['channel']} ({config['GENERAL']['frequency']})"
+            f"Starting a fake AP using {interface} on channel {config['GENERAL']['channel']} ({config['GENERAL']['frequency']})"
         )
         out.append(" ")
         out.append("Instructions:")

@@ -28,6 +28,28 @@ class InterfaceError(Exception):
     """Custom exception used when there are problems staging the interface for injection"""
 
 
+class InterfaceInformation:
+    """Base class for Interface Information"""
+
+    def __init__(
+        self,
+        phy,
+        interface,
+        mode,
+        driver,
+        driver_version,
+        firmware_rev,
+        chipset,
+    ):
+        self.phy = phy
+        self.interface = interface
+        self.mode = mode
+        self.driver = driver
+        self.driver_version = driver_version
+        self.firmware_rev = firmware_rev
+        self.chipset = chipset
+
+
 class Interface:
     """WLAN Interface data class"""
 
@@ -47,7 +69,7 @@ class Interface:
         self.driver = self.get_driver(self.name)
         eth_tool_info = self.get_ethtool_info(self.name)
         self.driver_version = self.get_driver_version(eth_tool_info)
-        self.firmware_version = self.get_firmware_version(eth_tool_info)
+        self.firmware_revision = self.get_firmware_revision(eth_tool_info)
         self.chipset = self.get_chipset(self.name)
         self.check_interface_stack(self.name)
         self.phy_id = self.get_phy_id()
@@ -93,21 +115,88 @@ class Interface:
         self.checks()
         self.log_debug()
 
+    @staticmethod
+    def get_attr_max_len(searchList, attr):
+        """Find all matching attributes in a list and return max length"""
+        _list = []
+        for _obj in searchList:
+            if isinstance(getattr(_obj, attr), str):
+                _list.append(getattr(_obj, attr))
+            else:
+                _list.append(str(getattr(_obj, attr)))
+        return max(len(x) for x in _list)
+
     def print_interface_information(self) -> None:
         """Print wiphys to the screen"""
         self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
         self.log.debug("phys: %s", self.phys)
-        print("phy, interface, mode, mac, driver, driver version, chipset")
+
+        ifaces = []
         for phy in self.phys:
             for iface in phy.interfaces:
                 eth_tool_info = self.get_ethtool_info(iface.name)
                 driver = self.get_driver(iface.name)
                 driver_version = self.get_driver_version(eth_tool_info)
+                firmware_rev = self.get_firmware_revision(eth_tool_info)
                 chipset = self.get_chipset(iface.name)
                 mode = self.get_mode(iface=iface.name)
-                print(
-                    f"phy#{phy.phy_id}, {iface.name}, {mode}, {iface.addr}, {driver}, {driver_version}, {chipset}"
+                ifaces.append(
+                    InterfaceInformation(
+                        f"phy{phy.phy_id}",
+                        iface.name,
+                        mode,
+                        driver,
+                        driver_version,
+                        firmware_rev,
+                        chipset,
+                    )
                 )
+        ifaces.reverse()
+
+        ifaces.insert(
+            0,
+            InterfaceInformation(
+                "PHY",
+                "Interface",
+                "Mode",
+                "Driver",
+                "DriverVersion",
+                "FirmwareRev",
+                "Chipset",
+            ),
+        )
+        ifaces.insert(1, InterfaceInformation(" ", " ", " ", " ", " ", " ", " "))
+
+        phy_len = Interface.get_attr_max_len(ifaces, "phy")
+        interface_len = Interface.get_attr_max_len(ifaces, "interface")
+        mode_len = Interface.get_attr_max_len(ifaces, "mode")
+        driver_len = Interface.get_attr_max_len(ifaces, "driver")
+        driverv_len = Interface.get_attr_max_len(ifaces, "driver_version")
+        firmwarer_len = Interface.get_attr_max_len(ifaces, "firmware_rev")
+        chipset_len = Interface.get_attr_max_len(ifaces, "chipset")
+
+        uname = run_command(["uname", "-a"])
+        print(uname)
+
+        out = ""
+        for iface in ifaces:
+            out += "{0:<{phy_len}}  {1:<{interface_len}}  {2:<{mode_len}}  {3:<{driver_len}}  {4:<{driverv_len}}  {5:<{firmwarer_len}}  {6:<{chipset_len}}\n".format(
+                iface.phy,
+                iface.interface,
+                iface.mode,
+                iface.driver,
+                iface.driver_version,
+                iface.firmware_rev,
+                iface.chipset,
+                phy_len=phy_len,
+                interface_len=interface_len,
+                mode_len=mode_len,
+                driver_len=driver_len,
+                driverv_len=driverv_len,
+                firmwarer_len=firmwarer_len,
+                chipset_len=chipset_len,
+            )
+        print(out)
 
     def check_reg_domain(self) -> None:
         """Check and report the set regulatory domain"""
@@ -178,6 +267,34 @@ class Interface:
         ]
         return cmds
 
+    def check_for_disabled_or_noir_channels(
+        self, freq: int, iw_phy_channels, verbose=False
+    ) -> bool:
+        """Check iw phy channels for disabled or No IR and return True if found"""
+        channels_status = self.get_channels_status(iw_phy_channels)
+        # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
+        if channels_status:
+            for _band, channels in channels_status.items():
+                # loop through channels and check if we need to do a scan before staging
+                for ch in channels:
+                    if int(freq) == int(ch.freq):
+                        # if channel we want to use is disabled or No IR, attempt scan to enable it
+                        if ch.disabled or ch.no_ir:
+                            if verbose:
+                                if ch.disabled:
+                                    self.log.warning(
+                                        "Channel is disabled for %s (%s)",
+                                        ch.ch,
+                                        ch.freq,
+                                    )
+                                if ch.no_ir:
+                                    self.log.warning(
+                                        "No IR found in iw channel information for %s (%s) which means injection will not function!",
+                                        ch.ch,
+                                        ch.freq,
+                                    )
+                            return True
+
     def stage_interface(self) -> None:
         """Prepare the interface for monitor mode and injection"""
         # get and print debugs for versions of system utilities
@@ -205,20 +322,11 @@ class Interface:
             cmds = self.get_generic_staging_commands()
         else:
             cmds = self.get_iwlwifi_staging_commands()
-            # get channels from iw phy phyX channels
-            cmd = ["iw", "phy", f"{self.phy}", "channels"]
-            iw_phy_channels = run_command(cmd)
-            channels_status = self.get_channels_status(iw_phy_channels)
-            # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
-            if channels_status:
-                for _band, channels in channels_status.items():
-                    # loop through channels and check if we need to do a scan before staging
-                    for ch in channels:
-                        if int(self.frequency) == int(ch.freq):
-                            # if channel we want to use is disabled or No IR, attempt scan to enable it
-                            if ch.disabled or ch.no_ir:
-                                self.scan()
-                            break
+
+            if self.check_for_disabled_or_noir_channels(
+                self.frequency, run_command(["iw", "phy", f"{self.phy}", "channels"])
+            ):
+                self.scan()
 
         # run the staging commands
         for cmd in cmds:
@@ -239,6 +347,13 @@ class Interface:
         self.mode = self.get_mode(iface=self.mon)
         if "monitor" not in self.mode:
             raise InterfaceError("interface is not in monitor mode")
+
+        # check for No IR or disabled
+        self.check_for_disabled_or_noir_channels(
+            self.frequency,
+            run_command(["iw", "phy", f"{self.phy}", "channels"]),
+            verbose=True,
+        )
 
     @staticmethod
     def get_channels_status(iw_phy_channels) -> Dict:
@@ -322,23 +437,24 @@ class Interface:
         self.check_reg_domain()
 
     def check_interface_stack(self, interface: str) -> str:
-        """Check that the interface we've been asked to run on actually exists and has an ieee80211 stack"""
+        """Check that the interface we've been asked to run on actually exists and has an mac80211 stack"""
         discovered_interfaces = []
         for iface in os.listdir("/sys/class/net"):
             iface_path = os.path.join("/sys/class/net", iface)
-            device_path = os.path.join(iface_path, "device")
-            if os.path.isdir(device_path):
-                if "ieee80211" in os.listdir(device_path):
+            # ieee80211
+            # device_path = os.path.join(iface_path, "device")
+            if os.path.isdir(iface_path):
+                if "phy80211" in os.listdir(iface_path):
                     discovered_interfaces.append(iface)
         if interface not in discovered_interfaces:
             self.log.warning(
-                "%s interface does not support the ieee80211 stack. here are some interfaces which do: %s",
+                "%s interface does not support the mac80211 stack. here are some interfaces which do: %s",
                 interface,
                 ", ".join(discovered_interfaces),
             )
             raise InterfaceError(f"{interface} is not detected as a valid interface")
         else:
-            self.log.debug("%s has ieee80211 stack", interface)
+            self.log.debug("%s has a mac80211 stack", interface)
             return interface
 
     def log_debug(self) -> None:
@@ -369,15 +485,15 @@ class Interface:
         out = ""
         for line in eth_tool_info.lower().splitlines():
             if line.startswith("version:"):
-                out = line.split(" ")[1]
+                out = line.replace("version:", "").strip()
         return out
 
-    def get_firmware_version(self, eth_tool_info) -> str:
+    def get_firmware_revision(self, eth_tool_info) -> str:
         """Gather driver firmware version for interface"""
         out = ""
         for line in eth_tool_info.lower().splitlines():
             if line.startswith("firmware-version:"):
-                out = line.split(" ")[1]
+                out = line.replace("firmware-version:", "").strip()
         return out
 
     def cleanup_chipset(self, chipset) -> str:
@@ -387,10 +503,23 @@ class Interface:
             "Network Connection",
             "Wireless Adapter",
             "WLAN Adapter",
+            "(",
+            ")",
+            "Corporation.",
+            "Corporation",
+            "Corp.",
+            "Corp",
+            "Inc.",
+            "Inc",
+            "Technology,",
+            "Technology",
+            '"',
+            "  ",
         ]
         for word in words:
             if word in chipset:
-                chipset = chipset.replace(word, "")
+                chipset = chipset.replace(word, " ")
+        chipset = " ".join(chipset.split())
         return chipset
 
     def get_chipset(self, iface) -> str:
