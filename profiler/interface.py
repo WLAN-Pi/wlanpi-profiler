@@ -222,7 +222,7 @@ class Interface:
             ["ip", "link", "set", f"{self.name}", "up"],
         ]
         for cmd in commands:
-            self.log.info("run: %s", " ".join(cmd))
+            self.log.debug("run: %s", " ".join(cmd))
             run_command(cmd)
 
     def scan(self) -> None:
@@ -233,9 +233,8 @@ class Interface:
             ["ip", "link", "set", f"{self.name}", "up"],
             ["iw", f"{self.name}", "scan"],
         ]
-        self.log.info("performing scan on %s", self.name)
         for cmd in iwlwifi_scan_commands:
-            self.log.info("run: %s", " ".join(cmd))
+            self.log.debug("run: %s", " ".join(cmd))
             run_command(cmd, suppress_output=True)
 
     def get_generic_staging_commands(self) -> List:
@@ -326,15 +325,20 @@ class Interface:
             if self.check_for_disabled_or_noir_channels(
                 self.frequency, run_command(["iw", "phy", f"{self.phy}", "channels"])
             ):
+                self.log.debug(
+                    "initiating scan on %s because checks found disabled or No IR on %s",
+                    self.name,
+                    self.frequency,
+                )
                 self.scan()
 
         # run the staging commands
         for cmd in cmds:
-            self.log.info("run: %s", " ".join(cmd))
+            self.log.debug("run: %s", " ".join(cmd))
             if "monitor" in cmd:
                 stdout = run_command(cmd).strip()
                 if "non-zero" not in stdout:
-                    self.log.info(stdout)
+                    self.log.debug(stdout)
                     if "not supported" in stdout:
                         raise InterfaceError(
                             f"{self.name} does not appear to support monitor mode"

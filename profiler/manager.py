@@ -47,11 +47,10 @@ def signal_handler(signum, frame):
             # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
                 if __IFACE.requires_vif:
-                    print(
-                        "Detected SIGINT or Control-C ... Removing monitor interface ..."
-                    )
+                    print("Detected SIGINT or Control-C ...")
+                    log = logging.getLogger(inspect.stack()[0][3])
+                    log.debug("Removing monitor interface ...")
                     __IFACE.reset_interface()
-                    print("Exiting ...")
                 else:
                     print("Detected SIGINT or Control-C ... Exiting ...")
         sys.exit(2)

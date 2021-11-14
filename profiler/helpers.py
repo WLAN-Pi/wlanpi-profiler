@@ -78,6 +78,8 @@ def setup_logger(args) -> None:
             logging_level = logging.WARNING
     else:
         logging_level = logging.INFO
+    if args.debug:
+        logging_level = logging.DEBUG
 
     default_logging = {
         "version": 1,
@@ -183,6 +185,13 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="use the WLAN Pi's hostname as SSID name (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        default=False,
+        help="enable debug logging output",
     )
     parser.add_argument(
         "--logging",
@@ -588,15 +597,17 @@ def generate_run_message(config: Dict) -> None:
     if config["GENERAL"].get("listen_only") is True:
         out = []
         out.append(
-            f"Starting profiler in listen only mode using {interface} on {config['GENERAL']['channel']} ({config['GENERAL']['frequency']}):"
+            f"Starting profiler in listen only mode using {interface} on {config['GENERAL']['channel']} ({config['GENERAL']['frequency']})"
         )
         out.append(" ")
-        out.append("Instructions:")
+        out.append("Getting started:")
+        out.append(" ")
         out.append(
-            " - Associate your Wi-Fi client to *any* SSID on the listening frequency above"
+            " - Associate your Wi-Fi client to *any* SSID on the channel/frequency above"
         )
-        out.append(" - We should hear and passively receive any association requests")
-        out.append(" - Results are saved locally and printed to screen")
+        out.append(" - Any detected association requests will be profiled")
+        out.append(" - Capabilities may vary depending on SSID and AP configuration")
+        out.append(" - Results are then saved locally and printed on the shell")
         header_len = len(max(out, key=len))
 
         print(f"\n{'~' * header_len}")
@@ -610,14 +621,15 @@ def generate_run_message(config: Dict) -> None:
             f"Starting a fake AP using {interface} on channel {config['GENERAL']['channel']} ({config['GENERAL']['frequency']})"
         )
         out.append(" ")
-        out.append("Instructions:")
+        out.append("Getting started:")
+        out.append(" ")
         out.append(f" - Associate your Wi-Fi client to *our* SSID: {ssid}")
         out.append(" - Enter any random password to connect")
         out.append(" - Authentication will fail, which is OK")
         out.append(
             f" - We should receive an association request to {config['GENERAL']['mac']}"
         )
-        out.append(" - Profiled results are saved locally and sent to stdout")
+        out.append(" - Results are then saved locally and printed on the shell")
         header_len = len(max(out, key=len))
 
         print(f"\n{'~' * header_len}")
