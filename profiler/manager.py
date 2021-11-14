@@ -49,7 +49,7 @@ def signal_handler(signum, frame):
                 if __IFACE.requires_vif:
                     print("Detected SIGINT or Control-C ...")
                     log = logging.getLogger(inspect.stack()[0][3])
-                    log.debug("Removing monitor interface ...")
+                    log.debug("Removing monitor vif ...")
                     __IFACE.reset_interface()
                 else:
                     print("Detected SIGINT or Control-C ... Exiting ...")
