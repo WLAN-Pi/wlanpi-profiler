@@ -1,9 +1,11 @@
-wlanpi-profiler (1.0.8-2) unstable; urgency=medium
+wlanpi-profiler (1.0.9) unstable; urgency=medium
 
   * Add detection for 6 GHz out-of-band as a supported alternative operating class
   * Add detection for 6 GHz in-band for band capabilities found when the client associations in 6 GHz
+  * Improve --list_interface output
+  * Add --debug option as shorthand for --logging debug
 
- -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 12 Nov 2021 01:23:59 -0500
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 19 Nov 2021 12:07:59 -0500
 
 wlanpi-profiler (1.0.8-2) unstable; urgency=medium
 
