@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         distro: [buster,bullseye]
-        arch: [armhf,arm64]
+        arch: [armhf]
 
     environment: PACKAGECLOUD
 
