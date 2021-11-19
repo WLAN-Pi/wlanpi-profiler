@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Release 1.0.9
 
 - Add detection for 6 GHz out-of-band as a supported alternative operating class
@@ -5,6 +6,8 @@ Release 1.0.9
 - Improve `--list_interface` output
 - Add `--debug` option as shorthand for `--logging debug`
 
+=======
+>>>>>>> main
 Release 1.0.8-2
 
 - Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed
