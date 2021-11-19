@@ -5,7 +5,7 @@ wlanpi-profiler (1.0.9) unstable; urgency=medium
   * Improve --list_interface output
   * Add --debug option as shorthand for --logging debug
 
- -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 19 Nov 2021 12:07:59 -0500
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 19 Nov 2021 14:07:59 -0500
 
 wlanpi-profiler (1.0.8-2) unstable; urgency=medium
 
