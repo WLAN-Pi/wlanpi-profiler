@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        distro: [buster,bullseye]
+        distro: [buster]
         arch: [armhf,arm64]
     
 

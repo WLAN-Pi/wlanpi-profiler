@@ -1,25 +1,17 @@
-<<<<<<< HEAD
 Release 1.0.9
 
 - Add detection for 6 GHz out-of-band as a supported alternative operating class
 - Add detection for 6 GHz in-band for band capabilities found when the client associations in 6 GHz
 - Improve `--list_interface` output
 - Add `--debug` option as shorthand for `--logging debug`
-
-=======
->>>>>>> main
-Release 1.0.8-2
-
-- Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed
-
-Release 1.0.8-1
-
 - Improvements to interface staging and diagnostics
-- Add `--list_interfaces` option to print out interfaces with their respective information
-- For monitor mode, default behavior is to create a vif, except for rtl88XXau cards
 
 Release 1.0.8
 
+- Add `-f` option to specify frequency rather than `-c`, only one or the other is allowed
+- Improvements to interface staging and diagnostics
+- Add `--list_interfaces` option to print out interfaces with their respective information
+- For monitor mode, default behavior is to create a vif, except for rtl88XXau cards
 - Interface staging changes (management of a monitor interface) for Intel AX2XX
 - Bump manuf from 1.1.1 to 1.1.3 to resolve URL changes and prevent URL redirection problems
 - Print more helpful information to the screen when updating manuf (--oui_update) from profiler

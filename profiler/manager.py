@@ -20,10 +20,10 @@ import logging
 import multiprocessing as mp
 import os
 import platform
+import signal
 import sys
 from datetime import datetime
 from multiprocessing import Queue
-from signal import SIGINT, signal
 
 # third party imports
 import scapy  # type: ignore
@@ -40,19 +40,24 @@ __PIDS.append(("main", os.getpid()))
 __IFACE = Interface()
 
 
-def signal_handler(signum, frame):
+def removeVif():
+    """Remove the vif we created if exists"""
+    if __IFACE.requires_vif and not __IFACE.removed:
+        log = logging.getLogger(inspect.stack()[0][3])
+        log.debug("Removing monitor vif ...")
+        __IFACE.reset_interface()
+        __IFACE.removed = True
+
+
+def receiveSignal(signum, _frame):
     """Handle noisy keyboardinterrupt"""
     if signum == 2:
         for name, pid in __PIDS:
             # We only want to print exit messages once as multiple processes close
             if name == "main" and os.getpid() == pid:
+                print("Detected SIGINT or Control-C ...")
                 if __IFACE.requires_vif:
-                    print("Detected SIGINT or Control-C ...")
-                    log = logging.getLogger(inspect.stack()[0][3])
-                    log.debug("Removing monitor vif ...")
-                    __IFACE.reset_interface()
-                else:
-                    print("Detected SIGINT or Control-C ... Exiting ...")
+                    removeVif()
         sys.exit(2)
 
 
@@ -107,7 +112,7 @@ def start(args: argparse.Namespace):
         __IFACE.print_interface_information()
         sys.exit(0)
 
-    signal(SIGINT, signal_handler)
+    signal.signal(signal.SIGINT, receiveSignal)
 
     processes = []
     finished_processes = []
@@ -162,8 +167,15 @@ def start(args: argparse.Namespace):
                 # get channel from `iw`
                 __IFACE.no_interface_prep = True
                 __IFACE.setup()
+
+                # setup should have detected a mac address
+                config["GENERAL"]["mac"] = __IFACE.mac
+                # need to set channel in config for banner
                 if __IFACE.channel:
                     config["GENERAL"]["channel"] = __IFACE.channel
+                # need to set freq in config for banner
+                if __IFACE.frequency:
+                    config["GENERAL"]["frequency"] = __IFACE.frequency
                 log.debug("finish interface setup with no staging ...")
             else:
                 # get channel from config setup by helpers.py (either passed in via CLI option or config.ini)
@@ -247,6 +259,8 @@ def start(args: argparse.Namespace):
             if shutdown:
                 process.kill()
             if process.exitcode is not None:
+                if __IFACE.requires_vif and not __IFACE.removed:
+                    removeVif()
                 log.debug(process)
                 processes.remove(process)
                 finished_processes.append(process)

@@ -244,13 +244,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="turn off 802.11ax High Efficiency (HE) reporting",
     )
     parser.add_argument(
-        "--no_sniffer_filter",
-        dest="no_sniffer_filter",
-        action="store_true",
-        default=False,
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
         "--clean",
         dest="clean",
         action="store_true",
@@ -279,6 +272,13 @@ def setup_parser() -> argparse.ArgumentParser:
         metavar="PCAP",
         dest="pcap_analysis",
         help="read and analyze association request frames from pcap",
+    )
+    parser.add_argument(
+        "--no_bpf_filters",
+        dest="no_bpf_filters",
+        action="store_true",
+        default=False,
+        help="removes BPF filters from sniffer() but may impact profiler performance",
     )
     parser.add_argument(
         "--list_interfaces",

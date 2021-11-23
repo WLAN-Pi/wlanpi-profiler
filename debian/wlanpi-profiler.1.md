@@ -114,7 +114,7 @@ This version of wlanpi-profiler is only available in English.
 
 /var/www/html/profiler
 
-/opt/venvs/wlanpi-profiler
+/opt/wlanpi-profiler
 
 # AUTHORS
 
