@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.9-1) unstable; urgency=low
+
+  * Improve interface handling in edge cases.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 23 Nov 2021 01:41:59 -0500
+
 wlanpi-profiler (1.0.9) unstable; urgency=medium
 
   * Add detection for 6 GHz out-of-band as a supported alternative operating class

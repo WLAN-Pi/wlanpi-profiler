@@ -61,6 +61,7 @@ class Interface:
         self.requires_vif = False
         self.phys = []
         self.no_interface_prep = False
+        self.removed = False
 
     def setup(self):
         """Perform setup for the interface"""
@@ -128,6 +129,8 @@ class Interface:
 
     def print_interface_information(self) -> None:
         """Print wiphys to the screen"""
+        lsb_release = run_command(["lsb_release", "-a"])
+        print(lsb_release)
         self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
         self.log.debug("phys: %s", self.phys)
 
@@ -293,6 +296,7 @@ class Interface:
                                         ch.freq,
                                     )
                             return True
+        return False
 
     def stage_interface(self) -> None:
         """Prepare the interface for monitor mode and injection"""
@@ -517,6 +521,7 @@ class Interface:
             "Inc",
             "Technology,",
             "Technology",
+            ",",
             '"',
             "  ",
         ]
