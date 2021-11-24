@@ -1,4 +1,7 @@
 #!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 export DH_VIRTUALENV_INSTALL_ROOT=/opt
 export PYBUILD_NAME=wlanpi-profiler
@@ -6,12 +9,15 @@ SNAKE=/usr/bin/python3
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell parsechangelog | grep ^Version: | sed -re 's/[^0-9]+([^-]+).*/\1/')
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
-EXTRA_REQUIREMENTS=--upgrade-pip --preinstall "setuptools>=18.1" --preinstall "wheel"
+EXTRA_REQUIREMENTS=--upgrade-pip --preinstall "setuptools>=57" --preinstall "wheel>=0.36"
 DH_VENV_ARGS=--builtin-venv --python ${SNAKE} $(EXTRA_REQUIREMENTS) \
 			--extra-pip-arg=--progress-bar=pretty
 
 %:
 	dh $@ --with python3,python-virtualenv --buildsystem=pybuild
+
+override_dh_installexamples:
+	dh_installexamples -A -X__pycache__
 
 override_dh_virtualenv:
 	dh_virtualenv $(DH_VENV_ARGS)
