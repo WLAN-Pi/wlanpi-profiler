@@ -4,7 +4,7 @@ Package manpage is written in Markdown and we can use pandoc to convert it into 
 
 ## Install Dependencies
 
-arm64 host: 
+no armhf package for pandoc, there is an arm64 host: 
 
 ```
 cd ~
@@ -14,7 +14,7 @@ sudo apt install ~/pandoc-2.12-1-arm64.deb
 
 ## Generate Man Page
 
-First time:
+first time:
 
 ```
 chmod +x manpage.sh
