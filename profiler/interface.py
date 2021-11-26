@@ -659,6 +659,9 @@ class Interface:
             # first phy
             line = line.strip().lower()
             if first_phy:
+                # if iw dev resp is empty return
+                if is_last_line:
+                    return []
                 # phy#0
                 if line.startswith("phy#"):
                     first_phy = False
@@ -722,7 +725,10 @@ class Interface:
             iface = self.name
         _interface_type: "str" = run_command(["cat", f"/sys/class/net/{iface}/type"])
         mode = "unknown"
-        _type = int(_interface_type)
+        try:
+            _type = int(_interface_type)
+        except ValueError:
+            return mode
         if _type == 1:
             mode = "managed"
         elif _type == 801:
