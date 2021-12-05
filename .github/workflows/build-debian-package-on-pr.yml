@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: sbuild for ${{ matrix.distro }} ${{ matrix.arch }}
-        uses: danielmundi/sbuild-debian-package@main
+        uses: wlan-pi/sbuild-debian-package@main
         id: build-debian-package
         with:
           distro: ${{ matrix.distro }}
