@@ -36,7 +36,7 @@ or if you don''t want to satisfy build depends:
 dpkg-buildpackage -us -uc -b
 ```
 
-Use `dpkg -i <file.deb>` to install and test the generated package.
+Use `sudo apt install ./<file.deb>` to install and test the generated package.
 
 ### debchange - tool for maintaining the source package changelog file
 
