@@ -1,6 +1,6 @@
 wlanpi-profiler (1.0.9-2) unstable; urgency=low
 
-  * Fix --list_interfaces bug
+  * Fix --list_interfaces bug 
 
  -- Josh Schmelzle <josh@joshschmelzle.com>  Sat, 04 Dec 2021 19:26:47 -0500
 
