@@ -35,17 +35,18 @@ jobs:
           name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
           
-      - name: Notify Slack
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        if: always()
-        uses: pullreminders/slack-action@master
-        with:
-          args: '{\"channel\":\"CFN3PMQD8\",\"text\": \"${{ github.repository }} <${{ github.event.commits[0].url }}/checks|${{ github.workflow }}> *${{ job.status }}* (${{ matrix.distro }}\\${{ matrix.arch }}) --- <${{ github.event.commits[0].url }}|${{ github.event.commits[0].message }}> by ${{ github.event.commits[0].author.name }}\"}'
-      
       - name: Upload Package to Gemfury
         uses: danielmundi/upload-gemfury@main
         with:
           package-name: ${{ steps.build-debian-package.outputs.deb-package }}
           gemfury-username: ${{ secrets.GEMFURY_NAME }}
           gemfury-token: ${{ secrets.GEMFURY_TOKEN }}
+  
+      - name: Notify Slack
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          message: '{"channel":"CFN3PMQD8","text": "${{ github.repository }}@${{ github.ref_name }} <${{ github.event.commits[0].url }}/checks|${{ github.workflow }}> *${{ job.status }}* (${{ matrix.distro }}\${{ matrix.arch }}) --- <${{ github.event.commits[0].url }}|${{ github.event.commits[0].message }}> by ${{ github.event.commits[0].author.name }}"}'
+        if: always()
+        uses: pullreminders/slack-action@master
+        with:
+          args: ${{ toJSON(env.message) }}
