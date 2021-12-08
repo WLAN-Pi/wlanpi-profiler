@@ -1,6 +1,9 @@
 name: Packagecloud Build CI
 
 on:
+  # Allow manual runs of workflow from Actions tab
+  workflow_dispatch:
+
   push:
     branches:
       - main
@@ -45,11 +48,17 @@ jobs:
           packagecloud-distrib: raspbian/${{ matrix.distro }}
           packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
   
-      - name: Notify Slack
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          message: '{"channel":"CFN3PMQD8","text": "${{ github.repository }}@${{ github.ref_name }} <${{ github.event.commits[0].url }}/checks|${{ github.workflow }}> *${{ job.status }}* (${{ matrix.distro }}\${{ matrix.arch }}) --- <${{ github.event.commits[0].url }}|${{ github.event.commits[0].message }}> by ${{ github.event.commits[0].author.name }}"}'
-        if: always()
-        uses: pullreminders/slack-action@master
+  slack-workflow-status:
+    if: always()
+    name: Post Workflow Status to Slack
+    needs:
+      - sbuild
+    runs-on: 'ubuntu-20.04'
+    steps:
+      - name: Slack Workflow Notification
+        uses: Gamesight/slack-workflow-status@master
         with:
-          args: ${{ toJSON(env.message) }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          channel: '#profiler2'
+          name: 'WLAN Pi CI Bot'

@@ -4,6 +4,9 @@
 name: Run Python Tests
 
 on:
+  # Allow manual runs of workflow from Actions tab
+  workflow_dispatch:
+
   push:
     branches: [ main ]
   pull_request:
