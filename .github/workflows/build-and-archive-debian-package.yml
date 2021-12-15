@@ -1,5 +1,4 @@
-
-name: Build Debian Package On PR
+name: Build and Archive Debian Package
 
 on:
   # Allow manual runs of workflow from Actions tab
