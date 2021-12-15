@@ -1,12 +1,11 @@
-name: Gemfury Build CI
+
+name: Build Debian Package On PR
 
 on:
   # Allow manual runs of workflow from Actions tab
   workflow_dispatch:
 
-  push:
-    branches:
-      - main
+  pull_request:
     paths:
       - 'debian/changelog'
 
@@ -15,17 +14,16 @@ jobs:
     runs-on: 'ubuntu-20.04'
 
     strategy:
+      fail-fast: false
       matrix:
-        distro: [buster]
-        arch: [armhf]
-
-    environment: GEMFURY
-
+        distro: [buster,bullseye]
+        arch: [armhf,arm64]
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: sbuild on ${{ matrix.distro }} ${{ matrix.arch }}
+      - name: sbuild for ${{ matrix.distro }} ${{ matrix.arch }}
         uses: wlan-pi/sbuild-debian-package@main
         id: build-debian-package
         with:
@@ -37,13 +35,6 @@ jobs:
         with:
           name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
-          
-      - name: Upload Package to Gemfury
-        uses: danielmundi/upload-gemfury@main
-        with:
-          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          gemfury-username: ${{ secrets.GEMFURY_NAME }}
-          gemfury-token: ${{ secrets.GEMFURY_TOKEN }}
   
   slack-workflow-status:
     if: always()
@@ -57,5 +48,5 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          channel: '#profiler2'
+          icon_emoji: ':page_facing_up:'
           name: 'WLAN Pi CI Bot'
