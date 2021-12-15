@@ -11,7 +11,7 @@ on:
       - 'debian/changelog'
 
 jobs:
-  build:
+  sbuild:
     runs-on: 'ubuntu-20.04'
 
     strategy:
@@ -60,5 +60,3 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          icon_emoji: ':page_facing_up:'
-          name: 'WLAN Pi CI Bot'
