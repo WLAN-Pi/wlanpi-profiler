@@ -29,7 +29,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install depends for profiler
       run: |
         sudo apt update
         sudo apt install ethtool iw tcpdump wpasupplicant
@@ -37,13 +37,13 @@ jobs:
         pip install tox
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
     
-    - name: run tox linters
+    - name: Run linters
       id: linters-run
       continue-on-error: true
       run: |
         tox -e lint
   
-    - name: Test with tox
+    - name: Run tests with tox
       id: tox-run
       run: |
         tox
