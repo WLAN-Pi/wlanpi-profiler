@@ -473,7 +473,11 @@ class Profiler(object):
 
         sanitize = {"intelwir": "Intel", "intelcor": "Intel", "samsunge": "Samsung"}
 
-        if oui_manuf is None or oui_manuf.lower().startswith(low_quality):
+        if (
+            oui_manuf is None
+            or oui_manuf.lower().startswith(low_quality)
+            or oui_manuf.lower() in sanitize.keys()
+        ):
             # inspect vendor specific IEs and see if there's an IE with
             # an OUI that we know can only be included if the manuf
             # of the client is the vendor that maps to that OUI
