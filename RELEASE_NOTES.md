@@ -1,3 +1,7 @@
+Release 1.0.10
+
+- bump manuf from 1.1.3 to 1.1.4 to fix linkrot for well known address (wka) URL 
+
 Release 1.0.9
 
 - Add detection for 6 GHz out-of-band as a supported alternative operating class
