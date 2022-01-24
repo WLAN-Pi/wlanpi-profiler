@@ -25,7 +25,7 @@ values to determine client capabilities.
     - d. inspect octet 2 (one of the four vht capability octets)
         - if bit zero set to '1', client is MU Beam-formee capable     
     - e. inspect octet 0 (one of the four vht capability octets)
-        - if bit zero set to '1', client supports TVHT 160 MHz 
+        - if bit zero set to '1', client supports VHT 160 MHz 
 
 3. 802.11k: inspect tagged parameter 70 (RM Enabled Capabilities) - RM = radio management
     - a. is tagged parameter present?
