@@ -224,6 +224,8 @@ def start(args: argparse.Namespace):
             )
         else:
             log.debug("beacon process")
+            # update ssid record for sharing with other apps like FPMS for QR code generation
+            helpers.update_ssid_record(config.get("GENERAL").get("ssid"))
             txbeacons = mp.Process(
                 name="txbeacons",
                 target=TxBeacons,
