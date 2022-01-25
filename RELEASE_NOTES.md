@@ -1,6 +1,12 @@
+Release 1.0.11
+
+- Write SSID to a record file when beaconing (for QR code generation on FPMS)
+- Fix bug which caused CPU pinning to 100% on one of the cores
+- Fix issue handling case sensitive sanitizing of vendor OUIs
+
 Release 1.0.10
 
-- bump manuf from 1.1.3 to 1.1.4 to fix linkrot for well known address (wka) URL 
+- bump manuf from 1.1.3 to 1.1.5 to fix linkrot for well known address (wka) URL 
 
 Release 1.0.9
 

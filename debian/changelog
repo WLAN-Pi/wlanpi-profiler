@@ -1,3 +1,11 @@
+wlanpi-profiler (1.0.11) unstable; urgency=medium
+
+  * Write SSID to a record file when beaconing (for QR code generation on FPMS)
+  * Fix bug which caused CPU pinning to 100% on one of the cores
+  * Fix issue handling case sensitive sanitizing of vendor OUIs 
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Mon, 24 Jan 2022 23:47:46 -0500
+
 wlanpi-profiler (1.0.10-1) unstable; urgency=low
 
   * bump manuf from 1.1.4 to 1.1.5 to update the pre-packaged manuf file 
