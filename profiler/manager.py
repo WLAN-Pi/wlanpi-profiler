@@ -24,6 +24,7 @@ import signal
 import sys
 from datetime import datetime
 from multiprocessing import Queue
+from time import sleep
 
 # third party imports
 import scapy  # type: ignore
@@ -255,6 +256,7 @@ def start(args: argparse.Namespace):
 
     # keep main process alive until all subprocesses are finished or closed
     while processes:
+        sleep(0.1)
         for process in processes:
             if shutdown:
                 process.kill()
