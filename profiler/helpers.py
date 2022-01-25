@@ -581,6 +581,17 @@ def get_wlanpi_version() -> str:
     return wlanpi_version
 
 
+def update_ssid_record(ssid: str):
+    """Update SSID record on local filesystem"""
+    log = logging.getLogger(inspect.stack()[0][3])
+
+    ssid_file_path = "/etc/wlanpi-profiler/ssid"
+
+    with open(ssid_file_path, "w") as _file:
+        _file.write(ssid)
+        log.debug("updated ssid record with: %s", ssid)
+
+
 def flag_last_object(seq):
     """Treat the last object in an iterable differently"""
     seq = iter(seq)  # ensure seq is an iterator
