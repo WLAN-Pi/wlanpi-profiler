@@ -318,6 +318,37 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
         log.exception("issue removing files")
 
 
+@dataclass
+class NetworkInterface:
+    ifname: str = None
+    operstate: str = None
+    mac: str = None
+
+
+def get_ip_data(intf) -> NetworkInterface:
+    # Get json output from `ip` command
+    result = run_command(["ip", "-json", "address"])
+    data = json.loads(result)
+    interface_data = {}
+    for item in data:
+        name = item["ifname"]
+        interface_data[name] = item
+    # Build dataclass for storage and easier test assertion
+    iface = NetworkInterface()
+    if intf in interface_data.keys():
+        iface.operstate = interface_data[intf]["operstate"]
+        iface.ifname = interface_data[intf]["ifname"]
+        iface.mac = interface_data[intf]["address"].replace(":","")
+    return iface
+
+def get_eth0_mac():
+    """000000111111"""
+    eth0_data = get_ip_data("eth0")
+    eth0_mac = eth0_data.mac.replace(":", "")
+    if eth0_mac:
+        return eth0_mac
+    return ""
+
 def setup_config(args):
     """Create the configuration (SSID, channel, interface, etc) for the Profiler"""
     log = logging.getLogger(inspect.stack()[0][3])
@@ -337,8 +368,9 @@ def setup_config(args):
     if "channel" not in config["GENERAL"]:
         config["GENERAL"]["channel"] = 36
 
-    if "ssid" not in config["GENERAL"]:
-        config["GENERAL"]["ssid"] = "WLAN Pi"
+    if "ssid" not in config["GENERAL"] or config["GENERAL"].get("ssid", "") == "":
+        last_3_of_eth0_mac = f" {get_eth0_mac()[-3:]}"
+        config["GENERAL"]["ssid"] = f"Profiler{last_3_of_eth0_mac}"
 
     if "interface" not in config["GENERAL"]:
         config["GENERAL"]["interface"] = "wlan0"
