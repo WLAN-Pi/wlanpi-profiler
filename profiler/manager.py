@@ -33,7 +33,7 @@ from scapy.all import rdpcap  # type: ignore
 # app imports
 from . import helpers
 from .__version__ import __version__
-from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, SSID_TMP_FILE
 from .interface import Interface, InterfaceError
 
 __PIDS = []
@@ -52,14 +52,24 @@ def removeVif():
 
 def receiveSignal(signum, _frame):
     """Handle noisy keyboardinterrupt"""
-    if signum == 2:
-        for name, pid in __PIDS:
-            # We only want to print exit messages once as multiple processes close
-            if name == "main" and os.getpid() == pid:
-                print("Detected SIGINT or Control-C ...")
-                if __IFACE.requires_vif:
-                    removeVif()
-        sys.exit(2)
+    for name, pid in __PIDS:
+        # We only want to print exit messages once as multiple processes close
+        if name == "main" and os.getpid() == pid:
+            if os.path.isfile(SSID_TMP_FILE):
+                os.remove(SSID_TMP_FILE)
+            if __IFACE.requires_vif:
+                removeVif()
+            if signum == 2:
+                print("\nDetected SIGINT or Control-C ...")
+            if signum == 15:
+                print("Detected SIGTERM ...")
+
+        # if name is not "main":
+        #     sys.exit(signum)
+
+
+signal.signal(signal.SIGINT, receiveSignal)
+signal.signal(signal.SIGTERM, receiveSignal)
 
 
 def are_we_root() -> bool:
@@ -113,9 +123,7 @@ def start(args: argparse.Namespace):
         __IFACE.print_interface_information()
         sys.exit(0)
 
-    signal.signal(signal.SIGINT, receiveSignal)
-
-    processes = []
+    running_processes = []
     finished_processes = []
     queue: "Queue[str]" = Queue()
     pcap_analysis = config.get("GENERAL").get("pcap_analysis")
@@ -232,7 +240,7 @@ def start(args: argparse.Namespace):
                 target=TxBeacons,
                 args=(config, boot_time, lock, sequence_number),
             )
-            processes.append(txbeacons)
+            running_processes.append(txbeacons)
             txbeacons.start()
             __PIDS.append(("txbeacons", txbeacons.pid))  # type: ignore
 
@@ -242,7 +250,7 @@ def start(args: argparse.Namespace):
             target=Sniffer,
             args=(config, boot_time, lock, sequence_number, queue, args),
         )
-        processes.append(sniffer)
+        running_processes.append(sniffer)
         sniffer.start()
         __PIDS.append(("sniffer", sniffer.pid))  # type: ignore
 
@@ -250,22 +258,28 @@ def start(args: argparse.Namespace):
 
     log.debug("profiler process")
     profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
-    processes.append(profiler)
+    running_processes.append(profiler)
     profiler.start()
     __PIDS.append(("profiler", profiler.pid))  # type: ignore
 
     shutdown = False
 
     # keep main process alive until all subprocesses are finished or closed
-    while processes:
+    while running_processes:
         sleep(0.1)
-        for process in processes:
-            if shutdown:
-                process.kill()
+        for process in running_processes:
+            # if exitcode is None, it has not stopped yet.
             if process.exitcode is not None:
                 if __IFACE.requires_vif and not __IFACE.removed:
                     removeVif()
-                log.debug(process)
-                processes.remove(process)
+                    # nesting this here is ugly but works
+                    if os.path.isfile(SSID_TMP_FILE):
+                        os.remove(SSID_TMP_FILE)
+                log.debug("shutdown %s process (%s)", process.name, process.exitcode)
+                running_processes.remove(process)
                 finished_processes.append(process)
                 shutdown = True
+
+            if shutdown:
+                process.kill()
+                process.join()
