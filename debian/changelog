@@ -1,4 +1,4 @@
-wlanpi-profiler (1.0.12) unstable; urgency=medium
+wlanpi-profiler (1.0.12-1) unstable; urgency=medium
 
   * When profiler beacons, /var/run/wlanpi-profiler.ssid is created with the contents of the SSID for the fake soft AP.
   * When profiler stops, /var/run/wlanpi-profiler.ssid is deleted.
