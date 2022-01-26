@@ -12,6 +12,7 @@ profiler.constants
 define constant values for app
 """
 
+SSID_TMP_FILE = "/var/run/wlanpi-profiler.ssid"
 CONFIG_FILE = "/etc/wlanpi-profiler/config.ini"
 
 DOT11_TYPE_MANAGEMENT = 0

@@ -64,7 +64,7 @@ for tool in __tools:
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS, CONFIG_FILE
+from .constants import CHANNELS, CONFIG_FILE, SSID_TMP_FILE
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -585,11 +585,9 @@ def update_ssid_record(ssid: str):
     """Update SSID record on local filesystem"""
     log = logging.getLogger(inspect.stack()[0][3])
 
-    ssid_file_path = "/etc/wlanpi-profiler/ssid"
-
-    with open(ssid_file_path, "w") as _file:
+    with open(SSID_TMP_FILE, "w") as _file:
         _file.write(ssid)
-        log.debug("updated ssid record with: %s", ssid)
+        log.debug("updated %s record with: %s", SSID_TMP_FILE, ssid)
 
 
 def flag_last_object(seq):
