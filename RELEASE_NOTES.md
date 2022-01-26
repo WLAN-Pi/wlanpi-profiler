@@ -1,3 +1,9 @@
+Release 1.0.12
+
+- When profiler beacons, /var/run/wlanpi-profiler.ssid is created with the contents of the SSID for the fake soft AP.
+- When profiler stops, /var/run/wlanpi-profiler.ssid is deleted.
+- Default SSID is Profiler xxx where xxx is the last 3 of the eth0 MAC.
+
 Release 1.0.11
 
 - Write SSID to a record file when beaconing (for QR code generation on FPMS)
