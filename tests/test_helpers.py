@@ -168,15 +168,8 @@ class TestHelpers:
         """test the default values which are set when no config is present"""
         parser = helpers.setup_parser()
         config = helpers.setup_config(parser.parse_args(["--config", "fake.ini"]))
-        assert config == dict(
-            GENERAL=dict(
-                channel=36,
-                frequency=0,
-                files_path="/var/www/html/profiler",
-                interface="wlan0",
-                ssid="WLAN Pi",
-            )
-        )
+        assert config["GENERAL"]["channel"] == 36
+        assert config["GENERAL"]["interface"] == "wlan0"
 
     def test_no_config_found(self):
         """test the default values which are set when no config is present"""

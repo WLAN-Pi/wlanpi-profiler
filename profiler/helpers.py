@@ -338,8 +338,9 @@ def get_ip_data(intf) -> NetworkInterface:
     if intf in interface_data.keys():
         iface.operstate = interface_data[intf]["operstate"]
         iface.ifname = interface_data[intf]["ifname"]
-        iface.mac = interface_data[intf]["address"].replace(":","")
+        iface.mac = interface_data[intf]["address"].replace(":", "")
     return iface
+
 
 def get_eth0_mac():
     """000000111111"""
@@ -348,6 +349,7 @@ def get_eth0_mac():
     if eth0_mac:
         return eth0_mac
     return ""
+
 
 def setup_config(args):
     """Create the configuration (SSID, channel, interface, etc) for the Profiler"""
