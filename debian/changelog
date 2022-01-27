@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.13) unstable; urgency=medium
+
+  * Save last profiled MAC address with no delimiters to /var/run/wlanpi-profiler.last_profile 
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 26 Jan 2022 23:51:58 -0500
+
 wlanpi-profiler (1.0.12-1) unstable; urgency=medium
 
   * When profiler beacons, /var/run/wlanpi-profiler.ssid is created with the contents of the SSID for the fake soft AP.

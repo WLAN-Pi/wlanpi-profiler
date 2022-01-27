@@ -49,7 +49,14 @@ from .constants import (
     VENDOR_SPECIFIC_IE_TAG,
     VHT_CAPABILITIES_IE_TAG,
 )
-from .helpers import Base64Encoder, Capability, flag_last_object, get_bit, is_randomized
+from .helpers import (
+    Base64Encoder,
+    Capability,
+    flag_last_object,
+    get_bit,
+    is_randomized,
+    update_last_profile_record,
+)
 
 
 class Profiler(object):
@@ -124,6 +131,10 @@ class Profiler(object):
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
         self.log.debug("detected freq from assoc is %s", freq)
+
+        # update /var/run/wlanpi-profiler.last_profile
+        update_last_profile_record(frame.addr2.replace(":", ""))
+
         channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
         """
         All radio tap headers are malformed from some adapters on certain kernels.
@@ -212,6 +223,7 @@ class Profiler(object):
             )
 
             self.client_profiled_count += 1
+
             self.log.debug(
                 "%s clients profiled this session", self.client_profiled_count
             )

@@ -64,7 +64,7 @@ for tool in __tools:
 
 # app imports
 from .__version__ import __version__
-from .constants import CHANNELS, CONFIG_FILE, SSID_TMP_FILE
+from .constants import CHANNELS, CONFIG_FILE, LAST_PROFILE_TMP_FILE, SSID_TMP_FILE
 
 FILES_PATH = "/var/www/html/profiler"
 
@@ -613,6 +613,14 @@ def get_wlanpi_version() -> str:
     except OSError:
         pass
     return wlanpi_version
+
+
+def update_last_profile_record(mac: str):
+    """Update Last Profile record on local filesystem"""
+    log = logging.getLogger(inspect.stack()[0][3])
+    with open(LAST_PROFILE_TMP_FILE, "w") as _file:
+        _file.write(mac)
+        log.debug("updated %s record with: %s", LAST_PROFILE_TMP_FILE, mac)
 
 
 def update_ssid_record(ssid: str):

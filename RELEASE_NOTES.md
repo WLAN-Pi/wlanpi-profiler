@@ -1,3 +1,7 @@
+Release 1.0.13
+
+- Save last profiled MAC address with no delimiters to /var/run/wlanpi-profiler.last_profile.
+
 Release 1.0.12
 
 - When profiler beacons, /var/run/wlanpi-profiler.ssid is created with the contents of the SSID for the fake soft AP.
