@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [buster,bullseye]
+        distro: [bullseye]
         arch: [armhf,arm64]
 
     environment: PACKAGECLOUD
