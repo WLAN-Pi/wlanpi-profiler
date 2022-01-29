@@ -346,7 +346,8 @@ def get_eth0_mac():
     """000000111111"""
     eth0_data = get_ip_data("eth0")
     if eth0_data:
-        eth0_mac = eth0_data.mac.replace(":", "")
+        if eth0_data.mac:
+            eth0_mac = eth0_data.mac.replace(":", "")
     if eth0_mac:
         return eth0_mac
     return ""
