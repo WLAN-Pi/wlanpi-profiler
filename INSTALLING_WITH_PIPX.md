@@ -1,6 +1,6 @@
 # Installing `wlanpi-profiler` using pipx
 
-It is possible to install `profiler` outside of the WLAN Pi ecosystem on distributions such as Debian or Ubuntu using the `pipx` package manager.
+It is possible to install `profiler` outside of the WLAN Pi ecosystem on distributions such as Debian or Ubuntu using the `pipx` package manager. There are some tradeoffs, but the core profiler features will still work.
 
 Assumptions:
 
@@ -101,6 +101,31 @@ Verbose/debug mode:
 ```bash
 $ sudo su -p
 # profiler --debug
+```
+
+## Conflicting processes
+
+Since you likely installed this on an OS that is not WLAN Pi, I recommend installing `aircrack-ng` and using `airmon-ng` to check and kill any processes that will take control of the WLAN NIC you're likely planning on using with `profiler`.
+
+1. Install `aircrack-ng`
+
+```bash
+$ sudo apt update
+$ sudo apt install aircrack-ng
+```
+
+2. Run `airmon-ng`
+
+```bash
+$ sudo airmon-ng check
+$ sudo airmon-ng check kill
+```
+
+3. Run profiler
+
+```bash
+$ sudo su -p
+# profiler
 ```
 
 ## Upgrading profiler
