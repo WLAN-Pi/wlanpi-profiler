@@ -136,7 +136,7 @@ $ sudo su -p
 sudo python3 -m pip install -U pipx
 ```
 
-```
+```bash
 $ sudo su -p
 # pipx upgrade profiler
 profiler is already at latest version 1.0.13 location: /root/.local/pipx/venvs/profiler)
