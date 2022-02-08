@@ -52,7 +52,7 @@ jobs:
           packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
 
       - name: Upload arm64 package to debian/${{ matrix.distro }}
-        if: matrix.arch == 'debian'
+        if: matrix.arch == 'arm64'
         uses: danielmundi/upload-packagecloud@main
         with:
           package-name: ${{ steps.build-debian-package.outputs.deb-package }}
