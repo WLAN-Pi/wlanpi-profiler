@@ -41,13 +41,24 @@ jobs:
           name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
 
-      - name: Upload package to packagecloud
+      - name: Upload armhf package to raspbian/${{ matrix.distro }}
+        if: matrix.arch == 'armhf'
         uses: danielmundi/upload-packagecloud@main
         with:
           package-name: ${{ steps.build-debian-package.outputs.deb-package }}
           packagecloud-username: wlanpi
           packagecloud-repo: dev
           packagecloud-distrib: raspbian/${{ matrix.distro }}
+          packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
+
+      - name: Upload arm64 package to debian/${{ matrix.distro }}
+        if: matrix.arch == 'debian'
+        uses: danielmundi/upload-packagecloud@main
+        with:
+          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
+          packagecloud-username: wlanpi
+          packagecloud-repo: dev
+          packagecloud-distrib: debian/${{ matrix.distro }}
           packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
   
   slack-workflow-status:
