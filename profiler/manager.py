@@ -18,6 +18,10 @@ import argparse
 import inspect
 import logging
 import multiprocessing as mp
+# things break when we use spawn
+# from multiprocessing import set_start_method
+# set_start_method("spawn")
+
 import os
 import platform
 import signal
