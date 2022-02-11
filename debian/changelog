@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.14) unstable; urgency=medium
+
+  * Remove tox and coveragebadge into extras and do not install in Debian package.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 11 Feb 2022 17:09:58 -0500
+
 wlanpi-profiler (1.0.13) unstable; urgency=medium
 
   * Save last profiled MAC address with no delimiters to /var/run/wlanpi-profiler.last_profile 
