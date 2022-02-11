@@ -301,6 +301,7 @@ class Interface:
     def stage_interface(self) -> None:
         """Prepare the interface for monitor mode and injection"""
         # get and print debugs for versions of system utilities
+        self.log.debug("start stage_interface")
         wpa_cli_version = run_command(["wpa_cli", "-v"])
         if wpa_cli_version:
             self.log.debug(
@@ -316,7 +317,9 @@ class Interface:
 
         # always run wpa_cli
         wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+        self.log.debug("running '%s'", wpa_cli_cmd)
         run_command(wpa_cli_cmd)
+        self.log.debug("finished with '%s'", wpa_cli_cmd)
 
         cmds = []
         # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
@@ -335,6 +338,8 @@ class Interface:
                     self.frequency,
                 )
                 self.scan()
+                self.log.debug("finished scan on %s", self.name)
+        self.log.debug("finish stage_interface")
 
         # run the staging commands
         for cmd in cmds:
