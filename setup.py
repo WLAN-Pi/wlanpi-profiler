@@ -20,7 +20,22 @@ except FileNotFoundError:
 
 packages = ["profiler"]
 
-requires = ["tox==3.24.5", "coverage-badge==1.1.0", "scapy==2.4.5", "manuf==1.1.5"]
+extras = {
+    "testing": [
+        "tox==3.24.5",
+        "black",
+        "isort",
+        "autoflake",
+        "mypy",
+        "flake8",
+        "pytest",
+        "pytest-cov",
+        "coverage-badge==1.1.0",
+        "pytest-mock",
+    ],
+}
+
+requires = ["scapy==2.4.5", "manuf==1.1.5"]
 
 setup(
     name=about["__title__"],
@@ -47,5 +62,6 @@ setup(
     },
     include_package_data=True,
     install_requires=requires,
+    extras_require=extras,
     entry_points={"console_scripts": ["profiler=profiler.__main__:main"]},
 )
