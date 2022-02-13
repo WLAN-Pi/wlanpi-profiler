@@ -18,7 +18,7 @@ If you would like to upgrade the shipped version of `profiler2` with WLAN Pi OS 
 
 In our future releases, we're packaging profiler into an installable Debian package (`.deb`).   
 
-So, we're moving away from using pipx to install and upgrade profiler, but you can still use this method for 1) upgrading profiler on legacy NEO2 platforms via pipx or 2) installing profiler via pipx on non-WLAN Pi images.
+So, we're moving away from using pipx to install and upgrade profiler, but you can still use this method for 1) upgrading profiler on legacy NEO2 platforms via pipx or 2) installing profiler via pipx on other Linux distributions.
 
 Otherwise, on WLAN Pi OS v3.0.0+, you'll want to use `sudo apt install wlanpi-profiler` or `sudo apt upgrade wlanpi-profiler` to install or upgrade the latest version of profiler.
 
