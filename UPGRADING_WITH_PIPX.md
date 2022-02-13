@@ -95,7 +95,7 @@ Check it out:
 ```bash
 $ which profiler
 $ profiler -h
-$ proviler --version
+$ profiler --version
 ```
 
 ## Appendix
