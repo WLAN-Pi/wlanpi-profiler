@@ -33,15 +33,11 @@ The profiler attempts to address this problem by advertising the highest-level f
 
 ## Getting started
 
-Start the profiler. It will broadcast a fake AP.
+The first step is to start the profiler, which will broadcast a fake AP. The client will send an association frame when attempting to connect to the fake AP. The capabilities of a client are then determined based on profiler analyzing the association frame. 
 
-When the client attempts association to the profilers fake AP, it will send an association frame. 
+If running directly from a terminal, once profiled, a text report prints in real-time to the screen, and results write to a local directory on the WLAN Pi host. If running from FPMS, you should see a banner display for a few moments. 
 
-The capabilities of a client are determined based on the tool analyzing the association frame. 
-
-If running directly from a terminal, once profiled, a text report prints in real-time to the screen, and results write to a local directory on the WLAN Pi host. 
-
-Saved results include a copy of the text report and the association frame in PCAP format, and the result is appended to a rotating `.csv` report.
+Once we've profiled a client, profiler saves the results which consist of a text report and the association frame in PCAP format. Profiler also appends the result to a daily rotating `.csv` report.
 
 1. Start the profiler:
 
@@ -83,39 +79,35 @@ Saved results include a copy of the text report and the association frame in PCA
 
 ## Installation
 
-profiler is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image, but if you want to install it manually, here is what you need.
+profiler is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image as a Debian package, but if you want to install it manually, here is what you need:
 
 General requirements:
 
 - adapter (and driver) which supports both monitor mode and packet injection
-  - mt76x2u (recommended) and rtl88XXau adapters are tested regularly (everything else is experimental and not officially supported)
+  - mt76x2u (recommended) and iwlwifi (ax200 and ax210) are tested regularly (everything else is experimental and not officially supported).
+  - removed from the recommended list are rtl88XXau adapters (comfast for example), but they should still work. with that said, don't open a bug report here for a rtl88XXau card.
 - elevated permissions
 
 Package requirements:
 
 - Python version 3.7 or higher
-- `iw`, `netstat`, and `tcpdump` tools installed on the host
+- `iw`, `iproute2`, `pciutils`, `usbutils`, `kmod`, `wpa_cli`, and `wpasupplicant` tools installed on the host. most distributions already come with these.
 
-### Manual installation example with pipx (this will change to debian packaging in the near future)
+### Upgrading WLAN Pi OS v3 installs.
 
-```
-sudo -i
+Got your hands on a fancy new WLAN Pi Pro or running WLAN Pi Community Edition (CE) on a RBPi 3b or 4? We deploy a Debian package for profiler on our package archive. You can `sudo apt update` and `sudo apt install wlanpi-profiler` to get the latest version!
 
-# install depends
-apt-get install python3 python3-pip python3-venv git iw netstat tcpdump
+### Upgrading existing WLAN Pi OS v2 NEO2 installs via pipx
 
-# install pipx
-python3 -m pip install pipx
-python3 -m pipx ensurepath
+Are you reading this and have a NEO2 WLAN Pi? You can upgrade your existing profiler install, but there are some manual things you need to do first. Check out the [upgrading with pipx](UPGRADING_WITH_PIPX.md) instructions.
 
-# install profiler from github
-pipx install git+https://github.com/WLAN-Pi/profiler.git
+### Non WLAN Pi: Installing via pipx
 
-# set reg domain (some adapters/drivers require this in order to Tx in 5 GHz bands)
-iw reg set US
-```
+Don't have a WLAN Pi? Have a Linux host handy? Try the [installing wlanpi-profiler using pipx](INSTALLING_WITH_PIPX.md) instructions.
 
-And starting profiler looks like this:
+# Usage from the CLI
+
+You can start profiler directly from the command line like this:
 
 ```
 sudo profiler
@@ -123,24 +115,26 @@ sudo profiler
 
 Stop with `CTRL + C`.
 
-# Usage
+Usage:
 
 ```
-usage: profiler [-h] [-c CHANNEL] [-i INTERFACE] [-s SSID]
-                [--config FILE] [--files_path PATH] [--hostname_ssid]
-                [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r]
-                [--no11ax] [--oui_update] [--read PCAP] [--version]
+$ profiler -h
+usage: profiler [-h] [-c CHANNEL | -f FREQ] [-i INTERFACE] [-s SSID] [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug]
+                [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r] [--no11ax] [--oui_update] [--read PCAP] [--no_bpf_filters]
+                [--list_interfaces] [--version]
 
 wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler
 
 optional arguments:
   -h, --help            show this help message and exit
-  -c CHANNEL            set the operating channel to broadcast on
+  -c CHANNEL            set the channel to broadcast on
+  -f FREQ               set the frequency to broadcast on
   -i INTERFACE          set network interface for profiler
   -s SSID               set profiler SSID name
   --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
   --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
   --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
+  --debug               enable debug logging output
   --logging [{debug,warning}]
                         change logging output
   --noprep              disable interface preperation (default: False)
@@ -149,6 +143,8 @@ optional arguments:
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
   --oui_update          initiates update of OUI database (requires Internet connection)
   --read PCAP           read and analyze association request frames from pcap
+  --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance
+  --list_interfaces     print out a list of interfaces with an 80211 stack
   --version, -V         show program's version number and exit
 ```
 
@@ -156,39 +152,53 @@ optional arguments:
 
 We require elevated permissions to put the interface in monitor mode and to open raw native sockets for frame injection. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this for you automatically. 
 
+Don't want to use the default channel? You can change it with the `-c` option:
+
 ```
 # capture frames on channel 48 using the default SSID
 sudo profiler -c 48
 ```
+
+Want to use a custom SSID? You can use the `-s` option to specify your own SSID:
 
 ```
 # capture frames on channel 36 using an SSID called 'JOIN ME'
 sudo profiler -c 36 -s "JOIN ME"
 ```
 
+Having problems profiling a client? We can disable .11r IE in fake AP beacon like this:
+
 ```
 # capture frames on channel 100 with 802.11r disabled for clients that don't like 802.11r
 sudo profiler -c 100 --no11r
 ```
+
+Having problems profiling a client? We can disable .11ax IE in fake AP beacon like this:
 
 ```
 # capture frames on the default channel with 802.11ax disabled for clients that don't like 802.11ax
 sudo profiler --no11ax
 ```
 
+Do you want to capture passively? We can do that! If we use `--noAP`, we will listen for any association request on a given channel.
+
 ```
 # capture frames on channel 100 without the fake AP running (Rx only, no Tx)
 sudo profiler --noAP -c 100
 ```
 
+Already have some association requests in a pcap? We can analyze them. Use `--read <file.pcap>` to feed them into profiler:
+
 ```
-# analyze an association request in a previously captured PCAP file (must be the only frame in the file)
+# analyze an association request in a previously captured PCAP file
 sudo profiler --read assoc_frame.pcap
 ```
 
+Something not working? Use `--debug` to get more logs printed to the shell.
+
 ```
 # increase output to screen for debugging
-sudo profiler --logging debug
+sudo profiler --debug
 ```
 
 ## Feature: overriding defaults with configuration file support
