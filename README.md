@@ -31,7 +31,7 @@ However, please note that the client will match the capabilities advertised by a
 
 The profiler attempts to address this problem by advertising the highest-level feature sets.   
 
-## Getting started
+## Getting started with profiler on a WLAN Pi
 
 The first step is to start the profiler, which will broadcast a fake AP. The client will send an association frame when attempting to connect to the fake AP. The capabilities of a client are then determined based on profiler analyzing the association frame. 
 
@@ -97,11 +97,11 @@ Package requirements:
 
 Got your hands on a fancy new WLAN Pi Pro or running WLAN Pi Community Edition (CE) on a RBPi 3b or 4? We deploy a Debian package for profiler on our package archive. You can `sudo apt update` and `sudo apt install wlanpi-profiler` to get the latest version!
 
-### Upgrading existing WLAN Pi OS v2 NEO2 installs via pipx
+### Upgrading existing WLAN Pi OS v2 NEO2 installs via pipx:
 
 Are you reading this and have a NEO2 WLAN Pi? You can upgrade your existing profiler install, but there are some manual things you need to do first. Check out the [upgrading with pipx](UPGRADING_WITH_PIPX.md) instructions.
 
-### Non WLAN Pi: Installing via pipx
+### Don't have a WLAN Pi? Installing via pipx:
 
 Don't have a WLAN Pi? Have a Linux host handy? Try the [installing wlanpi-profiler using pipx](INSTALLING_WITH_PIPX.md) instructions.
 
