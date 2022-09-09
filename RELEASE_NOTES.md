@@ -1,3 +1,7 @@
+Release 1.0.14
+
+- Trim package size. Moves testing toolchian (e.g. tox and coveragebadge) into extras so they are not installed inside the distributed Debian package.
+
 Release 1.0.13
 
 - Save last profiled MAC address with no delimiters to /var/run/wlanpi-profiler.last_profile.
