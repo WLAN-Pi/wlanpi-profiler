@@ -153,7 +153,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     frequency_group.add_argument(
         "-f",
-        dest="freq",
+        dest="frequency",
         type=frequency,
         help="set the frequency to broadcast on",
     )
@@ -391,8 +391,8 @@ def setup_config(args):
     #  - did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
-    if args.freq:
-        config["GENERAL"]["frequency"] = args.freq
+    if args.frequency:
+        config["GENERAL"]["frequency"] = args.frequency
         # user gave us freq, do not set value from config.ini
         config["GENERAL"]["channel"] = 0
     else:
