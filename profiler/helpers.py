@@ -135,7 +135,7 @@ def setup_parser() -> argparse.ArgumentParser:
     """Set default values and handle arg parser"""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler",
+        description="wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler",
     )
     parser.add_argument(
         "--pytest",
