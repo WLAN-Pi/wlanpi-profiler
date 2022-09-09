@@ -9,7 +9,7 @@ The primary purpose is to automate the collection and analysis of association re
 It performs two primary functions:
 
 1. advertises a "fake" Access Point
-2. "profiles" any attempted client association requests (which contain the client's claimed capabilities) 
+2. "profiles" any attempted client association requests (which contain the claimed capabilities of the client) 
 
 ## Why?
 
@@ -85,7 +85,7 @@ General requirements:
 
 - adapter (and driver) which supports both monitor mode and packet injection
   - mt76x2u (recommended) and iwlwifi (ax200 and ax210) are tested regularly (everything else is experimental and not officially supported).
-  - removed from the recommended list are rtl88XXau adapters (comfast for example), but they should still work. with that said, don't open a bug report here for a rtl88XXau card.
+  - removed from the recommended list are rtl88XXau adapters (certain comfast adapters for example), but they should still work. with that said, don't open a bug report here for a rtl88XXau card.
 - elevated permissions
 
 Package requirements:
@@ -93,11 +93,11 @@ Package requirements:
 - Python version 3.7 or higher
 - `iw`, `iproute2`, `pciutils`, `usbutils`, `kmod`, `wpa_cli`, and `wpasupplicant` tools installed on the host. most distributions already come with these.
 
-### Upgrading WLAN Pi OS v3 installs.
+### Upgrading WLAN Pi OS v3 (C4, M4, Pro) installs.
 
-Got your hands on a fancy new WLAN Pi Pro or running WLAN Pi Community Edition (CE) on a RBPi 3b or 4? We deploy a Debian package for profiler on our package archive. You can `sudo apt update` and `sudo apt install wlanpi-profiler` to get the latest version!
+Got your hands on a WLAN Pi C4, M4, or Pro? We build and deploy a Debian package for `wlanpi-profiler` to our package archive. Get the latest version by running `sudo apt update` and `sudo apt install wlanpi-profiler`.
 
-### Upgrading existing WLAN Pi OS v2 NEO2 installs via pipx:
+### Upgrading existing WLAN Pi OS v2 (NEO2) installs via pipx:
 
 Are you reading this and have a NEO2 WLAN Pi? You can upgrade your existing profiler install, but there are some manual things you need to do first. Check out the [upgrading with pipx](UPGRADING_WITH_PIPX.md) instructions.
 
@@ -119,20 +119,21 @@ Usage:
 
 ```
 $ profiler -h
-usage: profiler [-h] [-c CHANNEL | -f FREQ] [-i INTERFACE] [-s SSID] [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug]
-                [--logging [{debug,warning}]] [--noprep] [--noAP] [--no11r] [--no11ax] [--oui_update] [--read PCAP] [--no_bpf_filters]
-                [--list_interfaces] [--version]
+usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--config FILE]
+                [--files_path PATH] [--hostname_ssid] [--debug] [--logging [{debug,warning}]]
+                [--noprep] [--noAP] [--no11r] [--no11ax] [--oui_update] [--read PCAP] 
+                [--no_bpf_filters] [--list_interfaces] [--version]
 
-wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c CHANNEL            set the channel to broadcast on
-  -f FREQ               set the frequency to broadcast on
+  -f FREQUENCY          set the frequency to broadcast on
   -i INTERFACE          set network interface for profiler
   -s SSID               set profiler SSID name
-  --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
-  --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
+  --config FILE         customize path for configuration file 
+                            (default: /etc/wlanpi-profiler/config.ini)
+  --files_path PATH     customize default directory where analysis is saved on local system
+                            (default: /var/www/html/profiler)
   --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
   --debug               enable debug logging output
   --logging [{debug,warning}]
