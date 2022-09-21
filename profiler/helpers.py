@@ -27,7 +27,6 @@ import subprocess
 import sys
 from base64 import b64encode
 from dataclasses import dataclass
-from distutils.util import strtobool
 from time import ctime
 from typing import Any, Dict, List, Union
 
@@ -136,7 +135,7 @@ def setup_parser() -> argparse.ArgumentParser:
     """Set default values and handle arg parser"""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="wlanpi-profiler is an 802.11 client capabilities profiler. Read the manual with: man wlanpi-profiler",
+        description="wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler",
     )
     parser.add_argument(
         "--pytest",
@@ -154,7 +153,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     frequency_group.add_argument(
         "-f",
-        dest="freq",
+        dest="frequency",
         type=frequency,
         help="set the frequency to broadcast on",
     )
@@ -320,12 +319,15 @@ def files_cleanup(directory: str, acknowledged: bool) -> None:
 
 @dataclass
 class NetworkInterface:
-    ifname: str = None
-    operstate: str = None
-    mac: str = None
+    """Class for our Network Interface object"""
+
+    ifname: str = ""
+    operstate: str = ""
+    mac: str = ""
 
 
-def get_ip_data(intf) -> NetworkInterface:
+def get_data_from_iproute2(intf) -> NetworkInterface:
+    """Get and parse output from iproute2 for a given interface"""
     # Get json output from `ip` command
     result = run_command(["ip", "-json", "address"])
     data = json.loads(result)
@@ -343,8 +345,8 @@ def get_ip_data(intf) -> NetworkInterface:
 
 
 def get_eth0_mac():
-    """000000111111"""
-    eth0_data = get_ip_data("eth0")
+    """Check iproute2 output for eth0 and return a MAC with a format like 000000111111"""
+    eth0_data = get_data_from_iproute2("eth0")
     eth0_mac = None
     if eth0_data:
         if eth0_data.mac:
@@ -360,9 +362,14 @@ def setup_config(args):
 
     # load in config (a: from default location "/etc/wlanpi-profiler/config.ini" or b: from provided)
     if os.path.isfile(args.config):
-        parser = load_config(args.config)
-        # we want to work with a dict whether we have config.ini or not
-        config = convert_configparser_to_dict(parser)
+        try:
+            parser = load_config(args.config)
+
+            # we want to work with a dict whether we have config.ini or not
+            config = convert_configparser_to_dict(parser)
+        except configparser.MissingSectionHeaderError as error:
+            log.error("config file appears to be corrupt")
+            config = {}
     else:
         log.warning("can not find config at %s", args.config)
         config = {}
@@ -389,8 +396,8 @@ def setup_config(args):
     #  - did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
-    if args.freq:
-        config["GENERAL"]["frequency"] = args.freq
+    if args.frequency:
+        config["GENERAL"]["frequency"] = args.frequency
         # user gave us freq, do not set value from config.ini
         config["GENERAL"]["channel"] = 0
     else:
@@ -428,6 +435,21 @@ def setup_config(args):
         log.warning("config.ini does not have channel defined")
 
     return config
+
+
+def strtobool(val):  # noqa: VNE002
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()  # noqa: VNE002
+    if val in ("y", "yes", "t", "true", "on", "1"):
+        return 1
+    elif val in ("n", "no", "f", "false", "off", "0"):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
 
 
 def convert_configparser_to_dict(config: configparser.ConfigParser) -> Dict:

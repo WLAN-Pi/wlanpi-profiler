@@ -1,3 +1,10 @@
+wlanpi-profiler (1.0.15) UNRELEASED; urgency=medium
+
+  * Handle traceback when config.ini is corrupt 
+  * Minor cosmetic changes
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 20 Sep 2022 23:59:30 -0400
+
 wlanpi-profiler (1.0.14) unstable; urgency=medium
 
   * Remove tox and coveragebadge into extras and do not install in Debian package.

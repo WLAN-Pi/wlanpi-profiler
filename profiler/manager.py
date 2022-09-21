@@ -18,10 +18,6 @@ import argparse
 import inspect
 import logging
 import multiprocessing as mp
-# things break when we use spawn
-# from multiprocessing import set_start_method
-# set_start_method("spawn")
-
 import os
 import platform
 import signal
@@ -39,6 +35,11 @@ from . import helpers
 from .__version__ import __version__
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, SSID_TMP_FILE
 from .interface import Interface, InterfaceError
+
+# things break when we use spawn
+# from multiprocessing import set_start_method
+# set_start_method("spawn")
+
 
 __PIDS = []
 __PIDS.append(("main", os.getpid()))

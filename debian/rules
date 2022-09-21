@@ -11,7 +11,7 @@ VERSION=$(shell parsechangelog | grep ^Version: | sed -re 's/[^0-9]+([^-]+).*/\1
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
 EXTRA_REQUIREMENTS=--upgrade-pip --preinstall "setuptools>=57" --preinstall "wheel>=0.36"
 DH_VENV_ARGS=--builtin-venv --python ${SNAKE} $(EXTRA_REQUIREMENTS) \
-			--extra-pip-arg=--progress-bar=pretty
+			--extra-pip-arg=--progress-bar=on
 
 %:
 	dh $@ --with python3,python-virtualenv --buildsystem=pybuild
