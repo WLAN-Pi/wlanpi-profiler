@@ -1,8 +1,9 @@
-wlanpi-profiler (1.0.15-alpha1) UNRELEASED; urgency=medium
+wlanpi-profiler (1.0.15) UNRELEASED; urgency=medium
 
-  * Development build 
+  * Handle traceback when config.ini is corrupt 
+  * Minor cosmetic changes
 
- -- Josh Schmelzle <josh@joshschmelzle.com>  Fri, 09 Sep 2022 12:27:09 -0400
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 20 Sep 2022 23:59:30 -0400
 
 wlanpi-profiler (1.0.14) unstable; urgency=medium
 

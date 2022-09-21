@@ -1,6 +1,14 @@
+Unreleased
+
+- TBD
+
+Release 1.0.15
+
+- Handle traceback when config.ini is corrupt
+
 Release 1.0.14
 
-- Trim package size. Moves testing toolchian (e.g. tox and coveragebadge) into extras so they are not installed inside the distributed Debian package.
+- Trim package size. Moves testing toolchain (e.g. tox and coveragebadge) into extras so they are not installed inside the distributed Debian package.
 
 Release 1.0.13
 

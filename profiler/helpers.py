@@ -362,9 +362,14 @@ def setup_config(args):
 
     # load in config (a: from default location "/etc/wlanpi-profiler/config.ini" or b: from provided)
     if os.path.isfile(args.config):
-        parser = load_config(args.config)
-        # we want to work with a dict whether we have config.ini or not
-        config = convert_configparser_to_dict(parser)
+        try:
+            parser = load_config(args.config)
+
+            # we want to work with a dict whether we have config.ini or not
+            config = convert_configparser_to_dict(parser)
+        except configparser.MissingSectionHeaderError as error:
+            log.error("config file appears to be corrupt")
+            config = {}
     else:
         log.warning("can not find config at %s", args.config)
         config = {}
