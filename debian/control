@@ -2,6 +2,7 @@ Source: wlanpi-profiler
 Section: contrib/python
 Priority: optional
 Maintainer: Josh Schmelzle <josh@joshschmelzle.com>
+Uploaders: 
 Build-Depends: debhelper (>= 11),
                dh-python,
                dh-virtualenv (>= 1.1),
