@@ -2,13 +2,13 @@
 
 If you would like to upgrade the shipped version of `profiler2` with WLAN Pi OS v2, please follow these instructions. Please note that these instructions do not work unless `profiler2` was installed via `pipx` either during the WLAN Pi image creation or you manually installed it that way.
 
-## Prerequisites:
+## Prerequisites
 
 * Profiler is installed on your WLAN Pi via pipx
 * WLAN Pi must have Internet access (GitHub specifically)
 * You will need SSH/terminal access to the WLAN Pi
 
-## Why this process:
+## Why this process
 
 * Pipx needs to be upgraded otherwise you will get errors following this process.
 * When profiler was shipped with the NEO2 platform, the repository it was downloaded from was profiler2, but it has since been renamed.
