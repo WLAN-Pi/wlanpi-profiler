@@ -20,22 +20,19 @@ except FileNotFoundError:
 
 packages = ["profiler"]
 
+with open('requirements.txt') as f:
+    testing = f.read().splitlines()
+testing = [line for line in testing if '#' not in line]
+testing = list(filter(None, testing))
+
 extras = {
-    "testing": [
-        "tox==3.26.0",
-        "black",
-        "isort",
-        "autoflake",
-        "mypy",
-        "flake8",
-        "pytest",
-        "pytest-cov",
-        "coverage-badge==1.1.0",
-        "pytest-mock",
-    ],
+    "testing": testing
 }
 
-requires = ["scapy==2.4.5", "manuf==1.1.5"]
+with open('requirements.txt') as f:
+    requires = f.read().splitlines()
+requires = [line for line in requires if '#' not in line]
+requires = list(filter(None, requires))
 
 setup(
     name=about["__title__"],
@@ -52,6 +49,7 @@ setup(
         "Natural Language :: English",
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.9",
         "Intended Audience :: System Administrators",
         "Topic :: Utilities",
     ],
