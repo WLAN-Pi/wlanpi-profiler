@@ -27,5 +27,7 @@ Request to include two debug outputs:
  - Hardware: [e.g. RBPi 4, WLAN Pi Pro]
  - Version [e.g. 1.0.0 (`$ profiler --version`)]
 
+Output from `uname -a`. 
+
 **Additional context**
 Add any other context about the problem here.
