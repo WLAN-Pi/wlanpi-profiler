@@ -1,4 +1,4 @@
-wlanpi-profiler (1.0.15) UNRELEASED; urgency=medium
+wlanpi-profiler (1.0.15) unstable; urgency=medium
 
   * Handle traceback when config.ini is corrupt 
   * Minor cosmetic changes
