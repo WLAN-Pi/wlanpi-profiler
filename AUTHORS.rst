@@ -1,4 +1,4 @@
-profiler was created by Josh Schmelzle.
+wlanpi-profiler was created by Josh Schmelzle.
 
 Keepers
 ```````
