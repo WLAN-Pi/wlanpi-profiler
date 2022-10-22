@@ -291,7 +291,7 @@ class Interface:
                                     )
                                 if ch.no_ir:
                                     self.log.warning(
-                                        "No IR found in iw channel information for %s (%s) which means injection will not function!",
+                                        "No IR found in iw channel information for %s (%s) which _may_ cause packet injection to fail! Problem with discovery? Try a different channel / frequency. Confirm we're beaconing via OTA capture from a different interface or device.",
                                         ch.ch,
                                         ch.freq,
                                     )
