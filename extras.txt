@@ -6,5 +6,5 @@ flake8
 pytest
 pytest-cov
 pytest-mock
-tox==3.26.0
+tox==3.27.0
 coverage-badge==1.1.0
