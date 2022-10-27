@@ -22,9 +22,11 @@ values to determine client capabilities.
         - MCS 0-9 if pairs are set to '11'
     - c. inspect octet 1 (one of the four vht capability octets)
         - if bit zero set to '1', client is SU Beam-formee capable
-    - d. inspect octet 2 (one of the four vht capability octets)
+    - d. inspect octect 1 (one of the four vht capability octets)
+        - add bit 5, 6, 7 to determine VHT Beamformee STS
+    - e. inspect octet 2 (one of the four vht capability octets)
         - if bit zero set to '1', client is MU Beam-formee capable     
-    - e. inspect octet 0 (one of the four vht capability octets)
+    - f. inspect octet 0 (one of the four vht capability octets)
         - if bit zero set to '1', client supports VHT 160 MHz 
 
 3. 802.11k: inspect tagged parameter 70 (RM Enabled Capabilities) - RM = radio management
@@ -91,6 +93,14 @@ values to determine client capabilities.
     - h. Buffer Status Report (BSR) support: B19 of HE PHY Capabilities
         - Y - supported
         - N - not supported 
+    - i. HE SU Beamformer: Bit 31 of HE PHY Capabilities
+        - 1 - supported
+        - 0 - not supported
+    - j. HE SU Beamformee: Bit 32 of HE PHY Capabilities
+        - 1 - supported
+        - 0 - not supported
+    - k. HE Beamformee STS: Bits 36-34 of HE PHY Capabilities
+        - Add Bits 36-34 to determine HE Beamformee STS
 
 10. 802.11ax spatial reuse: inspect spatial reuse tag number 39 (Spatial Reuse Parameter Set)
     - a. is Spatial Reuse Parameter Set tagged parameter present?
