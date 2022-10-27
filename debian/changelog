@@ -1,6 +1,6 @@
 wlanpi-profiler (1.0.16-dev.1) UNRELEASED; urgency=medium
 
-  * WIP
+  * Chipset lookup via heuristics
 
  -- Josh Schmelzle <josh@joshschmelzle.com>  Sat, 22 Oct 2022 10:12:11 -0400
 

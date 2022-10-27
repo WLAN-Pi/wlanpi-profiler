@@ -1,6 +1,6 @@
-Unreleased
+Unreleased (1.0.16)
 
-- TBD
+- Chipset lookup via heuristics
 
 Release 1.0.15
 

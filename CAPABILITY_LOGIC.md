@@ -117,7 +117,14 @@ values to determine client capabilities.
                     - Y - Return match
                     - N - Unable to match
 
-14. Detecting 6 GHz Capability Out-of-band via Alternative Operating Class
+14. Chipset manufacturer detection through heuristics 
+    - a. can Vendor Specific Tag 221 OUI be resolved by lookup of OUI in manuf db?
+        - N - Unable to match
+        - Y - Check OUI matches our heuristics
+            - Y - return match
+            - N - unknown / unable to match
+
+15. Detecting 6 GHz Capability Out-of-band via Alternative Operating Class
     - a. is Supported Operating Classes tagged parameter present?
         - N - not supported
         - Y - may be supported
