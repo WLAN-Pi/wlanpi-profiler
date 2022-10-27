@@ -602,6 +602,7 @@ class Profiler(object):
         dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value="")
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
+        dot11ac_bf_sts = Capability(db_key="dot11ac_bf_sts", db_value=0)
         dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -638,6 +639,7 @@ class Profiler(object):
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
             su_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
+            bf_sts_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
             onesixty = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][0]
 
             # 160 MHz
@@ -664,6 +666,16 @@ class Profiler(object):
             else:
                 dot11ac.value += ", [ ] MU BF"
 
+            # BF STS
+            vht_bf_sts_binary_string = "{0}{1}{2}".format(
+                int(get_bit(bf_sts_octet, 5)),
+                int(get_bit(bf_sts_octet, 6)),
+                int(get_bit(bf_sts_octet, 7)),
+            )
+            vht_bf_sts_value = int(vht_bf_sts_binary_string, base=2)
+            dot11ac_bf_sts.db_value = vht_bf_sts_value
+            dot11ac.value += f", Beamformee STS={vht_bf_sts_value}"
+
         return [
             dot11ac,
             dot11ac_nss,
@@ -671,6 +683,7 @@ class Profiler(object):
             dot11ac_mcs,
             dot11ac_su_bf,
             dot11ac_mu_bf,
+            dot11ac_bf_sts,
         ]
 
     @staticmethod
@@ -902,6 +915,9 @@ class Profiler(object):
         dot11ax_he_su_beamformee = Capability(
             db_key="dot11ax_he_su_beamformee", db_value=0
         )
+        dot11ax_he_beamformee_sts = Capability(
+            db_key="dot11ax_he_beamformee_sts", db_value=0
+        )
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
@@ -1019,6 +1035,18 @@ class Profiler(object):
                             dot11ax_he_su_beamformee.db_value = 0
                             dot11ax.value += ", [ ] SU Beamformee"
 
+                        # BF STS
+                        he_bf_sts_octet = element_data[11]
+
+                        he_bf_sts_binary_string = "{0}{1}{2}".format(
+                            int(get_bit(he_bf_sts_octet, 2)),
+                            int(get_bit(he_bf_sts_octet, 3)),
+                            int(get_bit(he_bf_sts_octet, 4)),
+                        )
+                        he_bf_sts_value = int(he_bf_sts_binary_string, base=2)
+                        dot11ax_he_beamformee_sts.db_value = he_bf_sts_value
+                        dot11ax.value += f", Beamformee STS={he_bf_sts_value}"
+
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
                         for bit_position in range(8):
@@ -1091,6 +1119,7 @@ class Profiler(object):
             dot11ax_punctured_preamble,
             dot11ax_he_su_beamformer,
             dot11ax_he_su_beamformee,
+            dot11ax_he_beamformee_sts,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
             dot11ax_160_mhz,

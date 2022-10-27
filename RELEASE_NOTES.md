@@ -1,6 +1,8 @@
 Unreleased (1.0.16)
 
 - Chipset lookup via heuristics
+- VHT Beamformee STS Capability
+- HE Beamformee STS Capability
 
 Release 1.0.15
 
