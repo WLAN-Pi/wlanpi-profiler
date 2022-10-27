@@ -4,6 +4,7 @@
 #
 #    pip-compile requirements.in
 #
+--extra-index-url https://www.piwheels.org/simple
 
 manuf==1.1.5
     # via -r requirements.in
