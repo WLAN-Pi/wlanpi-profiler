@@ -123,8 +123,8 @@ def anonymize_file(input_file: str, output_file: str) -> None:
         has_fcs = False
 
         for frame in reader:
-
             if frame.haslayer(Dot11):
+                logger.debug(frame.show())
                 if frame.haslayer(Dot11FCS):
                     has_fcs = True
                     frame_fcs = frame.fcs
