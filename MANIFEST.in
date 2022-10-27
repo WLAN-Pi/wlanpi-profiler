@@ -1,1 +1,3 @@
 include profiler/config.ini
+include extras.txt
+include requirements.txt

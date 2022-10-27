@@ -143,6 +143,7 @@ class Profiler(object):
         ---------------------------------------------
         - Client MAC: 6e:1d:8a:28:32:51
         - OUI manufacturer lookup: Apple (Randomized MAC)
+        - Chipset lookup: Broadcom
         - Frequency band: Unknown
         - Capture channel: 0
         ---------------------------------------------
@@ -165,7 +166,7 @@ class Profiler(object):
         else:
             band = "unknown"
 
-        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame, is_6ghz)
+        ssid, oui_manuf, chipset, capabilities = self.analyze_assoc_req(frame, is_6ghz)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -195,6 +196,7 @@ class Profiler(object):
             # generate text report
             text_report = self.generate_text_report(
                 text_report_oui_manuf,
+                chipset,
                 capabilities,
                 frame.addr2,
                 channel,
@@ -216,6 +218,7 @@ class Profiler(object):
                 capabilities,
                 frame,
                 oui_manuf,
+                chipset,
                 randomized,
                 band,
                 channel,
@@ -231,6 +234,7 @@ class Profiler(object):
     @staticmethod
     def generate_text_report(
         oui_manuf: str,
+        chipset: str,
         capabilities: list,
         client_mac: str,
         channel: int,
@@ -245,6 +249,7 @@ class Profiler(object):
             text_report += f"\n - SSID: {ssid}"
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
+        text_report += f"\n - Chipset lookup: {chipset or 'Unknown'}"
         band_label = ""
         if band[0] == "2":
             band_label = "2.4 GHz"
@@ -275,6 +280,7 @@ class Profiler(object):
         capabilities,
         frame,
         oui_manuf,
+        chipset,
         randomized: bool,
         band,
         channel,
@@ -298,6 +304,7 @@ class Profiler(object):
         data["mac"] = client_mac
         data["is_laa"] = randomized
         data["manuf"] = oui_manuf
+        data["chipset"] = chipset
         if band[0] == "2":
             band_db = 2
         elif band[0] == "5":
@@ -514,6 +521,36 @@ class Profiler(object):
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
+
+    def resolve_vendor_specific_tag_chipset(self, dot11_elt_dict) -> str:
+        """Resolve client's chipset via heuristics of vendor specific tags"""
+        # Broadcom
+        # MediaTek
+        # Qualcomm
+        # Infineon AG
+        # Intel Wireless Network Group
+        chipset = None
+        manufs = []
+
+        if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
+            for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
+                oui = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                    element_data[0], element_data[1], element_data[2]
+                )
+                manufs.append(self.lookup.get_manuf(oui))
+
+        matches = ["broadcom", "qualcomm", "mediatek", "intel", "infineon"]
+        _break = False
+        for manuf in manufs:
+            for match in matches:
+                if manuf.lower().startswith(match):
+                    chipset = match.title()
+                    _break = True
+                    break
+            if _break:
+                break
+
+        return chipset
 
     @staticmethod
     def analyze_ssid_ie(dot11_elt_dict) -> str:
@@ -1090,6 +1127,9 @@ class Profiler(object):
         #  resolve manufacturer
         oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
+        # parse chipset
+        chipset = self.resolve_vendor_specific_tag_chipset(dot11_elt_dict)
+
         ssid = self.analyze_ssid_ie(dot11_elt_dict)
 
         # dictionary to store capabilities as we decode them
@@ -1127,4 +1167,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict, is_6ghz)
 
-        return ssid, oui_manuf, capabilities
+        return ssid, oui_manuf, chipset, capabilities

@@ -20,19 +20,27 @@ except FileNotFoundError:
 
 packages = ["profiler"]
 
-with open('requirements.txt') as f:
+def parse_requires(_list):
+    requires = list()
+    trims = ["#", "piwheels.org"]
+    for require in _list:
+        if any(match in require for match in trims):
+            continue
+        requires.append(require)
+    requires = list(filter(None, requires))  # remove "" from list
+    return requires
+
+with open("extras.txt") as f:
     testing = f.read().splitlines()
-testing = [line for line in testing if '#' not in line]
-testing = list(filter(None, testing))
 
-extras = {
-    "testing": testing
-}
+testing = parse_requires(testing)
 
-with open('requirements.txt') as f:
+extras = {"testing": testing}
+
+with open("requirements.txt") as f:
     requires = f.read().splitlines()
-requires = [line for line in requires if '#' not in line]
-requires = list(filter(None, requires))
+    
+requires = parse_requires(requires)
 
 setup(
     name=about["__title__"],
