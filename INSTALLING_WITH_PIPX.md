@@ -29,10 +29,10 @@ These are the instructions for first time installs.
 sudo apt update
 ```
 
-2. Install Python3 and pip
+2. Install Python3, pip, python-venv and tcpdump
 
 ```bash
-sudo apt install python3 python3-pip
+sudo apt install python3 python3-pip python3-venv tcpdump
 ```
 
 3. Update pip, setuptools, and wheel to the latest versions
