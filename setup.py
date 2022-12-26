@@ -35,7 +35,7 @@ extras = {
     ],
 }
 
-requires = ["scapy==2.4.5", "manuf==1.1.5"]
+requires = ["scapy==2.5.0", "manuf==1.1.5"]
 
 setup(
     name=about["__title__"],
