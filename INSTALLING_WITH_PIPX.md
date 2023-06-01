@@ -47,7 +47,7 @@ Note: it's important to use the `-p` argument to preserve the environment variab
 
 ```bash
 sudo su -p
-python3 -m pip install pipx
+python3 -m pip install -U pipx
 python3 -m pipx ensurepath
 exit
 ```
