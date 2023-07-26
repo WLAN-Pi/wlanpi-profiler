@@ -20,6 +20,7 @@ except FileNotFoundError:
 
 packages = ["profiler"]
 
+<<<<<<< HEAD
 def parse_requires(_list):
     requires = list()
     trims = ["#", "piwheels.org"]
@@ -36,6 +37,22 @@ with open("extras.txt") as f:
 testing = parse_requires(testing)
 
 extras = {"testing": testing}
+=======
+extras = {
+    "testing": [
+        "tox==3.27.0",
+        "black",
+        "isort",
+        "autoflake",
+        "mypy",
+        "flake8",
+        "pytest",
+        "pytest-cov",
+        "coverage-badge==1.1.0",
+        "pytest-mock",
+    ],
+}
+>>>>>>> main
 
 with open("requirements.txt") as f:
     requires = f.read().splitlines()
