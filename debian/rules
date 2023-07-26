@@ -9,7 +9,7 @@ SNAKE=/usr/bin/python3
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell parsechangelog | grep ^Version: | sed -re 's/[^0-9]+([^-]+).*/\1/')
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
-EXTRA_REQUIREMENTS=--upgrade-pip-to 22.3 --preinstall "setuptools==65.5.0" --preinstall "wheel==0.37.1"
+EXTRA_REQUIREMENTS=--upgrade-pip-to 23.2 --preinstall "setuptools==68.0.0" --preinstall "wheel==0.40.0"
 DH_VENV_ARGS=--builtin-venv --python ${SNAKE} $(EXTRA_REQUIREMENTS) \
 			--extra-pip-arg=--progress-bar=on
 
