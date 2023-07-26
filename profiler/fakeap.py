@@ -33,7 +33,7 @@ try:
     from scapy.all import Dot11ProbeResp  # type: ignore
     from scapy.all import Dot11, Dot11Auth, RadioTap, Scapy_Exception  # type: ignore
     from scapy.all import conf as scapyconf  # type: ignore
-    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff  # type: ignore
+    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff, hexdump  # type: ignore
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print("required module scapy not found.")
@@ -43,7 +43,6 @@ except ModuleNotFoundError as error:
 
 # app imports
 from .constants import (
-    CHANNELS,
     DOT11_SUBTYPE_ASSOC_REQ,
     DOT11_SUBTYPE_AUTH_REQ,
     DOT11_SUBTYPE_BEACON,
@@ -52,24 +51,16 @@ from .constants import (
     DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_TYPE_MANAGEMENT,
 )
+from .__version__ import __version__
+from .helpers import get_wlanpi_version
 
 
 class _Utils:
     """Fake AP helper functions"""
 
-    @staticmethod
-    def build_fake_frame_ies(config) -> Dot11Elt:
+    
+    def build_fake_frame_ies_2ghz_5ghz(ssid, channel, ft_disabled, disabled) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
-        ssid: "str" = config.get("GENERAL").get("ssid")
-        channel = int(config.get("GENERAL").get("channel"))
-
-        is_6ghz = False
-        if channel in CHANNELS["6G"]:
-            is_6ghz = True
-
-        ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
-        he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
-
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
         essid = Dot11Elt(ID="SSID", info=ssid_bytes)
 
@@ -130,16 +121,7 @@ class _Utils:
         six_ghz_cap_data = b"\x3b\x00\x00"
         six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
 
-        # reduced_neighbor_report_data = b"\x02"
-        # reduced_neighbor_report = Dot11Elt(ID=0xFF, info=reduced_neighbor_report_data)
-
-        # custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
-        # custom_data = bytes(f"{custom_hash}", "utf-8")
-        # custom = Dot11Elt(ID=0xDE, info=custom_data)
-
-        if is_6ghz:
-            frame = essid / rates / dsset / dtim / rsn / rm_enabled_cap / extended
-        elif ft_disabled:
+        if ft_disabled:
             frame = (
                 essid
                 / rates
@@ -173,16 +155,112 @@ class _Utils:
         else:
             frame = (
                 frame
-                # / reduced_neighbor_report
                 / he_capabilities
                 / he_operation
                 / spatial_reuse
                 / mu_edca
                 / six_ghz_cap
                 / wmm
-                # / custom
             )
+        return frame
+        
+    @staticmethod
+    def build_fake_frame_ies_6ghz(ssid, channel) -> Dot11Elt:
+        """Build base frame for beacon and probe resp"""
+        log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
+        log.debug("building 6 GHz frame")
+        ssid_bytes: "bytes" = bytes(ssid, "utf-8")
+        essid = Dot11Elt(ID="SSID", info=ssid_bytes)
 
+        rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
+        rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
+
+        channel = bytes([channel])  # type: ignore
+        dsset = Dot11Elt(ID="DSset", info=channel)
+
+        dtim_data = b"\x05\x04\x00\x03\x00\x00"
+        dtim = Dot11Elt(ID="TIM", info=dtim_data)
+
+        rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\xe8\x00"
+    
+        mobility_domain_data = b"\x45\xc2\x00"
+        mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
+
+        rsn = Dot11Elt(ID=0x30, info=rsn_data)
+
+        rm_enabled_data = b"\x02\x00\x00\x00\x00"
+        rm_enabled_cap = Dot11Elt(ID=0x46, info=rm_enabled_data)
+
+        extended_data = b"\x04\x00\x08\x00\x00\x00\x00\x40\x00\x40\x09"
+        extended = Dot11Elt(ID=0x7F, info=extended_data)
+
+        txpowerenv1_data = b"\x58\x2e"
+        txpowerenv1 = Dot11Elt(ID=0xC3, info=txpowerenv1_data)
+        
+        txpowerenv2_data = b"\x18\xfe"
+        txpowerenv2 = Dot11Elt(ID=0xC3, info=txpowerenv2_data)
+
+        wmm_data = b"\x00\x50\xf2\x02\x01\x01\x8a\x00\x03\xa4\x00\x00\x27\xa4\x00\x00\x42\x43\x5e\x00\x62\x32\x2f\x00"
+        wmm = Dot11Elt(ID=0xDD, info=wmm_data)
+
+        he_cap_data = b"\x23\x0d\x01\x00\x02\x40\x00\x04\x70\x0c\x89\x7f\x03\x80\x04\x00\x00\x00\xaa\xaa\xaa\xaa\x7b\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71\x1c\xc7\x71"
+        he_capabilities = Dot11Elt(ID=0xFF, info=he_cap_data)
+
+        he_op_data = b"\x24\xf4\x3f\x00\x19\xfc\xff"
+        he_operation = Dot11Elt(ID=0xFF, info=he_op_data)
+
+        spatial_reuse_data = b"\x27\x05\x00"
+        spatial_reuse = Dot11Elt(ID=0xFF, info=spatial_reuse_data)
+
+        mu_edca_data = b"\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
+        mu_edca = Dot11Elt(ID=0xFF, info=mu_edca_data)
+
+        six_ghz_cap_data = b"\x3b\x00\x00"
+        six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
+
+        rsnex_data = b"\x20"
+        rsnex = Dot11Elt(ID=0xF4, info=rsnex_data)
+        
+        custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
+        custom_data = bytes(f"{custom_hash}", "utf-8")
+        custom = Dot11Elt(ID=0xDD, info=custom_data)
+
+        return (
+            essid
+            / rates
+            / dtim
+            / rsn
+            / mobility_domain
+            / rm_enabled_cap
+            / extended
+            / txpowerenv1
+            / txpowerenv2
+            / he_capabilities
+            / he_operation
+            / spatial_reuse
+            / mu_edca
+            / six_ghz_cap
+            / rsnex
+            / wmm
+            # / custom
+        )
+
+    @staticmethod
+    def build_fake_frame_ies(config) -> Dot11Elt:
+        """Build base frame for beacon and probe resp"""
+        log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
+        ssid: "str" = config.get("GENERAL").get("ssid")
+        channel: int = int(config.get("GENERAL").get("channel"))
+        frequency: int = int(config.get("GENERAL").get("frequency"))
+        ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
+        he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
+
+        is_6ghz = False
+        if frequency > 5950:
+            is_6ghz = True
+            frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel)
+        else:
+            frame = _Utils.build_fake_frame_ies_2ghz_5ghz(ssid, channel, ft_disabled, he_disabled)
         # for gathering data to validate tests:
         #
         # frame_bytes = bytes(frame)
@@ -259,7 +337,7 @@ class TxBeacons(multiprocessing.Process):
             beacon_frame_ies = _Utils.build_fake_frame_ies(self.config)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
-        # self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
+        self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
         self.log.info("starting beacon transmissions")
         self.every(self.beacon_interval, self.beacon)
 
@@ -411,7 +489,7 @@ class Sniffer(multiprocessing.Process):
         elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
             if Dot11Elt in packet:
                 ssid = packet[Dot11Elt].info
-                # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr)
+                # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr2)
                 if ssid == self.ssid or packet[Dot11Elt].len == 0:
                     self.dot11_probe_request_cb(packet)
         elif (
@@ -422,6 +500,8 @@ class Sniffer(multiprocessing.Process):
                 self.dot11_assoc_request_cb(packet)
             if self.listen_only:
                 self.dot11_assoc_request_cb(packet)
+            ssid = packet[Dot11Elt].info
+            self.log.debug("assoc req seen for %s (%s) by MAC %s", ssid, packet.addr1, packet.addr2)
 
     def probe_response(self, probe_request) -> None:
         """Send probe resp to assist with profiler discovery"""
@@ -438,7 +518,7 @@ class Sniffer(multiprocessing.Process):
                         "probe_response(): network is down or no such device ... exiting ..."
                     )
                     sys.exit(signal.SIGALRM)
-        # self.log.debug("sent probe resp to %s", probe_request.addr2)
+        self.log.debug("sent probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame) -> None:
         """Put association request on queue for the Profiler"""
