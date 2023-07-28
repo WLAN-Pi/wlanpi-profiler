@@ -193,12 +193,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="enable debug logging output",
     )
     parser.add_argument(
-        "--logging",
-        help="change logging output",
-        nargs="?",
-        choices=("debug", "warning"),
-    )
-    parser.add_argument(
         "--noprep",
         dest="no_interface_prep",
         action="store_true",
