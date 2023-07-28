@@ -404,7 +404,6 @@ class Profiler(object):
 
         # check if csv file exists
         if not os.path.exists(self.csv_file):
-
             # create file with csv headers
             with open(self.csv_file, mode="w") as file_obj:
                 csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
@@ -575,12 +574,10 @@ class Profiler(object):
         dot11n_nss = Capability(db_key="dot11n_nss", db_value=0)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             spatial_streams = 0
 
             # mcs octets 1 - 4 indicate # streams supported (up to 4 streams only)
             for mcs_octet in range(3, 7):
-
                 mcs_octet_value = dot11_elt_dict[HT_CAPABILITIES_IE_TAG][mcs_octet]
 
                 if mcs_octet_value & 255:
@@ -725,12 +722,10 @@ class Profiler(object):
         )
 
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG]
 
             # check octet 3 exists
             if 3 <= len(ext_cap_list):
-
                 # bit 4 of octet 3 in the extended capabilites field
                 octet3 = ext_cap_list[2]
                 bss_trans_support = int("00001000", 2)
@@ -750,7 +745,6 @@ class Profiler(object):
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG]
             rsn_len = len(rsn_cap_list) - 2
             pmf_oct = rsn_cap_list[rsn_len]
@@ -779,7 +773,6 @@ class Profiler(object):
         )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict.keys():
-
             # octet 3 of power capabilites
             max_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][1]
             min_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][0]
@@ -818,7 +811,6 @@ class Profiler(object):
             is_5ghz = False
 
             while channel_sets_list:
-
                 start_channel = channel_sets_list.pop(0)
                 channel_range = channel_sets_list.pop(0)
 
@@ -932,7 +924,6 @@ class Profiler(object):
         else:
             if IE_EXT_TAG in dot11_elt_dict.keys():
                 for element_data in dot11_elt_dict[IE_EXT_TAG]:
-
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:

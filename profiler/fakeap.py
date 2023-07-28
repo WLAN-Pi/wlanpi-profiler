@@ -33,13 +33,20 @@ try:
     from scapy.all import Dot11ProbeResp  # type: ignore
     from scapy.all import Dot11, Dot11Auth, RadioTap, Scapy_Exception  # type: ignore
     from scapy.all import conf as scapyconf  # type: ignore
-    from scapy.all import get_if_hwaddr, get_if_raw_hwaddr, sniff, hexdump  # type: ignore
+    from scapy.all import (  # type: ignore
+        get_if_hwaddr,
+        get_if_raw_hwaddr,
+        hexdump,
+        sniff,
+    )
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print("required module scapy not found.")
     else:
         print(f"{error}")
     sys.exit(signal.SIGABRT)
+
+from .__version__ import __version__
 
 # app imports
 from .constants import (
@@ -51,15 +58,15 @@ from .constants import (
     DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_TYPE_MANAGEMENT,
 )
-from .__version__ import __version__
 from .helpers import get_wlanpi_version
 
 
 class _Utils:
     """Fake AP helper functions"""
 
-    
-    def build_fake_frame_ies_2ghz_5ghz(ssid, channel, ft_disabled, disabled) -> Dot11Elt:
+    def build_fake_frame_ies_2ghz_5ghz(
+        ssid, channel, ft_disabled, disabled
+    ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
         essid = Dot11Elt(ID="SSID", info=ssid_bytes)
@@ -163,7 +170,7 @@ class _Utils:
                 / wmm
             )
         return frame
-        
+
     @staticmethod
     def build_fake_frame_ies_6ghz(ssid, channel) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
@@ -182,7 +189,7 @@ class _Utils:
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
         rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\xe8\x00"
-    
+
         mobility_domain_data = b"\x45\xc2\x00"
         mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
 
@@ -196,7 +203,7 @@ class _Utils:
 
         txpowerenv1_data = b"\x58\x2e"
         txpowerenv1 = Dot11Elt(ID=0xC3, info=txpowerenv1_data)
-        
+
         txpowerenv2_data = b"\x18\xfe"
         txpowerenv2 = Dot11Elt(ID=0xC3, info=txpowerenv2_data)
 
@@ -220,7 +227,7 @@ class _Utils:
 
         rsnex_data = b"\x20"
         rsnex = Dot11Elt(ID=0xF4, info=rsnex_data)
-        
+
         custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
         custom_data = bytes(f"{custom_hash}", "utf-8")
         custom = Dot11Elt(ID=0xDD, info=custom_data)
@@ -248,19 +255,19 @@ class _Utils:
     @staticmethod
     def build_fake_frame_ies(config) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
-        log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
+        logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         ssid: "str" = config.get("GENERAL").get("ssid")
         channel: int = int(config.get("GENERAL").get("channel"))
         frequency: int = int(config.get("GENERAL").get("frequency"))
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
         he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
 
-        is_6ghz = False
         if frequency > 5950:
-            is_6ghz = True
             frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel)
         else:
-            frame = _Utils.build_fake_frame_ies_2ghz_5ghz(ssid, channel, ft_disabled, he_disabled)
+            frame = _Utils.build_fake_frame_ies_2ghz_5ghz(
+                ssid, channel, ft_disabled, he_disabled
+            )
         # for gathering data to validate tests:
         #
         # frame_bytes = bytes(frame)
@@ -501,7 +508,9 @@ class Sniffer(multiprocessing.Process):
             if self.listen_only:
                 self.dot11_assoc_request_cb(packet)
             ssid = packet[Dot11Elt].info
-            self.log.debug("assoc req seen for %s (%s) by MAC %s", ssid, packet.addr1, packet.addr2)
+            self.log.debug(
+                "assoc req seen for %s (%s) by MAC %s", ssid, packet.addr1, packet.addr2
+            )
 
     def probe_response(self, probe_request) -> None:
         """Send probe resp to assist with profiler discovery"""
