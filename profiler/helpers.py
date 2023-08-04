@@ -70,13 +70,7 @@ FILES_PATH = "/var/www/html/profiler"
 
 def setup_logger(args) -> None:
     """Configure and set logging levels"""
-    if args.logging:
-        if args.logging == "debug":
-            logging_level = logging.DEBUG
-        if args.logging == "warning":
-            logging_level = logging.WARNING
-    else:
-        logging_level = logging.INFO
+    logging_level = logging.INFO
     if args.debug:
         logging_level = logging.DEBUG
 
@@ -235,6 +229,21 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="turn off 802.11ax High Efficiency (HE) reporting",
+    )
+    wpa_group = parser.add_mutually_exclusive_group()
+    wpa_group.add_argument(
+        "--wpa3_personal_transition",
+        dest="wpa3_personal_transition",
+        action="store_true",
+        default=False,
+        help="enable WPA3 Personal Transition in the RSNE for 2.4 / 5 GHz",
+    )
+    wpa_group.add_argument(
+        "--wpa3_personal",
+        dest="wpa3_personal",
+        action="store_true",
+        default=False,
+        help="enable WPA3 Personal only in the RSNE for 2.4 / 5 GHz",
     )
     parser.add_argument(
         "--clean",
@@ -410,6 +419,10 @@ def setup_config(args):
         config["GENERAL"]["he_disabled"] = False
     if args.he_disabled:
         config["GENERAL"]["he_disabled"] = args.he_disabled
+    if args.wpa3_personal:
+        config["GENERAL"]["wpa3_personal"] = args.wpa3_personal
+    if args.wpa3_personal_transition:
+        config["GENERAL"]["wpa3_personal_transition"] = args.wpa3_personal_transition
     if args.listen_only:
         config["GENERAL"]["listen_only"] = args.listen_only
     if args.pcap_analysis:

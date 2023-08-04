@@ -65,7 +65,7 @@ class _Utils:
     """Fake AP helper functions"""
 
     def build_fake_frame_ies_2ghz_5ghz(
-        ssid, channel, ft_disabled, disabled
+        ssid, channel, ft_disabled, he_disabled, wpa3_personal_transition, wpa3_personal
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
@@ -84,11 +84,21 @@ class _Utils:
         ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
         if ft_disabled:
-            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02\x80\x00"
+            akm = b"\x01\x00\x00\x0f\xac\x02\x80\x00"
+            if wpa3_personal_transition:
+                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x08\x80\x00"
+            if wpa3_personal:
+                akm = b"\x01\x00\x00\x0f\xac\x08\x90\x00"
+            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
         else:
             mobility_domain_data = b"\x45\xc2\x00"
             mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
-            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
+            akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
+            if wpa3_personal_transition:
+                akm = b"\x04\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x00\x0f\xac\x08\x00\x0f\xac\x09\x8c\x00"
+            if wpa3_personal:
+                akm = b"\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\x9c\x00"
+            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
 
         rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
@@ -261,12 +271,21 @@ class _Utils:
         frequency: int = int(config.get("GENERAL").get("frequency"))
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
         he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
+        wpa3_personal_transition: "bool" = config.get("GENERAL").get(
+            "wpa3_personal_transition"
+        )
+        wpa3_personal: "bool" = config.get("GENERAL").get("wpa3_personal")
 
         if frequency > 5950:
             frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel)
         else:
             frame = _Utils.build_fake_frame_ies_2ghz_5ghz(
-                ssid, channel, ft_disabled, he_disabled
+                ssid,
+                channel,
+                ft_disabled,
+                he_disabled,
+                wpa3_personal_transition,
+                wpa3_personal,
             )
         # for gathering data to validate tests:
         #
