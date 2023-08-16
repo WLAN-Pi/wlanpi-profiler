@@ -22,7 +22,7 @@ packages = ["profiler"]
 
 extras = {
     "testing": [
-        "tox==3.27.0",
+        "tox==4.9.0",
         "black",
         "isort",
         "autoflake",
