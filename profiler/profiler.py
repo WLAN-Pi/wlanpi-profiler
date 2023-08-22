@@ -501,22 +501,25 @@ class Profiler(object):
             # of the client is the vendor that maps to that OUI
             if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
                 for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
-                    vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
-                        element_data[0], element_data[1], element_data[2]
-                    )
-                    oui_manuf_vendor = self.lookup.get_manuf(vendor_mac)
-                    if oui_manuf_vendor is not None:
-                        # Matches are vendor specific IEs we know are client specific
-                        # e.g. Apple vendor specific IEs can only be found in Apple devices
-                        # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
-                        matches = ("apple", "samsung", "intel")
-                        if oui_manuf_vendor.lower().startswith(matches):
-                            if oui_manuf_vendor.lower() in sanitize:
-                                oui_manuf = sanitize.get(
-                                    oui_manuf_vendor.lower(), oui_manuf_vendor
-                                )
-                            else:
-                                oui_manuf = oui_manuf_vendor
+                    try:
+                        vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                            element_data[0], element_data[1], element_data[2]
+                        )
+                        oui_manuf_vendor = self.lookup.get_manuf(vendor_mac)
+                        if oui_manuf_vendor is not None:
+                            # Matches are vendor specific IEs we know are client specific
+                            # e.g. Apple vendor specific IEs can only be found in Apple devices
+                            # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
+                            matches = ("apple", "samsung", "intel")
+                            if oui_manuf_vendor.lower().startswith(matches):
+                                if oui_manuf_vendor.lower() in sanitize:
+                                    oui_manuf = sanitize.get(
+                                        oui_manuf_vendor.lower(), oui_manuf_vendor
+                                    )
+                                else:
+                                    oui_manuf = oui_manuf_vendor
+                    except IndexError:
+                        log.debug("IndexError in %s" % VENDOR_SPECIFIC_IE_TAG)
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
@@ -528,15 +531,19 @@ class Profiler(object):
         # Qualcomm
         # Infineon AG
         # Intel Wireless Network Group
+        log = logging.getLogger(inspect.stack()[0][3])
         chipset = None
         manufs = []
 
         if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
             for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
-                oui = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
-                    element_data[0], element_data[1], element_data[2]
-                )
-                manufs.append(self.lookup.get_manuf(oui))
+                try:
+                    oui = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                        element_data[0], element_data[1], element_data[2]
+                    )
+                    manufs.append(self.lookup.get_manuf(oui))
+                except IndexError:
+                    log.debug("IndexError for %s" % VENDOR_SPECIFIC_IE_TAG)
 
         matches = ["broadcom", "qualcomm", "mediatek", "intel", "infineon"]
         _break = False

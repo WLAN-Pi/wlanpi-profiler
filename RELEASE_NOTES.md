@@ -1,8 +1,9 @@
-Unreleased (1.0.16)
+Release 1.0.16
 
 - Chipset lookup via heuristics
-- VHT Beamformee STS Capability
-- HE Beamformee STS Capability
+- Profile VHT Beamformee STS Capability
+- Profile HE Beamformee STS Capability
+- Fix crash in OUI profiling
 
 Release 1.0.15
 
