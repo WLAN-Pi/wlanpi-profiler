@@ -4,8 +4,6 @@
 #
 #    pip-compile extras.in
 #
---extra-index-url https://www.piwheels.org/simple
-
 autoflake==2.2.1
     # via -r extras.in
 black==23.9.1
@@ -20,6 +18,7 @@ colorama==0.4.6
     # via tox
 coverage[toml]==7.3.1
     # via
+    #   coverage
     #   coverage-badge
     #   pytest-cov
 coverage-badge==1.1.0
@@ -32,7 +31,7 @@ filelock==3.12.4
     # via
     #   tox
     #   virtualenv
-flake8==6.1.0
+flake8==7.0.0
     # via -r extras.in
 iniconfig==2.0.0
     # via pytest
@@ -65,7 +64,7 @@ pluggy==1.3.0
     #   tox
 pycodestyle==2.11.0
     # via flake8
-pyflakes==3.1.0
+pyflakes==3.2.0
     # via
     #   autoflake
     #   flake8
