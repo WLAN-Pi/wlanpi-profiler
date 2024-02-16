@@ -245,6 +245,13 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         help="turn off 802.11be Extremely High Throughput (EHT) reporting",
     )
+    parser.add_argument(
+        "--noprofilertlv",
+        dest="profiler_tlv_disabled",
+        action="store_true",
+        default=False,
+        help="disable generation of Profiler specific vendor IE",
+    )
     wpa_group = parser.add_mutually_exclusive_group()
     wpa_group.add_argument(
         "--wpa3_personal_transition",
@@ -399,8 +406,8 @@ def setup_config(args):
         config["GENERAL"]["channel"] = 36
 
     if "ssid" not in config["GENERAL"] or config["GENERAL"].get("ssid", "") == "":
-        last_3_of_eth0_mac = f" {get_iface_mac('eth0')[-3:]}"
-        config["GENERAL"]["ssid"] = f"Profiler{last_3_of_eth0_mac}"
+        last_3_of_eth0_mac = f"{get_iface_mac('eth0')[-3:]}".strip()
+        config["GENERAL"]["ssid"] = f"Profiler {last_3_of_eth0_mac}"
 
     if "interface" not in config["GENERAL"]:
         config["GENERAL"]["interface"] = "wlan0"
@@ -442,6 +449,8 @@ def setup_config(args):
         config["GENERAL"]["wpa3_personal"] = args.wpa3_personal
     if args.wpa3_personal_transition:
         config["GENERAL"]["wpa3_personal_transition"] = args.wpa3_personal_transition
+    if args.profiler_tlv_disabled:
+        config["GENERAL"]["profiler_tlv_disabled"] = args.profiler_tlv_disabled
     if args.listen_only:
         config["GENERAL"]["listen_only"] = args.listen_only
     if args.pcap_analysis:

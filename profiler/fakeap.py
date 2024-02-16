@@ -124,7 +124,8 @@ class _Utils:
         be_disabled,
         wpa3_personal_transition,
         wpa3_personal,
-        testing
+        profiler_tlv_disabled,
+        testing,
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
@@ -218,52 +219,39 @@ class _Utils:
         )
         mle = Dot11Elt(ID=0xFF, info=mle_data)
 
-        if ft_disabled:
-            frame = (
-                essid
-                / rates
-                / dsset
-                / dtim
-                / ht_capabilities
-                / rsn
-                / ht_information
-                / rm_enabled_cap
-                / extended
-                / vht_capabilities
-                / vht_operation
-            )
-        else:
-            frame = (
-                essid
-                / rates
-                / dsset
-                / dtim
-                / ht_capabilities
-                / rsn
-                / ht_information
-                / mobility_domain
-                / rm_enabled_cap
-                / extended
-                / vht_capabilities
-                / vht_operation
-            )
-        if he_disabled:
-            pass
-        else:
+        frame = essid / rates / dsset / dtim / ht_capabilities / rsn
+
+        if not ft_disabled:
+            frame = frame / mobility_domain
+
+        frame = (
+            frame
+            / ht_information
+            / rm_enabled_cap
+            / extended
+            / vht_capabilities
+            / vht_operation
+        )
+
+        if not profiler_tlv_disabled:
+            # Add WLAN Pi vendor IE
+            frame = frame / _Utils.build_wlanpi_vendor_ie_type_0(testing)
+
+        frame = frame / wmm
+
+        if not he_disabled:
             frame = frame / he_capabilities / he_operation / spatial_reuse / mu_edca
-        if be_disabled:
-            pass
-        else:
+
+        if not be_disabled:
             frame = frame / eht_operation / eht_capabilities
             # frame = frame / mle / eht_operation / eht_capabilities
 
-        # Add WLAN Pi vendor IE and WMM last
-        frame = frame / _Utils.build_wlanpi_vendor_ie_type_0(testing) / wmm
-        # frame = frame / wmm
         return frame
 
     @staticmethod
-    def build_fake_frame_ies_6ghz(ssid, channel, testing) -> Dot11Elt:
+    def build_fake_frame_ies_6ghz(
+        ssid, channel, ft_disabled, be_disabled, profiler_tlv_disabled, testing
+    ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         log.debug("building 6 GHz frame")
@@ -335,7 +323,7 @@ class _Utils:
         rsnex_data = b"\x20"
         rsnex = Dot11Elt(ID=0xF4, info=rsnex_data)
 
-        return (
+        frame = (
             essid
             / rates
             / dtim
@@ -345,17 +333,26 @@ class _Utils:
             / extended
             / txpowerenv1
             / txpowerenv2
+        )
+
+        if not profiler_tlv_disabled:
+            frame = frame / _Utils.build_wlanpi_vendor_ie_type_0(testing)
+
+        frame = (
+            frame
+            / wmm
             / he_capabilities
             / he_operation
             / spatial_reuse
             / mu_edca
             / six_ghz_cap
-            / eht_capabilities
-            / eht_operation
             / rsnex
-            / _Utils.build_wlanpi_vendor_ie_type_0(testing)
-            / wmm
         )
+
+        if not be_disabled:
+            frame = frame / eht_capabilities / eht_operation
+
+        return frame
 
     @staticmethod
     def build_fake_frame_ies(config, mac, testing=False) -> Dot11Elt:
@@ -368,13 +365,18 @@ class _Utils:
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
         he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
         be_disabled: "bool" = config.get("GENERAL").get("be_disabled")
+        profiler_tlv_disabled: "bool" = config.get("GENERAL").get(
+            "profiler_tlv_disabled"
+        )
         wpa3_personal_transition: "bool" = config.get("GENERAL").get(
             "wpa3_personal_transition"
         )
         wpa3_personal: "bool" = config.get("GENERAL").get("wpa3_personal")
 
         if frequency > 5950:
-            frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel, testing)
+            frame = _Utils.build_fake_frame_ies_6ghz(
+                ssid, channel, ft_disabled, be_disabled, profiler_tlv_disabled, testing
+            )
         else:
             frame = _Utils.build_fake_frame_ies_2ghz_5ghz(
                 ssid,
@@ -385,7 +387,8 @@ class _Utils:
                 be_disabled,
                 wpa3_personal_transition,
                 wpa3_personal,
-                testing
+                profiler_tlv_disabled,
+                testing,
             )
         # for gathering data to validate tests:
         #

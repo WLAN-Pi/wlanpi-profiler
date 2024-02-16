@@ -1,3 +1,8 @@
+Release 1.0.17
+
+- Allow user to disable addition of Profiler vendor information elements
+- Re-order IEs in frame generation by numerical order
+
 Release 1.0.16
 
 - Chipset lookup via heuristics
