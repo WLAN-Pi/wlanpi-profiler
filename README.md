@@ -1,4 +1,4 @@
-![versions](docs/images/profiler-pybadge-w-logo.svg) ![tests](https://github.com/wlan-pi/profiler/workflows/tests/badge.svg) ![coverage-badge](coverage.svg) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md) [![packagecloud-badge](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/)
+![versions](docs/images/profiler-pybadge-w-logo.svg) ![coverage-badge](coverage.svg) [![packagecloud-badge](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/)
 
 # wlanpi-profiler
 
@@ -84,13 +84,13 @@ profiler is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image as a De
 General requirements:
 
 - adapter (and driver) which supports both monitor mode and packet injection
-  - mt76x2u (recommended) and iwlwifi (ax200 and ax210) are tested regularly (everything else is experimental and not officially supported).
+  - mt76x2u, mt7921u (a8000), mt7921e (rz608/mt7921k, rz616/mt7922m), and iwlwifi (ax200, ax210, be200) are tested regularly (everything else is experimental and not officially supported).
   - removed from the recommended list are rtl88XXau adapters (certain comfast adapters for example), but they should still work. with that said, don't open a bug report here for a rtl88XXau card.
 - elevated permissions
 
 Package requirements:
 
-- Python version 3.7 or higher
+- Python version 3.9 or higher
 - `iw`, `iproute2`, `pciutils`, `usbutils`, `kmod`, `wpa_cli`, and `wpasupplicant` tools installed on the host. most distributions already come with these.
 
 ### Upgrading WLAN Pi OS v3 (C4, M4, Pro) installs.
