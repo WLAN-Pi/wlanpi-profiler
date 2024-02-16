@@ -64,7 +64,7 @@ from .helpers import get_wlanpi_version
 class _Utils:
     """Fake AP helper functions"""
 
-    def build_wlanpi_vendor_ie_type_0():
+    def build_wlanpi_vendor_ie_type_0(testing):
         """
         OUI type 0 will follow a type-length-value (TLV) encoding like so <221><total-length><oui><oui_type>[[<type><length><value>] ...]
 
@@ -91,15 +91,21 @@ class _Utils:
         oui = b"\x31\x41\x59"
         subtype = b"\x00"
 
+        profiler_version = __version__
+        if testing:
+            profiler_version = "6.6.6"
         profiler_version_type = int(0).to_bytes(1, "big")
-        profiler_version_data = bytes(f"{__version__}".encode("ascii"))
+        profiler_version_data = bytes(f"{profiler_version}".encode("ascii"))
         profiler_version_length = len(profiler_version_data).to_bytes(1, "big")
         profiler_version_tlv = (
             profiler_version_type + profiler_version_length + profiler_version_data
         )
 
+        system_version = get_wlanpi_version()
+        if testing:
+            system_version = "9.9.9"
         system_version_type = int(1).to_bytes(1, "big")
-        system_version_data = bytes(f"{get_wlanpi_version()}".encode("ascii"))
+        system_version_data = bytes(f"{system_version}".encode("ascii"))
         system_version_length = len(system_version_data).to_bytes(1, "big")
         system_version_tlv = (
             system_version_type + system_version_length + system_version_data
@@ -118,6 +124,7 @@ class _Utils:
         be_disabled,
         wpa3_personal_transition,
         wpa3_personal,
+        testing
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
@@ -251,12 +258,12 @@ class _Utils:
             # frame = frame / mle / eht_operation / eht_capabilities
 
         # Add WLAN Pi vendor IE and WMM last
-        frame = frame / _Utils.build_wlanpi_vendor_ie_type_0() / wmm
+        frame = frame / _Utils.build_wlanpi_vendor_ie_type_0(testing) / wmm
         # frame = frame / wmm
         return frame
 
     @staticmethod
-    def build_fake_frame_ies_6ghz(ssid, channel) -> Dot11Elt:
+    def build_fake_frame_ies_6ghz(ssid, channel, testing) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         log.debug("building 6 GHz frame")
@@ -346,12 +353,12 @@ class _Utils:
             / eht_capabilities
             / eht_operation
             / rsnex
-            / _Utils.build_wlanpi_vendor_ie_type_0()
+            / _Utils.build_wlanpi_vendor_ie_type_0(testing)
             / wmm
         )
 
     @staticmethod
-    def build_fake_frame_ies(config, mac) -> Dot11Elt:
+    def build_fake_frame_ies(config, mac, testing=False) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         ssid: "str" = config.get("GENERAL").get("ssid")
@@ -367,7 +374,7 @@ class _Utils:
         wpa3_personal: "bool" = config.get("GENERAL").get("wpa3_personal")
 
         if frequency > 5950:
-            frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel)
+            frame = _Utils.build_fake_frame_ies_6ghz(ssid, channel, testing)
         else:
             frame = _Utils.build_fake_frame_ies_2ghz_5ghz(
                 ssid,
@@ -378,6 +385,7 @@ class _Utils:
                 be_disabled,
                 wpa3_personal_transition,
                 wpa3_personal,
+                testing
             )
         # for gathering data to validate tests:
         #
