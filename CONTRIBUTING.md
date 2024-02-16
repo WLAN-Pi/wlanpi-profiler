@@ -50,7 +50,7 @@ Please be aware of the following things when filing bug reports:
 
 ### Development Environment
 
-Consider using PyCharm or Visual Studio Code with the official Python and Pylance extensions from Microsoft (recommended).
+Consider using Visual Studio Code with the official Python extensions from Microsoft.
 
 ### Development Setup  ('without pip install or pipx', 'may be recommended for development work'):
 
@@ -60,6 +60,7 @@ git clone <repo>
 cd <repo>
 virtualenv venv
 source venv/bin/activate
+pip install -U pip pip-tools setuptools wheel
 pip install -r requirements.txt
 sudo ./venv/bin/python3 -m profiler 
 sudo ./venv/bin/python3 -m profiler <optional params>

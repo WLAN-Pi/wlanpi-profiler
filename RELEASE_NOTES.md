@@ -1,6 +1,12 @@
-Unreleased
+Release 1.0.16
 
-- TBD
+- Chipset lookup via heuristics
+- Profile VHT Beamformee STS Capability
+- Profile HE Beamformee STS Capability
+- Fix crash in OUI profiling (caused by certain Wi-Fi 7 clients)
+- Add basic Wi-Fi 7 profiling (presence of EHT IEs)
+- Add Profiler Vendor IE with TLVs for profiler version and system version
+- Switch dependency on manuf to manuf2 fork
 
 Release 1.0.15
 

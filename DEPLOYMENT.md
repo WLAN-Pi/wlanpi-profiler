@@ -15,7 +15,7 @@ There are two workflows defined.
 On your build host, install the build tools (these are only needed on the device doing the build):
 
 ```bash
-sudo apt-get install build-essential debhelper devscripts equivs python3-pip python3-all python3-dev python3-setuptools dh-virtualenv
+sudo apt-get install build-essential debhelper devscripts equivs python3-pip python3-all python3-dev python3-setuptools dh-virtualenv dh-python
 ```
 
 Install Python depends so that the tooling doesn't fail when it tries to evaluate which tests to run.

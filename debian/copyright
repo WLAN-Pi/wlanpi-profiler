@@ -3,7 +3,7 @@ Upstream-Name: wlanpi-profiler
 Source: https://www.github.com/wlan-pi/wlanpi-profiler
 
 Files: *
-Copyright: 2021 Josh Schmelzle <josh@joshschmelzle.com>
+Copyright: 2024 Josh Schmelzle <josh@joshschmelzle.com>
 License: 3-clause BSD
 
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:

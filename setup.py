@@ -20,22 +20,27 @@ except FileNotFoundError:
 
 packages = ["profiler"]
 
-extras = {
-    "testing": [
-        "tox==3.27.0",
-        "black",
-        "isort",
-        "autoflake",
-        "mypy",
-        "flake8",
-        "pytest",
-        "pytest-cov",
-        "coverage-badge==1.1.0",
-        "pytest-mock",
-    ],
-}
+def parse_requires(_list):
+    requires = list()
+    trims = ["#", "piwheels.org"]
+    for require in _list:
+        if any(match in require for match in trims):
+            continue
+        requires.append(require)
+    requires = list(filter(None, requires))  # remove "" from list
+    return requires
 
-requires = ["scapy==2.4.5", "manuf==1.1.5"]
+with open("extras.txt") as f:
+    testing = f.read().splitlines()
+
+testing = parse_requires(testing)
+
+extras = {"testing": testing}
+
+with open("requirements.txt") as f:
+    requires = f.read().splitlines()
+    
+requires = parse_requires(requires)
 
 setup(
     name=about["__title__"],
@@ -46,12 +51,12 @@ setup(
     author=about["__author__"],
     author_email=about["__author_email__"],
     url=about["__url__"],
-    python_requires="~=3.7,",
+    python_requires="~=3.9,",
     license=about["__license__"],
     classifiers=[
         "Natural Language :: English",
         "Development Status :: 3 - Alpha",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.9",
         "Intended Audience :: System Administrators",
         "Topic :: Utilities",
     ],

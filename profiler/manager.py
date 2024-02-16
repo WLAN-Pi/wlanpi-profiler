@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -110,7 +110,7 @@ def start(args: argparse.Namespace):
 
     if args.oui_update:
         # run manuf oui update and exit
-        sys.exit(0) if helpers.update_manuf() else sys.exit(-1)
+        sys.exit(0) if helpers.update_manuf2() else sys.exit(-1)
 
     config = helpers.setup_config(args)
 

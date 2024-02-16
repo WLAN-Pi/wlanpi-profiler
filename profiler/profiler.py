@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -26,13 +26,14 @@ from time import strftime
 from typing import Dict, List, Tuple
 
 # third party imports
-from manuf import manuf  # type: ignore
+from manuf2 import manuf  # type: ignore
 from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 
 # app imports
 from .__version__ import __version__
 from .constants import (
     _20MHZ_FREQUENCY_CHANNEL_MAP,
+    EHT_CAPABILITIES_IE_EXT_TAG,
     EXT_CAPABILITIES_IE_TAG,
     FT_CAPABILITIES_IE_TAG,
     HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
@@ -79,6 +80,7 @@ class Profiler(object):
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
             self.ft_disabled = config.get("GENERAL").get("ft_disabled")
             self.he_disabled = config.get("GENERAL").get("he_disabled")
+            self.be_disabled = config.get("GENERAL").get("be_disabled")
             self.reports_dir = os.path.join(self.files_path, "reports")
             self.clients_dir = os.path.join(self.files_path, "clients")
             self.csv_file = os.path.join(
@@ -143,6 +145,7 @@ class Profiler(object):
         ---------------------------------------------
         - Client MAC: 6e:1d:8a:28:32:51
         - OUI manufacturer lookup: Apple (Randomized MAC)
+        - Chipset lookup: Broadcom
         - Frequency band: Unknown
         - Capture channel: 0
         ---------------------------------------------
@@ -158,14 +161,14 @@ class Profiler(object):
         if freq > 2411 and freq < 2485:
             band = "2.4GHz"
         elif freq > 5100 and freq < 5900:
-            band = "5.8GHz"
+            band = "5.0GHz"
         elif freq > 5900 and freq < 7120:
             band = "6.0GHz"
             is_6ghz = True
         else:
             band = "unknown"
 
-        ssid, oui_manuf, capabilities = self.analyze_assoc_req(frame, is_6ghz)
+        ssid, oui_manuf, chipset, capabilities = self.analyze_assoc_req(frame, is_6ghz)
         analysis_hash = hash(f"{frame.addr2}: {capabilities}")
         if analysis_hash in self.analyzed_hash.keys():
             self.log.info(
@@ -195,6 +198,7 @@ class Profiler(object):
             # generate text report
             text_report = self.generate_text_report(
                 text_report_oui_manuf,
+                chipset,
                 capabilities,
                 frame.addr2,
                 channel,
@@ -216,6 +220,7 @@ class Profiler(object):
                 capabilities,
                 frame,
                 oui_manuf,
+                chipset,
                 randomized,
                 band,
                 channel,
@@ -231,6 +236,7 @@ class Profiler(object):
     @staticmethod
     def generate_text_report(
         oui_manuf: str,
+        chipset: str,
         capabilities: list,
         client_mac: str,
         channel: int,
@@ -245,6 +251,7 @@ class Profiler(object):
             text_report += f"\n - SSID: {ssid}"
         text_report += f"\n - Client MAC: {client_mac}"
         text_report += f"\n - OUI manufacturer lookup: {oui_manuf or 'Unknown'}"
+        text_report += f"\n - Chipset lookup: {chipset or 'Unknown'}"
         band_label = ""
         if band[0] == "2":
             band_label = "2.4 GHz"
@@ -275,6 +282,7 @@ class Profiler(object):
         capabilities,
         frame,
         oui_manuf,
+        chipset,
         randomized: bool,
         band,
         channel,
@@ -298,6 +306,7 @@ class Profiler(object):
         data["mac"] = client_mac
         data["is_laa"] = randomized
         data["manuf"] = oui_manuf
+        data["chipset"] = chipset
         if band[0] == "2":
             band_db = 2
         elif band[0] == "5":
@@ -397,7 +406,6 @@ class Profiler(object):
 
         # check if csv file exists
         if not os.path.exists(self.csv_file):
-
             # create file with csv headers
             with open(self.csv_file, mode="w") as file_obj:
                 csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
@@ -483,7 +491,12 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
-        sanitize = {"intelwir": "Intel", "intelcor": "Intel", "samsunge": "Samsung"}
+        sanitize = {
+            "intelwir": "Intel",
+            "intelcor": "Intel",
+            "samsunge": "Samsung",
+            "samsungelect": "Samsung",
+        }
 
         if (
             oui_manuf is None
@@ -495,25 +508,62 @@ class Profiler(object):
             # of the client is the vendor that maps to that OUI
             if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
                 for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
-                    vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
-                        element_data[0], element_data[1], element_data[2]
-                    )
-                    oui_manuf_vendor = self.lookup.get_manuf(vendor_mac)
-                    if oui_manuf_vendor is not None:
-                        # Matches are vendor specific IEs we know are client specific
-                        # e.g. Apple vendor specific IEs can only be found in Apple devices
-                        # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
-                        matches = ("apple", "samsung", "intel")
-                        if oui_manuf_vendor.lower().startswith(matches):
-                            if oui_manuf_vendor.lower() in sanitize:
-                                oui_manuf = sanitize.get(
-                                    oui_manuf_vendor.lower(), oui_manuf_vendor
-                                )
-                            else:
-                                oui_manuf = oui_manuf_vendor
+                    try:
+                        vendor_mac = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                            element_data[0], element_data[1], element_data[2]
+                        )
+                        oui_manuf_vendor = self.lookup.get_manuf(vendor_mac)
+                        if oui_manuf_vendor is not None:
+                            # Matches are vendor specific IEs we know are client specific
+                            # e.g. Apple vendor specific IEs can only be found in Apple devices
+                            # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
+                            matches = ("apple", "samsung", "intel")
+                            if oui_manuf_vendor.lower().startswith(matches):
+                                if oui_manuf_vendor.lower() in sanitize:
+                                    oui_manuf = sanitize.get(
+                                        oui_manuf_vendor.lower(), oui_manuf_vendor
+                                    )
+                                else:
+                                    oui_manuf = oui_manuf_vendor
+                    except IndexError:
+                        log.debug("IndexError in %s" % VENDOR_SPECIFIC_IE_TAG)
 
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
+
+    def resolve_vendor_specific_tag_chipset(self, dot11_elt_dict) -> str:
+        """Resolve client's chipset via heuristics of vendor specific tags"""
+        # Broadcom
+        # MediaTek
+        # Qualcomm
+        # Infineon AG
+        # Intel Wireless Network Group
+        log = logging.getLogger(inspect.stack()[0][3])
+        chipset = None
+        manufs = []
+
+        if VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict.keys():
+            for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
+                try:
+                    oui = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                        element_data[0], element_data[1], element_data[2]
+                    )
+                    manufs.append(self.lookup.get_manuf(oui))
+                except IndexError:
+                    log.debug("IndexError for %s" % VENDOR_SPECIFIC_IE_TAG)
+
+        matches = ["broadcom", "qualcomm", "mediatek", "intel", "infineon"]
+        _break = False
+        for manuf in manufs:
+            for match in matches:
+                if manuf.lower().startswith(match):
+                    chipset = match.title()
+                    _break = True
+                    break
+            if _break:
+                break
+
+        return chipset
 
     @staticmethod
     def analyze_ssid_ie(dot11_elt_dict) -> str:
@@ -538,12 +588,10 @@ class Profiler(object):
         dot11n_nss = Capability(db_key="dot11n_nss", db_value=0)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             spatial_streams = 0
 
             # mcs octets 1 - 4 indicate # streams supported (up to 4 streams only)
             for mcs_octet in range(3, 7):
-
                 mcs_octet_value = dot11_elt_dict[HT_CAPABILITIES_IE_TAG][mcs_octet]
 
                 if mcs_octet_value & 255:
@@ -565,6 +613,7 @@ class Profiler(object):
         dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value="")
         dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
         dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
+        dot11ac_bf_sts = Capability(db_key="dot11ac_bf_sts", db_value=0)
         dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -601,6 +650,7 @@ class Profiler(object):
             # check for SU & MU beam formee support
             mu_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][2]
             su_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
+            bf_sts_octet = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][1]
             onesixty = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][0]
 
             # 160 MHz
@@ -627,6 +677,16 @@ class Profiler(object):
             else:
                 dot11ac.value += ", [ ] MU BF"
 
+            # BF STS
+            vht_bf_sts_binary_string = "{0}{1}{2}".format(
+                int(get_bit(bf_sts_octet, 5)),
+                int(get_bit(bf_sts_octet, 6)),
+                int(get_bit(bf_sts_octet, 7)),
+            )
+            vht_bf_sts_value = int(vht_bf_sts_binary_string, base=2)
+            dot11ac_bf_sts.db_value = vht_bf_sts_value
+            dot11ac.value += f", Beamformee STS={vht_bf_sts_value}"
+
         return [
             dot11ac,
             dot11ac_nss,
@@ -634,6 +694,7 @@ class Profiler(object):
             dot11ac_mcs,
             dot11ac_su_bf,
             dot11ac_mu_bf,
+            dot11ac_bf_sts,
         ]
 
     @staticmethod
@@ -675,12 +736,10 @@ class Profiler(object):
         )
 
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG]
 
             # check octet 3 exists
             if 3 <= len(ext_cap_list):
-
                 # bit 4 of octet 3 in the extended capabilites field
                 octet3 = ext_cap_list[2]
                 bss_trans_support = int("00001000", 2)
@@ -700,7 +759,6 @@ class Profiler(object):
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
-
             rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG]
             rsn_len = len(rsn_cap_list) - 2
             pmf_oct = rsn_cap_list[rsn_len]
@@ -729,7 +787,6 @@ class Profiler(object):
         )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict.keys():
-
             # octet 3 of power capabilites
             max_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][1]
             min_power = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][0]
@@ -768,7 +825,6 @@ class Profiler(object):
             is_5ghz = False
 
             while channel_sets_list:
-
                 start_channel = channel_sets_list.pop(0)
                 channel_range = channel_sets_list.pop(0)
 
@@ -844,8 +900,10 @@ class Profiler(object):
         return [six_ghz_operating_class_cap]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict, he_disabled: bool) -> List:
-        """Check for 802.11ax support"""
+    def analyze_extension_ies(
+        dot11_elt_dict, he_disabled: bool, be_disabled: bool
+    ) -> List:
+        """Check for 802.11ax and 802.11be support"""
         dot11ax = Capability(
             name="802.11ax",
             value="Not supported",
@@ -865,6 +923,9 @@ class Profiler(object):
         dot11ax_he_su_beamformee = Capability(
             db_key="dot11ax_he_su_beamformee", db_value=0
         )
+        dot11ax_he_beamformee_sts = Capability(
+            db_key="dot11ax_he_beamformee_sts", db_value=0
+        )
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
@@ -879,7 +940,6 @@ class Profiler(object):
         else:
             if IE_EXT_TAG in dot11_elt_dict.keys():
                 for element_data in dot11_elt_dict[IE_EXT_TAG]:
-
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
@@ -982,6 +1042,18 @@ class Profiler(object):
                             dot11ax_he_su_beamformee.db_value = 0
                             dot11ax.value += ", [ ] SU Beamformee"
 
+                        # BF STS
+                        he_bf_sts_octet = element_data[11]
+
+                        he_bf_sts_binary_string = "{0}{1}{2}".format(
+                            int(get_bit(he_bf_sts_octet, 2)),
+                            int(get_bit(he_bf_sts_octet, 3)),
+                            int(get_bit(he_bf_sts_octet, 4)),
+                        )
+                        he_bf_sts_value = int(he_bf_sts_binary_string, base=2)
+                        dot11ax_he_beamformee_sts.db_value = he_bf_sts_value
+                        dot11ax.value += f", Beamformee STS={he_bf_sts_value}"
+
                         he_er_su_ppdu_octet = element_data[15]
                         he_er_su_ppdu_octet_binary_string = ""
                         for bit_position in range(8):
@@ -1044,6 +1116,63 @@ class Profiler(object):
                         dot11ax_six_ghz.value = "Supported"
                         dot11ax_six_ghz.db_value = 1
 
+                    if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
+                        # dot11ax is supported
+                        dot11ax.value = "Supported"
+                        dot11ax.db_value = 1
+
+        dot11be = Capability(
+            name="802.11be",
+            value="Not supported",
+            db_key="dot11be",
+            db_value=0,
+        )
+        dot11be_nss = Capability(
+            db_key="dot11be_nss",
+            db_value=0,
+        )
+        dot11be_mcs = Capability(
+            db_key="dot11be_mcs",
+            db_value="",
+        )
+        dot11be_320_mhz = Capability(db_key="dot11be_320_mhz", db_value=0)
+
+        if be_disabled:
+            dot11be.value = "Reporting disabled (--no11be option used)"
+        else:
+            if IE_EXT_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[IE_EXT_TAG]:
+                    ext_ie_id = int(str(element_data[0]))
+
+                    if ext_ie_id == EHT_CAPABILITIES_IE_EXT_TAG:
+                        # dot11ax is supported
+                        dot11be.value = "Supported"
+                        dot11be.db_value = 1
+
+                        element_data[1]
+                        element_data[2]
+                        eht_phy_cap_1 = element_data[3]
+                        element_data[4]
+                        element_data[5]
+                        element_data[6]
+                        element_data[7]
+                        element_data[8]
+                        element_data[9]
+                        element_data[10]
+                        element_data[11]
+                        element_data[12]
+                        element_data[13]
+                        element_data[14]
+                        element_data[15]
+                        element_data[16]
+                        element_data[17]
+
+                        if get_bit(eht_phy_cap_1, 2):
+                            dot11be.value += ", [X] 320 MHz"
+                            dot11be_320_mhz.db_value = 1
+                        else:
+                            dot11be.value += ", [ ] 320 MHz"
+
         return [
             dot11ax,
             dot11ax_nss,
@@ -1054,9 +1183,14 @@ class Profiler(object):
             dot11ax_punctured_preamble,
             dot11ax_he_su_beamformer,
             dot11ax_he_su_beamformee,
+            dot11ax_he_beamformee_sts,
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
             dot11ax_160_mhz,
+            dot11be,
+            dot11be_nss,
+            dot11be_mcs,
+            dot11be_320_mhz,
         ]
 
     def analyze_assoc_req(self, frame, is_6ghz: bool) -> Tuple[str, str, list]:
@@ -1090,6 +1224,9 @@ class Profiler(object):
         #  resolve manufacturer
         oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
+        # parse chipset
+        chipset = self.resolve_vendor_specific_tag_chipset(dot11_elt_dict)
+
         ssid = self.analyze_ssid_ie(dot11_elt_dict)
 
         # dictionary to store capabilities as we decode them
@@ -1115,8 +1252,10 @@ class Profiler(object):
         # check for 11ac support
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
-        # check for ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.he_disabled)
+        # check for ext tags (e.g. 802.11ax support, 802.11be draft support)
+        capabilities += self.analyze_extension_ies(
+            dot11_elt_dict, self.he_disabled, self.be_disabled
+        )
 
         # check supported operating classes for 6 GHz
         capabilities += self.analyze_operating_classes(dot11_elt_dict)
@@ -1127,4 +1266,4 @@ class Profiler(object):
         # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict, is_6ghz)
 
-        return ssid, oui_manuf, capabilities
+        return ssid, oui_manuf, chipset, capabilities

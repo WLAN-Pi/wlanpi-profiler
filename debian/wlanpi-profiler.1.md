@@ -129,7 +129,7 @@ https://github.com/wlan-pi/profiler
 
 # COPYRIGHT
 
-Copyright © 2021 Josh Schmelzle. License BSD-3-Clause.
+Copyright © 2024 Josh Schmelzle. License BSD-3-Clause.
 
 # SEE ALSO
 
