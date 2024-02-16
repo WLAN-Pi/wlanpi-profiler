@@ -10,7 +10,7 @@ from profiler import helpers
 class TestHelpers:
     @pytest.mark.parametrize(
         "args,expected",
-        [(["--logging", "debug"], 10), (["--logging", "warning"], 30), ([], 20)],
+        [(["--debug"], 10), ([], 20)],
     )
     def test_logger(self, args, expected):
         parser = helpers.setup_parser()

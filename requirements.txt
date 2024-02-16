@@ -6,7 +6,7 @@
 #
 --extra-index-url https://www.piwheels.org/simple
 
-manuf==1.1.5
+manuf2==2.0.0
     # via -r requirements.in
 scapy==2.5.0
     # via -r requirements.in

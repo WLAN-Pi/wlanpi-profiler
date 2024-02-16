@@ -12,12 +12,12 @@ Build-Depends: debhelper (>= 11),
                python3-distutils,
                python3-venv
 Standards-Version: 4.6.0
-X-Python3-Version: >= 3.7
+X-Python3-Version: >= 3.9
 Homepage: https://github.com/WLAN-Pi/profiler
 
 Package: wlanpi-profiler
 Architecture: any
-Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.7), python3-distutils, ${misc:Pre-Depends}
+Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.9), python3-distutils, ${misc:Pre-Depends}
 Depends: ${misc:Depends}
 Description: WLAN Pi - Wi-Fi client capabilities profiler
  wlanpi-profiler creates a fake AP for the collection and analysis of station association frames.

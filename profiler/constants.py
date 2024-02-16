@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -41,6 +41,9 @@ HE_CAPABILITIES_IE_EXT_TAG = 35  # 802.11ax HE Capabilities IE
 HE_OPERATION_IE_EXT_TAG = 36  # 802.11ax HE Operation IE
 HE_SPATIAL_REUSE_IE_EXT_TAG = 39  # 802.11ax Spatial Reuse Paramater IE
 HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 802.11ax 6 GHz capabilities IE
+MLE_EXT_TAG = 107  # 802.11be Multi-Link Element
+EHT_CAPABILITIES_IE_EXT_TAG = 108  # 802.11be EHT Capabilities IE
+EHT_OPERATION_IE_EXT_TAG = 109  # 802.11be EHT Operation IE
 
 CHANNELS = {
     "2G": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],

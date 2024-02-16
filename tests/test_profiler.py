@@ -31,6 +31,7 @@ class TestProfiler:
         p = profiler.Profiler()
         p.ft_disabled = False
         p.he_disabled = False
+        p.be_disabled = False
         cap = rdpcap(pcap)
         is_6ghz = False
         ssid, oui, chipset, capabilities = p.analyze_assoc_req(cap[0], is_6ghz)
@@ -74,6 +75,7 @@ class TestProfiler:
         p = profiler.Profiler()
         p.ft_disabled = False
         p.he_disabled = False
+        p.be_disabled = False
         cap = rdpcap(pcap)
         # dot11_elt_dict = self.get_dot11_elt_dict(cap[0], p)
 
@@ -98,12 +100,13 @@ class TestProfiler:
             p = profiler.Profiler()
             p.ft_disabled = False
             p.he_disabled = False
+            p.be_disabled = False
             cap = rdpcap(pcap)
             # dot11_elt_dict = self.get_dot11_elt_dict(cap[0], p)
 
             ssid, oui_manuf, chipset, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=True)
             assert ssid == "WLANPI_1"
-            assert oui_manuf == "Samsung"
+            assert "Samsung" in oui_manuf
             assert chipset == "Broadcom"  # S21 shipped with Broadcom
             for capability in capabilities:
                 if capability.name == "802.11n":

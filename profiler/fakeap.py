@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -64,8 +64,60 @@ from .helpers import get_wlanpi_version
 class _Utils:
     """Fake AP helper functions"""
 
+    def build_wlanpi_vendor_ie_type_0():
+        """
+        OUI type 0 will follow a type-length-value (TLV) encoding like so <221><total-length><oui><oui_type>[[<type><length><value>] ...]
+
+        | Byte Offset | Field Length   | Field Name | Description                   |
+        | ----------- | -------------  | ---------- | ----------------------------- |
+        | 0           | 1 Bytes        | Subtype    | Type identifier for attribute |
+
+        Followed by TLVs:
+
+            Type 0
+
+            | Field Length | Field Name              | Description                           |
+            | 1 Bytes      | Type                    |                                       |
+            | 1 Bytes      | Profiler version length | Length of profiler version data field |
+            | N Bytes      | Profiler version data   | Profiler version                      |
+
+            Type 1
+
+            | Field Length | Field Name                    | Description                                 |
+            | 1 Bytes      | Type                          |                                             |
+            | 1 Bytes      | WLAN Pi system version length | Length of WLAN Pi system version data field |
+            | N Bytes      | WLAN Pi system version data   | WLAN Pi system version                      |
+        """
+        oui = b"\x31\x41\x59"
+        subtype = b"\x00"
+
+        profiler_version_type = int(0).to_bytes(1, "big")
+        profiler_version_data = bytes(f"{__version__}".encode("ascii"))
+        profiler_version_length = len(profiler_version_data).to_bytes(1, "big")
+        profiler_version_tlv = (
+            profiler_version_type + profiler_version_length + profiler_version_data
+        )
+
+        system_version_type = int(1).to_bytes(1, "big")
+        system_version_data = bytes(f"{get_wlanpi_version()}".encode("ascii"))
+        system_version_length = len(system_version_data).to_bytes(1, "big")
+        system_version_tlv = (
+            system_version_type + system_version_length + system_version_data
+        )
+
+        wlanpi_vendor_data = oui + subtype + profiler_version_tlv + system_version_tlv
+        return Dot11Elt(ID=0xDD, info=wlanpi_vendor_data)
+
+    @staticmethod
     def build_fake_frame_ies_2ghz_5ghz(
-        ssid, channel, ft_disabled, he_disabled, wpa3_personal_transition, wpa3_personal
+        ssid,
+        mac,
+        channel,
+        ft_disabled,
+        he_disabled,
+        be_disabled,
+        wpa3_personal_transition,
+        wpa3_personal,
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: "bytes" = bytes(ssid, "utf-8")
@@ -135,8 +187,29 @@ class _Utils:
         mu_edca_data = b"\x26\x09\x03\xa4\x28\x27\xa4\x28\x42\x73\x28\x62\x72\x28"
         mu_edca = Dot11Elt(ID=0xFF, info=mu_edca_data)
 
-        six_ghz_cap_data = b"\x3b\x00\x00"
-        six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
+        eht_cap_data = b"\x6c\x00\x00\xe2\xff\xdb\x00\x18\x36\xd8\x1e\x00\x44\x44\x44\x44\x44\x44\x44\x44\x44"
+        eht_capabilities = Dot11Elt(ID=0xFF, info=eht_cap_data)
+
+        # EHT CBW
+        # 0111 7 or 1100 C - 320 MHz
+        # 0011 3 or 1011 B - 160 MHz
+        # 0010 2 or 1010 A - 80 MHz
+        # 0001 1 or 1001 9 - 40 MHz
+        # 0000 0 or 1000 8 - 20 MHz
+        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xf8\x4f\x3f" # 20 MHz CBW
+        # eht_op_data24 = b"\x6a\x05\x11\x00\x00\x00\xf9\x4f\x3f" # 40 MHz CBW
+        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xfa\x4f\x3f" # 80 MHz CBW
+        eht_op_data5 = b"\x6a\x05\x11\x00\x00\x00\xfb\x4f\x3f"  # 160 MHz CBW
+        # eht_op_data6 = b"\x6a\x05\x11\x00\x00\x00\xfc\x4f\x3f" # 320 MHz CBW
+
+        eht_operation = Dot11Elt(ID=0xFF, info=eht_op_data5)
+
+        mac = mac.replace(":", "")
+        # mle_data = b"\x6b\xb0\x01\x0d" + b"\x40\xed\x00\xad\xaa\x1b" + b"\x02\x00\x01\x00\x41\x00"
+        mle_data = (
+            b"\x6b\xb0\x01\x0d" + bytes.fromhex(mac) + b"\x02\x00\x01\x00\x41\x00"
+        )
+        mle = Dot11Elt(ID=0xFF, info=mle_data)
 
         if ft_disabled:
             frame = (
@@ -168,17 +241,18 @@ class _Utils:
                 / vht_operation
             )
         if he_disabled:
-            frame = frame / wmm
+            pass
         else:
-            frame = (
-                frame
-                / he_capabilities
-                / he_operation
-                / spatial_reuse
-                / mu_edca
-                / six_ghz_cap
-                / wmm
-            )
+            frame = frame / he_capabilities / he_operation / spatial_reuse / mu_edca
+        if be_disabled:
+            pass
+        else:
+            frame = frame / eht_operation / eht_capabilities
+            # frame = frame / mle / eht_operation / eht_capabilities
+
+        # Add WLAN Pi vendor IE and WMM last
+        frame = frame / _Utils.build_wlanpi_vendor_ie_type_0() / wmm
+        # frame = frame / wmm
         return frame
 
     @staticmethod
@@ -235,12 +309,24 @@ class _Utils:
         six_ghz_cap_data = b"\x3b\x00\x00"
         six_ghz_cap = Dot11Elt(ID=0xFF, info=six_ghz_cap_data)
 
+        eht_cap_data = b"\x6c\x00\x00\xe2\xff\xdb\x00\x18\x36\xd8\x1e\x00\x44\x44\x44\x44\x44\x44\x44\x44\x44"
+        eht_capabilities = Dot11Elt(ID=0xFF, info=eht_cap_data)
+
+        # EHT CBW
+        # 0111 7 or 1100 C - 320 MHz
+        # 0011 3 or 1011 B - 160 MHz
+        # 0010 2 or 1010 A - 80 MHz
+        # 0001 1 or 1001 9 - 40 MHz
+        # 0000 0 or 1000 8 - 20 MHz
+        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xf8\x4f\x3f" # 20 MHz CBW
+        # eht_op_data24 = b"\x6a\x05\x11\x00\x00\x00\xf9\x4f\x3f" # 40 MHz CBW
+        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xfa\x4f\x3f" # 80 MHz CBW
+        # eht_op_data5 = b"\x6a\x05\x11\x00\x00\x00\xfb\x4f\x3f" # 160 MHz CBW
+        eht_op_data6 = b"\x6a\x05\x11\x00\x00\x00\xfc\x4f\x3f"  # 320 MHz CBW
+        eht_operation = Dot11Elt(ID=0xFF, info=eht_op_data6)
+
         rsnex_data = b"\x20"
         rsnex = Dot11Elt(ID=0xF4, info=rsnex_data)
-
-        custom_hash = {"pver": f"{__version__}", "sver": get_wlanpi_version()}
-        custom_data = bytes(f"{custom_hash}", "utf-8")
-        custom = Dot11Elt(ID=0xDD, info=custom_data)
 
         return (
             essid
@@ -257,20 +343,24 @@ class _Utils:
             / spatial_reuse
             / mu_edca
             / six_ghz_cap
+            / eht_capabilities
+            / eht_operation
             / rsnex
+            / _Utils.build_wlanpi_vendor_ie_type_0()
             / wmm
-            # / custom
         )
 
     @staticmethod
-    def build_fake_frame_ies(config) -> Dot11Elt:
+    def build_fake_frame_ies(config, mac) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         ssid: "str" = config.get("GENERAL").get("ssid")
+        mac = mac
         channel: int = int(config.get("GENERAL").get("channel"))
         frequency: int = int(config.get("GENERAL").get("frequency"))
         ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
         he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
+        be_disabled: "bool" = config.get("GENERAL").get("be_disabled")
         wpa3_personal_transition: "bool" = config.get("GENERAL").get(
             "wpa3_personal_transition"
         )
@@ -281,9 +371,11 @@ class _Utils:
         else:
             frame = _Utils.build_fake_frame_ies_2ghz_5ghz(
                 ssid,
+                mac,
                 channel,
                 ft_disabled,
                 he_disabled,
+                be_disabled,
                 wpa3_personal_transition,
                 wpa3_personal,
             )
@@ -360,7 +452,7 @@ class TxBeacons(multiprocessing.Process):
                 addr3=self.mac,
             )
             dot11beacon = Dot11Beacon(cap=0x1111)
-            beacon_frame_ies = _Utils.build_fake_frame_ies(self.config)
+            beacon_frame_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
         self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
@@ -469,8 +561,8 @@ class Sniffer(multiprocessing.Process):
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
         with lock:
-            probe_resp_ies = _Utils.build_fake_frame_ies(self.config)
             self.mac = _Utils.get_mac(self.interface)
+            probe_resp_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
             self.probe_response_frame = (
                 RadioTap()
                 / Dot11(
@@ -484,7 +576,6 @@ class Sniffer(multiprocessing.Process):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
-
         try:
             sniff(
                 iface=self.interface,
@@ -511,12 +602,13 @@ class Sniffer(multiprocessing.Process):
         """Handle incoming packets for profiling"""
         if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
             if packet.addr1 == self.mac:  # if we are the receiver
+                self.log.debug("rx auth sent from MAC %s", packet.addr2)
                 self.dot11_auth_cb(packet.addr2)
-        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
+        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:  # probe request
             if Dot11Elt in packet:
                 ssid = packet[Dot11Elt].info
-                # self.log.debug("probe req for %s by MAC %s", ssid, packet.addr2)
-                if ssid == self.ssid or packet[Dot11Elt].len == 0:
+                self.log.debug("rx probe req for %s by MAC %s", ssid, packet.addr2)
+                if ssid == self.ssid.encode() or packet[Dot11Elt].len == 0:
                     self.dot11_probe_request_cb(packet)
         elif (
             packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
@@ -546,7 +638,7 @@ class Sniffer(multiprocessing.Process):
                         "probe_response(): network is down or no such device ... exiting ..."
                     )
                     sys.exit(signal.SIGALRM)
-        self.log.debug("sent probe resp to %s", probe_request.addr2)
+        self.log.debug("tx probe resp to %s", probe_request.addr2)
 
     def assoc_req(self, frame) -> None:
         """Put association request on queue for the Profiler"""
@@ -563,7 +655,7 @@ class Sniffer(multiprocessing.Process):
                 _Utils.next_sequence_number(self.sequence_number) - 1
             )
 
-        # self.log.debug("sending authentication (0x0B) to %s", receiver)
+        self.log.debug("tx authentication (0x0B) to %s", receiver)
 
         try:
             self.l2socket.send(frame)  # type: ignore

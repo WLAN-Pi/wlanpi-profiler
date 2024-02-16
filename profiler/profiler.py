@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -26,13 +26,14 @@ from time import strftime
 from typing import Dict, List, Tuple
 
 # third party imports
-from manuf import manuf  # type: ignore
+from manuf2 import manuf  # type: ignore
 from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 
 # app imports
 from .__version__ import __version__
 from .constants import (
     _20MHZ_FREQUENCY_CHANNEL_MAP,
+    EHT_CAPABILITIES_IE_EXT_TAG,
     EXT_CAPABILITIES_IE_TAG,
     FT_CAPABILITIES_IE_TAG,
     HE_6_GHZ_BAND_CAP_IE_EXT_TAG,
@@ -79,6 +80,7 @@ class Profiler(object):
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
             self.ft_disabled = config.get("GENERAL").get("ft_disabled")
             self.he_disabled = config.get("GENERAL").get("he_disabled")
+            self.be_disabled = config.get("GENERAL").get("be_disabled")
             self.reports_dir = os.path.join(self.files_path, "reports")
             self.clients_dir = os.path.join(self.files_path, "clients")
             self.csv_file = os.path.join(
@@ -159,7 +161,7 @@ class Profiler(object):
         if freq > 2411 and freq < 2485:
             band = "2.4GHz"
         elif freq > 5100 and freq < 5900:
-            band = "5.8GHz"
+            band = "5.0GHz"
         elif freq > 5900 and freq < 7120:
             band = "6.0GHz"
             is_6ghz = True
@@ -489,7 +491,12 @@ class Profiler(object):
         # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
-        sanitize = {"intelwir": "Intel", "intelcor": "Intel", "samsunge": "Samsung"}
+        sanitize = {
+            "intelwir": "Intel",
+            "intelcor": "Intel",
+            "samsunge": "Samsung",
+            "samsungelect": "Samsung",
+        }
 
         if (
             oui_manuf is None
@@ -893,8 +900,10 @@ class Profiler(object):
         return [six_ghz_operating_class_cap]
 
     @staticmethod
-    def analyze_extension_ies(dot11_elt_dict, he_disabled: bool) -> List:
-        """Check for 802.11ax support"""
+    def analyze_extension_ies(
+        dot11_elt_dict, he_disabled: bool, be_disabled: bool
+    ) -> List:
+        """Check for 802.11ax and 802.11be support"""
         dot11ax = Capability(
             name="802.11ax",
             value="Not supported",
@@ -1107,6 +1116,63 @@ class Profiler(object):
                         dot11ax_six_ghz.value = "Supported"
                         dot11ax_six_ghz.db_value = 1
 
+                    if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
+                        # dot11ax is supported
+                        dot11ax.value = "Supported"
+                        dot11ax.db_value = 1
+
+        dot11be = Capability(
+            name="802.11be",
+            value="Not supported",
+            db_key="dot11be",
+            db_value=0,
+        )
+        dot11be_nss = Capability(
+            db_key="dot11be_nss",
+            db_value=0,
+        )
+        dot11be_mcs = Capability(
+            db_key="dot11be_mcs",
+            db_value="",
+        )
+        dot11be_320_mhz = Capability(db_key="dot11be_320_mhz", db_value=0)
+
+        if be_disabled:
+            dot11be.value = "Reporting disabled (--no11be option used)"
+        else:
+            if IE_EXT_TAG in dot11_elt_dict.keys():
+                for element_data in dot11_elt_dict[IE_EXT_TAG]:
+                    ext_ie_id = int(str(element_data[0]))
+
+                    if ext_ie_id == EHT_CAPABILITIES_IE_EXT_TAG:
+                        # dot11ax is supported
+                        dot11be.value = "Supported"
+                        dot11be.db_value = 1
+
+                        element_data[1]
+                        element_data[2]
+                        eht_phy_cap_1 = element_data[3]
+                        element_data[4]
+                        element_data[5]
+                        element_data[6]
+                        element_data[7]
+                        element_data[8]
+                        element_data[9]
+                        element_data[10]
+                        element_data[11]
+                        element_data[12]
+                        element_data[13]
+                        element_data[14]
+                        element_data[15]
+                        element_data[16]
+                        element_data[17]
+
+                        if get_bit(eht_phy_cap_1, 2):
+                            dot11be.value += ", [X] 320 MHz"
+                            dot11be_320_mhz.db_value = 1
+                        else:
+                            dot11be.value += ", [ ] 320 MHz"
+
         return [
             dot11ax,
             dot11ax_nss,
@@ -1121,6 +1187,10 @@ class Profiler(object):
             dot11ax_he_er_su_ppdu,
             dot11ax_six_ghz,
             dot11ax_160_mhz,
+            dot11be,
+            dot11be_nss,
+            dot11be_mcs,
+            dot11be_320_mhz,
         ]
 
     def analyze_assoc_req(self, frame, is_6ghz: bool) -> Tuple[str, str, list]:
@@ -1182,8 +1252,10 @@ class Profiler(object):
         # check for 11ac support
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
-        # check for ext tags (e.g. 802.11ax draft support)
-        capabilities += self.analyze_extension_ies(dot11_elt_dict, self.he_disabled)
+        # check for ext tags (e.g. 802.11ax support, 802.11be draft support)
+        capabilities += self.analyze_extension_ies(
+            dot11_elt_dict, self.he_disabled, self.be_disabled
+        )
 
         # check supported operating classes for 6 GHz
         capabilities += self.analyze_operating_classes(dot11_elt_dict)

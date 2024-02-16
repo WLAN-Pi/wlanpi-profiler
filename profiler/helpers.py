@@ -1,7 +1,7 @@
 # -* coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2020-2021 Josh Schmelzle
+# Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -32,10 +32,10 @@ from typing import Any, Dict, List, Union
 
 # third party imports
 try:
-    import manuf  # type: ignore
+    import manuf2  # type: ignore
 except ModuleNotFoundError as error:
-    if error.name == "manuf":
-        print("required module manuf not found.")
+    if error.name == "manuf2":
+        print("required module manuf2 not found.")
     else:
         print(f"{error}")
     sys.exit(signal.SIGABRT)
@@ -230,6 +230,21 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         help="turn off 802.11ax High Efficiency (HE) reporting",
     )
+    dot11be_group = parser.add_mutually_exclusive_group()
+    dot11be_group.add_argument(
+        "--11be",
+        dest="be_enabled",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,  # "turn on 802.11be Extremely High Throughput (EHT) reporting (override --config <file>)",
+    )
+    dot11be_group.add_argument(
+        "--no11be",
+        dest="be_disabled",
+        action="store_true",
+        default=False,
+        help="turn off 802.11be Extremely High Throughput (EHT) reporting",
+    )
     wpa_group = parser.add_mutually_exclusive_group()
     wpa_group.add_argument(
         "--wpa3_personal_transition",
@@ -347,15 +362,15 @@ def get_data_from_iproute2(intf) -> NetworkInterface:
     return iface
 
 
-def get_eth0_mac():
-    """Check iproute2 output for eth0 and return a MAC with a format like 000000111111"""
-    eth0_data = get_data_from_iproute2("eth0")
-    eth0_mac = None
-    if eth0_data:
-        if eth0_data.mac:
-            eth0_mac = eth0_data.mac.replace(":", "")
-    if eth0_mac:
-        return eth0_mac
+def get_iface_mac(iface: str):
+    """Check iproute2 output for <iface> and return a MAC with a format like 000000111111"""
+    iface_data = get_data_from_iproute2(iface)
+    iface_mac = None
+    if iface_data:
+        if iface_data.mac:
+            iface_mac = iface_data.mac.replace(":", "")
+    if iface_mac:
+        return iface_mac
     return ""
 
 
@@ -384,7 +399,7 @@ def setup_config(args):
         config["GENERAL"]["channel"] = 36
 
     if "ssid" not in config["GENERAL"] or config["GENERAL"].get("ssid", "") == "":
-        last_3_of_eth0_mac = f" {get_eth0_mac()[-3:]}"
+        last_3_of_eth0_mac = f" {get_iface_mac('eth0')[-3:]}"
         config["GENERAL"]["ssid"] = f"Profiler{last_3_of_eth0_mac}"
 
     if "interface" not in config["GENERAL"]:
@@ -419,6 +434,10 @@ def setup_config(args):
         config["GENERAL"]["he_disabled"] = False
     if args.he_disabled:
         config["GENERAL"]["he_disabled"] = args.he_disabled
+    if args.be_enabled:
+        config["GENERAL"]["be_disabled"] = False
+    if args.be_disabled:
+        config["GENERAL"]["be_disabled"] = args.be_disabled
     if args.wpa3_personal:
         config["GENERAL"]["wpa3_personal"] = args.wpa3_personal
     if args.wpa3_personal_transition:
@@ -559,28 +578,28 @@ def run_command(cmd: list, suppress_output=False) -> str:
     return "completed process return code is non-zero with no stdout or stderr"
 
 
-def update_manuf() -> bool:
-    """Manuf wrapper to update manuf OUI flat file from Internet"""
+def update_manuf2() -> bool:
+    """manuf2 wrapper to update manuf2 OUI flat file from Internet"""
     log = logging.getLogger(inspect.stack()[0][3])
     try:
-        flat_file = os.path.join(manuf.__path__[0], "manuf")
-        manuf_location = f"{sys.prefix}/bin/manuf"
+        flat_file = os.path.join(manuf2.__path__[0], "manuf")
+        manuf2_location = f"{sys.prefix}/bin/manuf2"
         log.info("OUI database is located at %s", flat_file)
-        log.info("manuf is located at %s", manuf_location)
+        log.info("manuf2 is located at %s", manuf2_location)
         log.info(
-            "manuf file last modified at: %s",
+            "manuf2 file last modified at: %s",
             ctime(os.path.getmtime(flat_file)),
         )
-        log.info("running 'sudo manuf --update'")
-        out = run_command(["sudo", manuf_location, "--update"])
+        log.info("running 'sudo manuf2 --update'")
+        out = run_command(["sudo", manuf2_location, "--update"])
         log.info("%s", str(out))
         if "URLError" not in out:
             log.info(
-                "manuf file last modified at: %s",
+                "manuf2 file last modified at: %s",
                 ctime(os.path.getmtime(flat_file)),
             )
     except OSError:
-        log.exception("problem updating manuf. make sure manuf is installed...")
+        log.exception("problem updating manuf2. make sure manuf2 is installed...")
         print("exiting...")
         return False
     return True
