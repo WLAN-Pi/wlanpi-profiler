@@ -4,8 +4,6 @@
 #
 #    pip-compile extras.in
 #
---extra-index-url https://www.piwheels.org/simple
-
 autoflake==2.2.1
     # via -r extras.in
 black==23.9.1
@@ -20,6 +18,7 @@ colorama==0.4.6
     # via tox
 coverage[toml]==7.3.1
     # via
+    #   coverage
     #   coverage-badge
     #   pytest-cov
 coverage-badge==1.1.0
@@ -36,7 +35,7 @@ flake8==6.1.0
     # via -r extras.in
 iniconfig==2.0.0
     # via pytest
-isort==5.12.0
+isort==5.13.2
     # via -r extras.in
 mccabe==0.7.0
     # via flake8
