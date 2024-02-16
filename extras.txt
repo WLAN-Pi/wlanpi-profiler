@@ -70,7 +70,7 @@ pyflakes==3.2.0
     #   flake8
 pyproject-api==1.6.1
     # via tox
-pytest==7.4.2
+pytest==8.0.0
     # via
     #   -r extras.in
     #   pytest-cov
