@@ -6,7 +6,7 @@
 #
 autoflake==2.2.1
     # via -r extras.in
-black==23.9.1
+black==24.2.0
     # via -r extras.in
 cachetools==5.3.1
     # via tox
