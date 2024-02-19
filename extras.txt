@@ -39,7 +39,7 @@ isort==5.13.2
     # via -r extras.in
 mccabe==0.7.0
     # via flake8
-mypy==1.5.1
+mypy==1.8.0
     # via -r extras.in
 mypy-extensions==1.0.0
     # via
