@@ -4,7 +4,7 @@
 #
 #    pip-compile extras.in
 #
-autoflake==2.2.1
+autoflake==2.3.0
     # via -r extras.in
 black==24.2.0
     # via -r extras.in
