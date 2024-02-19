@@ -88,7 +88,7 @@ tomli==2.0.1
     #   pyproject-api
     #   pytest
     #   tox
-tox==4.12.1
+tox==4.13.0
     # via -r extras.in
 typing-extensions==4.7.1
     # via
