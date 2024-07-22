@@ -4,9 +4,19 @@
 #
 #    pip-compile requirements.in
 #
---extra-index-url https://www.piwheels.org/simple
-
-manuf2==2.0.0
+certifi==2024.7.4
+    # via
+    #   manuf2
+    #   requests
+charset-normalizer==3.3.2
+    # via requests
+idna==3.7
+    # via requests
+manuf2==2.0.1
     # via -r requirements.in
+requests==2.32.3
+    # via manuf2
 scapy==2.5.0
     # via -r requirements.in
+urllib3==2.2.2
+    # via requests
