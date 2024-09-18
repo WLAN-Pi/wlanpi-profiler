@@ -14,11 +14,11 @@ on:
 
 jobs:
   python:
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10"]
+        python-version: ["3.9", "3.11", "3.12"]
 
     steps:
     - name: Checkout
@@ -33,6 +33,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install ethtool iw tcpdump wpasupplicant
+        python -m ensurepip --upgrade
         python -m pip install --upgrade pip setuptools wheel
         pip install tox coverage-badge
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
@@ -53,7 +54,7 @@ jobs:
     name: Post Workflow Status to Slack
     needs:
       - python
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
     steps:
       - name: Slack Workflow Notification
         uses: Gamesight/slack-workflow-status@master

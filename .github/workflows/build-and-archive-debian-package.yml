@@ -12,13 +12,13 @@ jobs:
   sbuild:
     name: sbuild ${{ matrix.distro }}+${{ matrix.arch }}
 
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
 
     strategy:
       fail-fast: false
       matrix:
-        distro: [bullseye]
-        arch: [armhf,arm64]
+        distro: [bullseye,bookworm]
+        arch: [arm64]
     
     steps:
       - name: Checkout
@@ -32,7 +32,7 @@ jobs:
           arch: ${{ matrix.arch }}
 
       - name: Archive artifacts and upload to GitHub
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
@@ -42,7 +42,7 @@ jobs:
     name: Post Workflow Status to Slack
     needs:
       - sbuild
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
     steps:
       - name: Slack Workflow Notification
         uses: Gamesight/slack-workflow-status@master
