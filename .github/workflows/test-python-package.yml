@@ -33,6 +33,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install ethtool iw tcpdump wpasupplicant
+        python -m ensurepip --upgrade
         python -m pip install --upgrade pip setuptools wheel
         pip install tox coverage-badge
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
