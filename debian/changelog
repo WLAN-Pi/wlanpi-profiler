@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.18) unstable; urgency=medium
+
+  * Fix crash when an (re)association request is seen without an SSID element
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 18 Sep 2024 14:23:45 -0500
+
 wlanpi-profiler (1.0.17) unstable; urgency=medium
 
   * Allow user to disable addition of Profiler vendor information elements
