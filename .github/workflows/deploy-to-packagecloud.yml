@@ -14,13 +14,13 @@ jobs:
   sbuild:
     name: sbuild ${{ matrix.distro }}+${{ matrix.arch }}
     
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
 
     strategy:
       fail-fast: false
       matrix:
-        distro: [bullseye]
-        arch: [armhf,arm64]
+        distro: [bullseye,bookworm]
+        arch: [arm64]
 
     environment: PACKAGECLOUD
 
