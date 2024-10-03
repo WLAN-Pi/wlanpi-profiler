@@ -1,48 +1,69 @@
 name: Build and Archive Debian Package
-
 on:
   # Allow manual runs of workflow from Actions tab
   workflow_dispatch:
-
   pull_request:
     paths:
       - 'debian/changelog'
-
+env:
+  debpackagename: wlanpi-profiler
 jobs:
+  format:
+    name: Get formatted version for filename
+    uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild:
-    name: sbuild ${{ matrix.distro }}+${{ matrix.arch }}
-
-    runs-on: 'ubuntu-22.04'
-
+    name: sbuild ${{ matrix.distro }}+${{ matrix.arch }} pkg
+    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
     strategy:
       fail-fast: false
       matrix:
         distro: [bullseye,bookworm]
         arch: [arm64]
-    
     steps:
+      # - name: Enable debug logging
+      #   run: echo "Debug logging enabled"
+      #   env:
+      #     ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
+      - name: Validate formatted version output
+        run: |
+          if [ -z "${{ needs.format.outputs.version }}" ]; then
+            echo "Error: formatted version output is empty."
+            exit 1 
+          else
+            echo "Formatted version output: ${{ needs.format.outputs.version }}"
+          fi
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+      - name: Get package filename
+        run: |
+          echo "filename=${{ env.debpackagename }}_${{ needs.format.outputs.version }}~gha${{ env.date }}+${{ matrix.arch }}_${{ matrix.distro }}" >> $GITHUB_ENV
       - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: sbuild for ${{ matrix.distro }} ${{ matrix.arch }}
+        uses: actions/checkout@v4
+      - name: Validate Environment Variables
+        run: |
+          if [ -z "${{ env.debpackagename }}" ]; then
+            echo "Error: debpackagename cannot be empty"
+            exit 1
+          fi
+        shell: bash
+      - name: sbuild deb pkg for ${{ matrix.distro }}+${{ matrix.arch }}
         uses: wlan-pi/sbuild-debian-package@main
         id: build-debian-package
         with:
           distro: ${{ matrix.distro }}
           arch: ${{ matrix.arch }}
-
       - name: Archive artifacts and upload to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
+          name: ${{ env.filename }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
-  
   slack-workflow-status:
-    if: always()
+    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') }}
     name: Post Workflow Status to Slack
     needs:
       - sbuild
-    runs-on: 'ubuntu-22.04'
+    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
     steps:
       - name: Slack Workflow Notification
         uses: Gamesight/slack-workflow-status@master
