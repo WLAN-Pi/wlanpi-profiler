@@ -1,38 +1,46 @@
----
 name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
+about: Create a report to help us fix a profiler bug.
+title: '[Bug]: '
+labels: '["bug"]'
 assignees: ''
-
----
-
-**Describe the bug**
-A clear and concise description of what the bug is.
-
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
-
-**Expected behavior**
-A clear and concise description of what you expected to happen.
-
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
-
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
-
-**Additional context**
-Add any other context about the problem here.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to fill out this bug report!
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what happened and what you expected.
+      value: "It's a bug"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      values: |
+        * Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
+        * Run `$ sudo profiler --list_interfaces`, and paste in the full output.
+      render: shell
+    validations:
+      required: ture
+  - type: checkboxes
+    id: contribs
+    attributes:
+      label: Contributions
+      description: By submitting this issue, you should review our [developer documentation](https://github.com/WLAN-Pi/developers).
+      options:
+        - label: I have read the contribution guidelines
+          required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/WLAN-Pi/.github/blob/main/code_of_conduct.md).
+      options:
+        - label: I agree to follow WLAN Pi's Code of Conduct
+          required: true
