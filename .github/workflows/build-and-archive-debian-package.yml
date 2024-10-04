@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - 'debian/changelog'
-env:
+vars:
   debpackagename: wlanpi-profiler
 jobs:
   format:
@@ -23,7 +23,7 @@ jobs:
     with:
       distro: ${{ matrix.distro }}
       arch: ${{ matrix.arch }}
-      pkg: ${{ env.debpackagename }}
+      pkg: ${{ vars.debpackagename }}
       version: ${{ needs.format.outputs.version }}
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
