@@ -1,4 +1,4 @@
-wlanpi-profiler (1.0.18-1) unstable; urgency=medium
+wlanpi-profiler (1.0.18) unstable; urgency=medium
 
   * Fix crash when an (re)association request is seen without an SSID element
 
