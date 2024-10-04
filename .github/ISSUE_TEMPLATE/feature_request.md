@@ -1,10 +1,8 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: ''
-labels: ''
-assignees: ''
-
+title: '[FEATURE] <title>'
+labels: ['feature', 'untriaged']
 ---
 
 **Is your feature request related to a problem? Please describe.**
