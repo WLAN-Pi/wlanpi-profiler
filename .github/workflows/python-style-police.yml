@@ -1,7 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
-
-name: Run Python Tests
+name: Run Python Style Police
 
 on:
   # Allow manual runs of workflow from Actions tab
@@ -10,13 +7,13 @@ on:
   push:
     branches: [ main ]
     paths-ignore: # ignore files that don't change build output
-      - '**.md'
+      - '**/*.md'
       - .github/dependabot.yml
       - .gitignore
       - LICENSE
   pull_request:
     paths-ignore: # ignore files that don't change build output
-      - '**.md'
+      - '**/*.md'
       - .github/dependabot.yml
       - .gitignore
       - LICENSE
@@ -34,7 +31,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -47,17 +44,17 @@ jobs:
         pip install tox coverage-badge
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
     
-    - name: Run tests with tox
-      id: tox-run
+    - name: Run format checker
+      id: format-checker
       run: |
-        tox
+        tox -e formatcheck
 
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack
     needs:
       - python
-    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
+    runs-on: 'ubuntu-22.04'
     steps:
       - name: Slack Workflow Notification
         uses: Gamesight/slack-workflow-status@master

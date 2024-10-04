@@ -118,30 +118,31 @@ Stop with `CTRL + C`.
 Usage:
 
 ```
-$ profiler -h
-usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--config FILE]
-                [--files_path PATH] [--hostname_ssid] [--debug] [--logging [{debug,warning}]]
-                [--noprep] [--noAP] [--no11r] [--no11ax] [--oui_update] [--read PCAP] 
-                [--no_bpf_filters] [--list_interfaces] [--version]
+usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug] [--noprep]
+                   [--noAP] [--no11r] [--no11ax] [--no11be] [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--read PCAP]
+                   [--no_bpf_filters] [--list_interfaces] [--version]
 
-options:
+wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler
+
+optional arguments:
   -h, --help            show this help message and exit
   -c CHANNEL            set the channel to broadcast on
   -f FREQUENCY          set the frequency to broadcast on
   -i INTERFACE          set network interface for profiler
   -s SSID               set profiler SSID name
-  --config FILE         customize path for configuration file 
-                            (default: /etc/wlanpi-profiler/config.ini)
-  --files_path PATH     customize default directory where analysis is saved on local system
-                            (default: /var/www/html/profiler)
+  --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
+  --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
   --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
   --debug               enable debug logging output
-  --logging [{debug,warning}]
-                        change logging output
   --noprep              disable interface preperation (default: False)
   --noAP                enable Rx only mode (default: False)
   --no11r               turn off 802.11r Fast Transition (FT) reporting
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
+  --no11be              turn off 802.11be Extremely High Throughput (EHT) reporting
+  --noprofilertlv       disable generation of Profiler specific vendor IE
+  --wpa3_personal_transition
+                        enable WPA3 Personal Transition in the RSNE for 2.4 / 5 GHz
+  --wpa3_personal       enable WPA3 Personal only in the RSNE for 2.4 / 5 GHz
   --oui_update          initiates update of OUI database (requires Internet connection)
   --read PCAP           read and analyze association request frames from pcap
   --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance

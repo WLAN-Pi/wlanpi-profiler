@@ -1,72 +1,36 @@
-name: Deploy to Packagecloud
-
+name: Build and Deploy to Packagecloud
 on:
   # Allow manual runs of workflow from Actions tab
   workflow_dispatch:
-
   push:
     branches:
       - main
     paths:
       - 'debian/changelog'
-
 jobs:
-  sbuild:
-    name: sbuild ${{ matrix.distro }}+${{ matrix.arch }}
-    
-    runs-on: 'ubuntu-22.04'
-
-    strategy:
-      fail-fast: false
-      matrix:
-        distro: [bullseye,bookworm]
-        arch: [arm64]
-
-    environment: PACKAGECLOUD
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: sbuild for ${{ matrix.distro }} ${{ matrix.arch }}
-        uses: wlan-pi/sbuild-debian-package@main
-        id: build-debian-package
-        with:
-          distro: ${{ matrix.distro }}
-          arch: ${{ matrix.arch }}
-
-      - name: Archive artifacts and upload to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: wlanpi-profiler-${{ matrix.distro }}-${{ matrix.arch }}
-          path: ${{ steps.build-debian-package.outputs.deb-package }}
-
-      - name: Upload armhf package to raspbian/${{ matrix.distro }}
-        if: matrix.arch == 'armhf'
-        uses: danielmundi/upload-packagecloud@main
-        with:
-          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          packagecloud-username: wlanpi
-          packagecloud-repo: dev
-          packagecloud-distrib: raspbian/${{ matrix.distro }}
-          packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
-
-      - name: Upload arm64 package to debian/${{ matrix.distro }}
-        if: matrix.arch == 'arm64'
-        uses: danielmundi/upload-packagecloud@main
-        with:
-          package-name: ${{ steps.build-debian-package.outputs.deb-package }}
-          packagecloud-username: wlanpi
-          packagecloud-repo: dev
-          packagecloud-distrib: debian/${{ matrix.distro }}
-          packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
-  
+  check_version:
+    name: Check py & deb pkg versions match
+    uses: WLAN-Pi/gh-workflows/.github/workflows/check-py-deb-pkg-versions-match.yml@main
+    with:
+      python_version_file_path: 'profiler/__version__.py'
+  format:
+    name: Get formatted version for filename
+    uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
+  sbuild_deploy:
+    name: sbuild deploy pkg
+    needs: 
+      - format
+    uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-deploy-pkg.yml@main
+    with:
+      pkg: wlanpi-profiler
+      version: ${{ needs.format.outputs.version }} 
+    secrets: inherit
   slack-workflow-status:
-    if: always()
-    name: Post Workflow Status to Slack
+    if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
+    name: Post workflow status to Slack
     needs:
-      - sbuild
-    runs-on: 'ubuntu-22.04'
+      - sbuild_deploy
+    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
     steps:
       - name: Slack Workflow Notification
         uses: Gamesight/slack-workflow-status@master
