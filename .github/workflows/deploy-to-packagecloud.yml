@@ -29,10 +29,6 @@ jobs:
         arch: [arm64]
     environment: PACKAGECLOUD
     steps:
-      # - name: Enable debug logging
-      #   run: echo "Debug logging enabled"
-      #   env:
-      #     ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
       - name: Validate formatted version output
         run: |
           if [ -z "${{ needs.format.outputs.version }}" ]; then
