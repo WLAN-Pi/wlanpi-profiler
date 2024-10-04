@@ -5,14 +5,14 @@ on:
   pull_request:
     paths:
       - 'debian/changelog'
-vars:
-  debpackagename: wlanpi-profiler
 jobs:
   format:
     name: Get formatted version for filename
     uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild:
-    name: sbuild ${{ matrix.distro }}+${{ matrix.arch }} pkg
+    env:
+      PKG_NAME: wlanpi-profiler
+    name: sbuild pkg
     uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
     needs: format
     strategy:
@@ -23,7 +23,7 @@ jobs:
     with:
       distro: ${{ matrix.distro }}
       arch: ${{ matrix.arch }}
-      pkg: ${{ vars.debpackagename }}
+      pkg: ${{ env.PKG_NAME }}
       version: ${{ needs.format.outputs.version }}
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
