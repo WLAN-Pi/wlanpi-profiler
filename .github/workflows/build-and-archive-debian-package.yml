@@ -10,21 +10,16 @@ jobs:
     name: Get formatted version for filename
     uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild:
-    env:
-      PKG_NAME: wlanpi-profiler
     name: sbuild pkg
-    uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
-    needs: format
-    strategy:
-      fail-fast: false
-      matrix:
-        distro: [bullseye,bookworm]
-        arch: [arm64]
-    with:
-      distro: ${{ matrix.distro }}
-      arch: ${{ matrix.arch }}
-      pkg: ${{ env.PKG_NAME }}
-      version: ${{ needs.format.outputs.version }}
+    needs: 
+      - format
+    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
+    steps:
+      - name: sbuild
+        uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
+        with:
+          pkg: wlanpi-profiler
+          version: ${{ needs.format.outputs.version }}
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack
