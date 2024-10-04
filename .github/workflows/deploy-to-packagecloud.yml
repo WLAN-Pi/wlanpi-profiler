@@ -86,7 +86,7 @@ jobs:
           packagecloud-distrib: debian/${{ matrix.distro }}
           packagecloud-token: ${{ secrets.PACKAGECLOUD_TOKEN }}
   slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post workflow status to Slack
     needs:
       - sbuild
