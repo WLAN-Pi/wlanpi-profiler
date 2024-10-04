@@ -6,8 +6,18 @@ on:
 
   push:
     branches: [ main ]
+    paths-ignore: # ignore files that don't change build output
+      - '**/*.md'
+      - .github/dependabot.yml
+      - .gitignore
+      - LICENSE
   pull_request:
     branches: [ main ]
+    paths-ignore: # ignore files that don't change build output
+      - '**/*.md'
+      - .github/dependabot.yml
+      - .gitignore
+      - LICENSE
 
 jobs:
   python:
@@ -41,7 +51,7 @@ jobs:
         tox -e formatcheck
 
   slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') }}
+    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (github.event.pull_request.head.repo.full_name == github.repository) }}
     name: Post Workflow Status to Slack
     needs:
       - python

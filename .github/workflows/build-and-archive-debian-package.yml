@@ -14,6 +14,7 @@ jobs:
   sbuild:
     name: sbuild ${{ matrix.distro }}+${{ matrix.arch }} pkg
     runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
+    needs: format
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +60,7 @@ jobs:
           name: ${{ env.filename }}
           path: ${{ steps.build-debian-package.outputs.deb-package }}
   slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') }}
+    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (github.event.pull_request.head.repo.full_name == github.repository) }}
     name: Post Workflow Status to Slack
     needs:
       - sbuild

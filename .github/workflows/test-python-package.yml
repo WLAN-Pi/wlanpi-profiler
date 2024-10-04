@@ -8,9 +8,17 @@ on:
   workflow_dispatch:
 
   push:
-    branches: [ main ]
+    paths-ignore: # ignore files that don't change build output
+      - '**.md'
+      - .github/dependabot.yml
+      - .gitignore
+      - LICENSE
   pull_request:
-    branches: [ main ]
+    paths-ignore: # ignore files that don't change build output
+      - '**.md'
+      - .github/dependabot.yml
+      - .gitignore
+      - LICENSE
 
 jobs:
   python:
@@ -38,19 +46,13 @@ jobs:
         pip install tox coverage-badge
         if [ -f requirements.txt ]; then sudo pip install -r requirements.txt; fi
     
-    - name: Run linters
-      id: linters-run
-      continue-on-error: true
-      run: |
-        tox -e lint
-  
     - name: Run tests with tox
       id: tox-run
       run: |
         tox
 
   slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') }}
+    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (github.event.pull_request.head.repo.full_name == github.repository) }}
     name: Post Workflow Status to Slack
     needs:
       - python
