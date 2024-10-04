@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
   push:
+    branches: [ main ]
     paths-ignore: # ignore files that don't change build output
       - '**.md'
       - .github/dependabot.yml
