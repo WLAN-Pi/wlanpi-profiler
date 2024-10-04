@@ -69,16 +69,3 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
-
-  slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') }}
-    name: Post Workflow Status to Slack
-    needs:
-      - analyze
-    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
-    steps:
-      - name: Slack Workflow Notification
-        uses: Gamesight/slack-workflow-status@master
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
