@@ -1,8 +1,7 @@
 name: Bug report
-about: Create a report to help us fix a profiler bug.
-title: '[Bug]: '
-labels: '["bug"]'
-assignees: ''
+about: Create a report to help us improve profiler
+title: "[Bug]: <title>"
+labels: ['bug, untriaged']
 body:
   - type: markdown
     attributes:
@@ -23,16 +22,18 @@ body:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
       value: |
-        * Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
-        * Run `$ sudo profiler --list_interfaces`, and paste in the full output.
+        **Commands**
+
+         - Run `$ sudo profiler --list_interfaces`, and paste in the full output.
+         - Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
       render: shell
     validations:
-      required: ture
+      required: true
   - type: checkboxes
     id: contribs
     attributes:
       label: Contributions
-      description: By submitting this issue, you should review our [developer documentation](https://github.com/WLAN-Pi/developers).
+      description: By submitting this issue, you should review our [developer documentation](https://github.com/WLAN-Pi/developers). 
       options:
         - label: I have read the contribution guidelines
           required: true
@@ -40,7 +41,7 @@ body:
     id: terms
     attributes:
       label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/WLAN-Pi/.github/blob/main/code_of_conduct.md).
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/WLAN-Pi/.github/blob/main/code_of_conduct.md). 
       options:
         - label: I agree to follow WLAN Pi's Code of Conduct
           required: true
