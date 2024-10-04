@@ -13,13 +13,10 @@ jobs:
     name: sbuild pkg
     needs: 
       - format
-    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
-    steps:
-      - name: sbuild
-        uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
-        with:
-          pkg: wlanpi-profiler
-          version: ${{ needs.format.outputs.version }}
+    uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
+    with:
+      pkg: wlanpi-profiler
+      version: ${{ needs.format.outputs.version }} 
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack
