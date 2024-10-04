@@ -29,7 +29,7 @@ jobs:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post workflow status to Slack
     needs:
-      - sbuild
+      - sbuild_deploy
     runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
     steps:
       - name: Slack Workflow Notification
