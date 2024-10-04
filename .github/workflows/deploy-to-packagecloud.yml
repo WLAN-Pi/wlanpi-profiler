@@ -18,14 +18,13 @@ jobs:
     uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild_deploy:
     name: sbuild deploy pkg
-    environment: PACKAGECLOUD
-    secrets: inherit
     needs: 
       - format
     uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-deploy-pkg.yml@main
     with:
       pkg: wlanpi-profiler
       version: ${{ needs.format.outputs.version }} 
+    secrets: inherit
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post workflow status to Slack
