@@ -13,52 +13,18 @@ jobs:
     uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild:
     name: sbuild ${{ matrix.distro }}+${{ matrix.arch }} pkg
-    runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"
+    uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
     needs: format
     strategy:
       fail-fast: false
       matrix:
         distro: [bullseye,bookworm]
         arch: [arm64]
-    steps:
-      # - name: Enable debug logging
-      #   run: echo "Debug logging enabled"
-      #   env:
-      #     ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
-      - name: Validate formatted version output
-        run: |
-          if [ -z "${{ needs.format.outputs.version }}" ]; then
-            echo "Error: formatted version output is empty."
-            exit 1 
-          else
-            echo "Formatted version output: ${{ needs.format.outputs.version }}"
-          fi
-      - name: Get current date
-        id: date
-        run: echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_ENV
-      - name: Get package filename
-        run: |
-          echo "filename=${{ env.debpackagename }}_${{ needs.format.outputs.version }}~gha${{ env.date }}+${{ matrix.arch }}_${{ matrix.distro }}" >> $GITHUB_ENV
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Validate Environment Variables
-        run: |
-          if [ -z "${{ env.debpackagename }}" ]; then
-            echo "Error: debpackagename cannot be empty"
-            exit 1
-          fi
-        shell: bash
-      - name: sbuild deb pkg for ${{ matrix.distro }}+${{ matrix.arch }}
-        uses: wlan-pi/sbuild-debian-package@main
-        id: build-debian-package
-        with:
-          distro: ${{ matrix.distro }}
-          arch: ${{ matrix.arch }}
-      - name: Archive artifacts and upload to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.filename }}
-          path: ${{ steps.build-debian-package.outputs.deb-package }}
+    with:
+      distro: ${{ matrix.distro }}
+      arch: ${{ matrix.arch }}
+      pkg: ${{ env.debpackagename }}
+      version: ${{ needs.format.outputs.version }}
   slack-workflow-status:
     if: ${{ always() && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack
