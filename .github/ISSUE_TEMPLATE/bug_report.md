@@ -22,7 +22,7 @@ body:
     attributes:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      values: |
+      value: |
         * Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
         * Run `$ sudo profiler --list_interfaces`, and paste in the full output.
       render: shell
