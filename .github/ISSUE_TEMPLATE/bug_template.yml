@@ -1,6 +1,6 @@
-name: Bug report
-about: Create a report to help us improve profiler
-title: "[Bug]: <title>"
+name: 🐛 Bug report
+description: Create a report to help us improve profiler
+title: "[BUG]: <concise title>"
 labels: ['bug, untriaged']
 body:
   - type: markdown
@@ -11,9 +11,8 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: Also tell us, what did you expect to happen?
-      placeholder: Tell us what happened and what you expected.
-      value: "It's a bug"
+      description: What did you expect?
+      placeholder: Tell us what happened and what you expected instead.
     validations:
       required: true
   - type: textarea
@@ -22,18 +21,36 @@ body:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
       value: |
-        **Commands**
-
          - Run `$ sudo profiler --list_interfaces`, and paste in the full output.
+
          - Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
       render: shell
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: How often does this bug happen?
+      description: |
+        Following the repro steps above, how easily are you able to reproduce this bug?
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Only once
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: What version of the app are you using?
+      description: |
+        Please provide the app version where this issue occurred.
     validations:
       required: true
   - type: checkboxes
     id: contribs
     attributes:
       label: Contributions
-      description: By submitting this issue, you should review our [developer documentation](https://github.com/WLAN-Pi/developers). 
+      description: Please review our [developer documentation](https://github.com/WLAN-Pi/developers) before contributing.
       options:
         - label: I have read the contribution guidelines
           required: true

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: WLAN Pi Feedback
+  - name: 🤔 Questions and help
     url: https://github.com/WLAN-Pi/feedback/discussions
-    about: Please ask and answer questions here. Don't open issues for usage questions.
+    about: This issue tracker is not for support questions. Please refer to the discussions in the feedback repo instead.
