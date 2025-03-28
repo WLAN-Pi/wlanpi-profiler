@@ -31,7 +31,12 @@ try:
     from scapy.all import Dot11Beacon  # type: ignore
     from scapy.all import Dot11Elt  # type: ignore
     from scapy.all import Dot11ProbeResp  # type: ignore
-    from scapy.all import Dot11, Dot11Auth, RadioTap, Scapy_Exception  # type: ignore
+    from scapy.all import (  # type: ignore
+        Dot11,
+        Dot11Auth,
+        RadioTap,
+        Scapy_Exception,
+    )
     from scapy.all import conf as scapyconf  # type: ignore
     from scapy.all import (  # type: ignore
         get_if_hwaddr,
