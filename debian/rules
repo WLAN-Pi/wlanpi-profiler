@@ -27,42 +27,42 @@ override_dh_lintian:
 override_dh_virtualenv:
 	@echo "Starting dh_virtualenv override"
 	dh_virtualenv \
-                --install-suffix "wlanpi-profiler" \
-                --builtin-venv \
-                --python ${SNAKE} \
-                --upgrade-pip-to=23.2 \
-                --preinstall="setuptools==68.0.0" \
-                --preinstall="wheel==0.40.0" \
-                --extra-pip-arg "--no-cache-dir" \
-                --extra-pip-arg "--no-compile" \
-	        --extras="all,systemd,test"
+				--install-suffix "wlanpi-profiler" \
+				--builtin-venv \
+				--python ${SNAKE} \
+				--upgrade-pip-to=23.2 \
+				--preinstall="setuptools==68.0.0" \
+				--preinstall="wheel==0.40.0" \
+				--extra-pip-arg "--no-cache-dir" \
+				--extra-pip-arg "--no-compile" \
+			--extras="all,systemd,test"
 
-        @echo "BYTECODE CLEANUP:"
-        find $(DH_VENV_DIR)/lib -type d -name "__pycache__" -exec rm -rf {} + -print 2>/dev/null || true
-        find $(DH_VENV_DIR)/lib -name "*.pyc" -delete -print
-        find $(DH_VENV_DIR)/lib -name "*.pyo" -delete -print
+		@echo "BYTECODE CLEANUP:"
+		find $(DH_VENV_DIR)/lib -type d -name "__pycache__" -exec rm -rf {} + -print 2>/dev/null || true
+		find $(DH_VENV_DIR)/lib -name "*.pyc" -delete -print
+		find $(DH_VENV_DIR)/lib -name "*.pyo" -delete -print
 
-        @echo "BEFORE BUILD TOOLS CLEANUP:"
-        du -sh $(DH_VENV_DIR)/bin/pip* || echo "No pip binaries found"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/pip || echo "No pip package found"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/setuptools || echo "No setuptools found"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/wheel || echo "No wheel found"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack || echo "No _distutils_hack found"
-        du -sh $(DH_VENV_DIR) || echo "Cannot determine total venv size"
+		@echo "BEFORE BUILD TOOLS CLEANUP:"
+		du -sh $(DH_VENV_DIR)/bin/pip* || echo "No pip binaries found"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/pip || echo "No pip package found"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/setuptools || echo "No setuptools found"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/wheel || echo "No wheel found"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack || echo "No _distutils_hack found"
+		du -sh $(DH_VENV_DIR) || echo "Cannot determine total venv size"
 
-        rm -rfv $(DH_VENV_DIR)/bin/pip*
-        rm -rfv $(DH_VENV_DIR)/bin/easy_install*
-        rm -rfv $(DH_VENV_DIR)/bin/wheel
-        rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/pip
-        rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/setuptools
-        rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/wheel
-        rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack
-        rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/*.dist-info
+		rm -rfv $(DH_VENV_DIR)/bin/pip*
+		rm -rfv $(DH_VENV_DIR)/bin/easy_install*
+		rm -rfv $(DH_VENV_DIR)/bin/wheel
+		rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/pip
+		rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/setuptools
+		rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/wheel
+		rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack
+		rm -rfv $(DH_VENV_DIR)/lib/python*/site-packages/*.dist-info
 
-        @echo "AFTER BUILD TOOLS CLEANUP:"
-        du -sh $(DH_VENV_DIR)/bin/pip* 2>/dev/null || echo "No pip binaries found - good!"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/pip 2>/dev/null || echo "No pip package found - good!"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/setuptools 2>/dev/null || echo "No setuptools found - good!"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/wheel 2>/dev/null || echo "No wheel found - good!"
-        du -sh $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack 2>/dev/null || echo "No _distutils_hack found - good!"
-        du -sh $(DH_VENV_DIR) || echo "Cannot determine total venv size"w
+		@echo "AFTER BUILD TOOLS CLEANUP:"
+		du -sh $(DH_VENV_DIR)/bin/pip* 2>/dev/null || echo "No pip binaries found - good!"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/pip 2>/dev/null || echo "No pip package found - good!"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/setuptools 2>/dev/null || echo "No setuptools found - good!"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/wheel 2>/dev/null || echo "No wheel found - good!"
+		du -sh $(DH_VENV_DIR)/lib/python*/site-packages/_distutils_hack 2>/dev/null || echo "No _distutils_hack found - good!"
+		du -sh $(DH_VENV_DIR) || echo "Cannot determine total venv size"w
