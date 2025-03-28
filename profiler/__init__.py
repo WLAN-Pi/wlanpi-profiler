@@ -7,4 +7,4 @@
 #   \_/\_/ |_|\__,_|_| |_| .__/|_|     | .__/|_|  \___/|_| |_|_|\___|_|
 #                        |_|           |_|
 
-""" a Wi-Fi client capability profiler for the WLAN Pi. """
+"""a Wi-Fi client capability profiler for the WLAN Pi."""
