@@ -12,6 +12,8 @@ profiler
 Wi-Fi client capabilities analyzer for the WLAN Pi
 """
 
+import logging
+import logging.config
 import os
 import platform
 import sys
@@ -19,22 +21,38 @@ import sys
 
 def main():
     """Set up args and start the profiler manager"""
+    logging_level = logging.INFO
+
     from . import helpers, manager
 
     parser = helpers.setup_parser()
     args = parser.parse_args()
+    if args.debug:
+        logging_level = logging.DEBUG
+
+    default_logging = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"}
+        },
+        "handlers": {
+            "default": {
+                "level": logging_level,
+                "formatter": "standard",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+            }
+        },
+        "loggers": {"": {"handlers": ["default"], "level": logging_level}},
+    }
+    logging.config.dictConfig(default_logging)
 
     manager.start(args)
 
 
 def init():
     """Handle main init"""
-    # hard set no support for non linux platforms
-    if "linux" not in sys.platform:
-        sys.exit(
-            "{0} only works on Linux... exiting...".format(os.path.basename(__file__))
-        )
-
     # hard set no support for python < v3.9
     if sys.version_info < (3, 9):
         sys.exit(

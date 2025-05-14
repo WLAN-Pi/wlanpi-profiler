@@ -12,14 +12,13 @@ profiler.helpers
 provides init functions that are used to help setup the app.
 """
 
-# standard library imports
 import argparse
 import configparser
 import inspect
 import json
 import logging
-import logging.config
 import os
+import platform
 import shutil
 import signal
 import socket
@@ -27,10 +26,10 @@ import subprocess
 import sys
 from base64 import b64encode
 from dataclasses import dataclass
+from pathlib import Path
 from time import ctime
-from typing import Any, Dict, List, Union
+from typing import Any, Dict
 
-# third party imports
 try:
     import manuf2  # type: ignore
 except ModuleNotFoundError as error:
@@ -53,44 +52,19 @@ __tools = [
     "wpa_cli",
 ]
 
-# are the required tools installed?
-for tool in __tools:
-    if shutil.which(tool) is None:
-        print(f"It looks like you do not have {tool} installed.")
-        print("Please install using your distro's package manager.")
-        sys.exit(signal.SIGABRT)
+
+def check_tools():
+    # are the required tools installed?
+    for tool in __tools:
+        if shutil.which(tool) is None:
+            print(f"It looks like you do not have {tool} installed.")
+            print("Please install using your distro's package manager.")
+            sys.exit(signal.SIGABRT)
 
 
 # app imports
 from .__version__ import __version__
 from .constants import CHANNELS, CONFIG_FILE, LAST_PROFILE_TMP_FILE, SSID_TMP_FILE
-
-FILES_PATH = "/var/www/html/profiler"
-
-
-def setup_logger(args) -> None:
-    """Configure and set logging levels"""
-    logging_level = logging.INFO
-    if args.debug:
-        logging_level = logging.DEBUG
-
-    default_logging = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"}
-        },
-        "handlers": {
-            "default": {
-                "level": logging_level,
-                "formatter": "standard",
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stdout",
-            }
-        },
-        "loggers": {"": {"handlers": ["default"], "level": logging_level}},
-    }
-    logging.config.dictConfig(default_logging)
 
 
 def channel(value: str) -> int:
@@ -123,6 +97,79 @@ def frequency(freq) -> int:
             return freq
 
     raise ValueError("%s not found in these frequency ranges: %s", freq, freq_ranges)
+
+
+def get_app_data_path() -> str:
+    """
+    Returns the application data directory path based on the platform.
+
+    Args:
+        app_name: folder name
+
+    Returns:
+        Path object pointing to the application data directory
+    """
+    app_name = "wlanpi-profiler"
+    system = platform.system()
+    candidate_paths = []
+    logging.getLogger(inspect.stack()[0][3])
+    if system == "Windows":
+        userprofile = os.environ.get("USERPROFILE")
+        if userprofile:
+            candidate_paths.append(Path(userprofile) / "AppData" / "Local" / app_name)
+        candidate_paths.append(Path.home() / f".{app_name}")
+    elif system == "Darwin":
+        candidate_paths.append(
+            Path.home() / "Library" / "Application Support" / app_name
+        )
+        candidate_paths.append(Path.home() / f".{app_name}")
+    elif system == "Linux":
+        if os.path.exists("/var/www/html"):
+            candidate_paths.append(Path("/var/www/html/profiler"))
+
+        xdg_data_home = os.environ.get("XDG_DATA_HOME")
+        if xdg_data_home:
+            candidate_paths.append(Path(xdg_data_home) / app_name)
+
+        candidate_paths.append(Path.home() / ".local" / "share" / app_name)
+
+        candidate_paths.append(Path.home() / f".{app_name}")
+
+    if not candidate_paths:
+        candidate_paths.append(Path.home() / f".{app_name}")
+
+    for path in candidate_paths:
+        try:
+            os.makedirs(path, exist_ok=True)
+
+            test_file = path / ".profiler_test_write"
+            try:
+                with open(test_file, "w") as f:
+                    f.write("test")
+                os.remove(test_file)
+                print(f"Using application directory to save output: {path}")
+                return path
+            except (IOError, PermissionError):
+                continue
+        except (IOError, PermissionError) as e:
+            print(f"Debug: Cannot use {path}: {str(e)}")
+            continue
+    import tempfile
+
+    temp_dir = Path(tempfile.gettempdir()) / app_name
+    try:
+        os.makedirs(temp_dir, exist_ok=True)
+        print(f"Falling back to temporary data directory: {temp_dir}")
+        return temp_dir
+    except Exception as e:
+        print(f"Failed to create temporary data directory: {str(e)}")
+        raise RuntimeError(f"Cannot find a writable data directory for {app_name}")
+
+
+def validate_path(path_str):
+    """Convert string path to a valid Path that exists."""
+    path = Path(path_str)
+    return path
 
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -169,7 +216,8 @@ def setup_parser() -> argparse.ArgumentParser:
         "--files_path",
         metavar="PATH",
         dest="files_path",
-        default="/var/www/html/profiler",
+        type=validate_path,
+        default=get_app_data_path(),
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
     )
     ssid_group.add_argument(
@@ -353,14 +401,13 @@ class NetworkInterface:
 
 def get_data_from_iproute2(intf) -> NetworkInterface:
     """Get and parse output from iproute2 for a given interface"""
-    # Get json output from `ip` command
     result = run_command(["ip", "-json", "address"])
     data = json.loads(result)
     interface_data = {}
     for item in data:
         name = item["ifname"]
         interface_data[name] = item
-    # Build dataclass for storage and easier test assertion
+
     iface = NetworkInterface()
     if intf in interface_data.keys():
         iface.operstate = interface_data[intf]["operstate"]
@@ -406,8 +453,9 @@ def setup_config(args):
         config["GENERAL"]["channel"] = 36
 
     if "ssid" not in config["GENERAL"] or config["GENERAL"].get("ssid", "") == "":
-        last_3_of_eth0_mac = f"{get_iface_mac('eth0')[-3:]}".strip()
-        config["GENERAL"]["ssid"] = f"Profiler {last_3_of_eth0_mac}"
+        if not args.pcap_analysis:
+            last_3_of_eth0_mac = f"{get_iface_mac('eth0')[-3:]}".strip()
+            config["GENERAL"]["ssid"] = f"Profiler {last_3_of_eth0_mac}"
 
     if "interface" not in config["GENERAL"]:
         config["GENERAL"]["interface"] = "wlan0"
@@ -419,6 +467,8 @@ def setup_config(args):
     # handle args
     #  - args passed in take precedent over config.ini values
     #  - did user pass in options that over-ride defaults?
+    if args.debug:
+        config["GENERAL"]["debug"] = args.debug
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
     if args.frequency:
@@ -457,8 +507,6 @@ def setup_config(args):
         config["GENERAL"]["pcap_analysis"] = args.pcap_analysis
     if args.files_path:
         config["GENERAL"]["files_path"] = args.files_path
-    else:
-        config["GENERAL"]["files_path"] = FILES_PATH
 
     # ensure channel 1 is an integer and not a bool
     try:
@@ -678,9 +726,10 @@ def get_wlanpi_version() -> str:
 def update_last_profile_record(mac: str):
     """Update Last Profile record on local filesystem"""
     log = logging.getLogger(inspect.stack()[0][3])
-    with open(LAST_PROFILE_TMP_FILE, "w") as _file:
-        _file.write(mac)
-        log.debug("updated %s record with: %s", LAST_PROFILE_TMP_FILE, mac)
+    if platform.system() == "Linux":
+        with open(LAST_PROFILE_TMP_FILE, "w") as _file:
+            _file.write(mac)
+            log.debug("updated %s record with: %s", LAST_PROFILE_TMP_FILE, mac)
 
 
 def update_ssid_record(ssid: str):
@@ -747,16 +796,6 @@ def generate_run_message(config: Dict) -> None:
         for line in out:
             print(line)
         print(f"{'~' * header_len}\n")
-
-
-@dataclass
-class Capability:
-    """Define custom fields for reporting"""
-
-    name: str = ""
-    value: Union[str, int] = ""
-    db_key: str = ""
-    db_value: Union[int, str, List[str]] = 0
 
 
 def get_bit(byteval, index) -> bool:

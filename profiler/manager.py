@@ -13,7 +13,6 @@ profiler.manager
 handle profiler
 """
 
-# standard library imports
 import argparse
 import inspect
 import logging
@@ -23,14 +22,10 @@ import platform
 import signal
 import sys
 from datetime import datetime
+from logging.handlers import QueueListener
 from multiprocessing import Queue
 from time import sleep
 
-# third party imports
-import scapy  # type: ignore
-from scapy.all import rdpcap  # type: ignore
-
-# app imports
 from . import helpers
 from .__version__ import __version__
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, SSID_TMP_FILE
@@ -43,16 +38,17 @@ from .interface import Interface, InterfaceError
 
 __PIDS = []
 __PIDS.append(("main", os.getpid()))
-__IFACE = Interface()
+__IFACE = None
 
 
 def removeVif():
     """Remove the vif we created if exists"""
-    if __IFACE.requires_vif and not __IFACE.removed:
-        log = logging.getLogger(inspect.stack()[0][3])
-        log.debug("Removing monitor vif ...")
-        __IFACE.reset_interface()
-        __IFACE.removed = True
+    if __IFACE is not None:
+        if __IFACE.requires_vif and not __IFACE.removed:
+            log = logging.getLogger(inspect.stack()[0][3])
+            log.debug("Removing monitor vif ...")
+            __IFACE.reset_interface()
+            __IFACE.removed = True
 
 
 def receiveSignal(signum, _frame):
@@ -62,8 +58,9 @@ def receiveSignal(signum, _frame):
         if name == "main" and os.getpid() == pid:
             if os.path.isfile(SSID_TMP_FILE):
                 os.remove(SSID_TMP_FILE)
-            if __IFACE.requires_vif:
-                removeVif()
+            if __IFACE is not None:
+                if __IFACE.requires_vif:
+                    removeVif()
             if signum == 2:
                 print("\nDetected SIGINT or Control-C ...")
             if signum == 15:
@@ -86,27 +83,70 @@ def are_we_root() -> bool:
 
 
 def start(args: argparse.Namespace):
-    """Begin work"""
+    """I didn't come here to tell you how this is going to end. I came here to tell you how it's going to begin."""
+    global __IFACE
     log = logging.getLogger(inspect.stack()[0][3])
 
     if args.pytest:
         sys.exit("pytest")
+    log.debug("args: %s", args)
 
-    if not are_we_root():
-        log.error("profiler must be run with root permissions... exiting...")
-        sys.exit(-1)
+    info = {
+        "app_version": __version__,
+        "platform": platform.system(),
+        "platform_release": platform.release(),
+        "platform_version": platform.version(),
+        "architecture": platform.machine(),
+        "processor": platform.processor(),
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "python_compiler": platform.python_compiler(),
+        "python_build": platform.python_build(),
+        "python_executable": sys.executable,
+        "cpu_count": os.cpu_count(),
+        "current_time": datetime.now().isoformat(),
+    }
 
-    helpers.setup_logger(args)
+    try:
+        utc_offset = datetime.now().astimezone().utcoffset().total_seconds() / 3600
+        info["utc_offset"] = f"{utc_offset:.0f}"
+    except Exception:
+        info["utc_offset"] = "unknown"
 
-    log.debug("%s version %s", __name__.split(".")[0], __version__)
-    log.debug("python platform version is %s", platform.python_version())
+    for k, v in info.items():
+        log.debug("%s: %s", k, v)
+
+    if not args.pcap_analysis:
+        if "linux" not in sys.platform:
+            log.error(
+                "Tx mode is only supported on Linux with an injection capable NIC... exiting..."
+            )
+            sys.exit(-1)
+
+        helpers.check_tools()
+
+        if not are_we_root():
+            log.error("profiler must be run with root permissions... exiting...")
+            sys.exit(-1)
+
+        __IFACE = Interface()
+
+    class ScapyWarningFilter(logging.Filter):
+        def filter(self, record):
+            return "No IPv4 address found on" not in record.getMessage()
+
+    scapy_runtime_logger = logging.getLogger("scapy.runtime")
+    scapy_runtime_logger.addFilter(ScapyWarningFilter())
+
+    import scapy  # type: ignore
+    from scapy.all import rdpcap  # type: ignore
+
     scapy_version = ""
     try:
         scapy_version = scapy.__version__
         log.debug("scapy version is %s", scapy_version)
     except AttributeError:
         log.exception("could not get version information from scapy.__version__")
-        log.debug("args: %s", args)
 
     if args.oui_update:
         # run manuf oui update and exit
@@ -125,8 +165,12 @@ def start(args: argparse.Namespace):
         sys.exit(0)
 
     if args.list_interfaces:
-        __IFACE.print_interface_information()
-        sys.exit(0)
+        if __IFACE is not None:
+            __IFACE.print_interface_information()
+            sys.exit(0)
+        else:
+            log.error("List interfaces not supported on this platform")
+            sys.exit(-1)
 
     running_processes = []
     finished_processes = []
@@ -262,7 +306,15 @@ def start(args: argparse.Namespace):
     from .profiler import Profiler
 
     log.debug("profiler process")
-    profiler = mp.Process(name="profiler", target=Profiler, args=(config, queue))
+
+    log_queue = Queue(-1)
+    logger = logging.getLogger()
+    listener = QueueListener(log_queue, *logger.handlers)
+    listener.start()
+
+    profiler = mp.Process(
+        name="profiler", target=Profiler, args=(config, queue, log_queue)
+    )
     running_processes.append(profiler)
     profiler.start()
     __PIDS.append(("profiler", profiler.pid))  # type: ignore
@@ -275,11 +327,12 @@ def start(args: argparse.Namespace):
         for process in running_processes:
             # if exitcode is None, it has not stopped yet.
             if process.exitcode is not None:
-                if __IFACE.requires_vif and not __IFACE.removed:
-                    removeVif()
-                    # nesting this here is ugly but works
-                    if os.path.isfile(SSID_TMP_FILE):
-                        os.remove(SSID_TMP_FILE)
+                if __IFACE is not None:
+                    if __IFACE.requires_vif and not __IFACE.removed:
+                        removeVif()
+                        # nesting this here is ugly but works
+                        if os.path.isfile(SSID_TMP_FILE):
+                            os.remove(SSID_TMP_FILE)
                 log.debug("shutdown %s process (%s)", process.name, process.exitcode)
                 running_processes.remove(process)
                 finished_processes.append(process)
