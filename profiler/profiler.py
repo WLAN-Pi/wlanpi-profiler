@@ -14,7 +14,6 @@ profiler code goes here, separate from fake ap code.
 
 import base64
 import csv
-from functools import total_ordering
 import inspect
 import json
 import logging
@@ -27,6 +26,7 @@ import sys
 import time
 from dataclasses import dataclass
 from difflib import Differ
+from functools import total_ordering
 from logging.handlers import QueueHandler
 from time import strftime
 from typing import Dict, List, Tuple, Union
@@ -83,12 +83,13 @@ class Capability:
         if not isinstance(other, Capability):
             return NotImplemented
         return self.name < other.name
-    
+
     def __eq__(self, other):
         """Define equality based on name"""
         if not isinstance(other, Capability):
             return NotImplemented
         return self.name == other.name
+
 
 class TsharkClientCapabilityParser:
     """Parse WiFi client capabilities from tshark JSON output"""
@@ -110,7 +111,7 @@ class TsharkClientCapabilityParser:
 
             client_mac = self._extract_client_mac(packet)
             client_manuf = self._extract_manufacturer(packet)
-            
+
             capture_bssid = self._extract_bssid(packet)
             capture_manuf = self._extract_ap_manufacturer(packet)
             capture_freq_band = self._extract_frequency_band(packet)
@@ -133,7 +134,7 @@ class TsharkClientCapabilityParser:
                 }
 
             chipset = self._extract_chipset(dot11_elt_dict)
-            
+
             capabilities += self._analyze_ht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_vht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_rm_capabilities(dot11_elt_dict)
@@ -145,15 +146,12 @@ class TsharkClientCapabilityParser:
             is_6ghz = False
             if "6" in str(capture_freq_band):
                 is_6ghz = True
-            capabilities += self._analyze_supported_channels(
-                dot11_elt_dict,
-                is_6ghz
-            )
+            capabilities += self._analyze_supported_channels(dot11_elt_dict, is_6ghz)
             capabilities += self._analyze_rsnx_capabilities(dot11_elt_dict)
             capabilities += self._analyze_6ghz_capabilities(dot11_elt_dict)
             capabilities += self._analyze_eht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_multi_link_capabilities(dot11_elt_dict)
-            
+
             result = {
                 "mac": client_mac,
                 "is_laa": is_randomized(client_mac),
@@ -181,14 +179,10 @@ class TsharkClientCapabilityParser:
         except KeyError as e:
             return {"error": f"Failed to parse packet data: {str(e)}"}
 
-
-    def generate_text_report(
-        self,
-        profile: dict
-    ) -> str:
+    def generate_text_report(self, profile: dict) -> str:
         """Generate a report for profile"""
-        mac = profile.get('mac')
-        manuf = profile.get('manuf', None)
+        mac = profile.get("mac")
+        manuf = profile.get("manuf", None)
         if is_randomized(mac):
             if manuf is None:
                 manuf = "Randomized MAC"
@@ -201,7 +195,7 @@ class TsharkClientCapabilityParser:
         text_report += f"\n - OUI manufacturer lookup: {manuf}"
         text_report += f"\n - Chipset lookup: {profile.get('chipset', 'Unknown')}"
         band_label = ""
-        band = profile.get('capture_band')
+        band = profile.get("capture_band")
         if band[0] == "2":
             band_label = "2.4 GHz"
         elif band[0] == "5":
@@ -214,7 +208,7 @@ class TsharkClientCapabilityParser:
         text_report += f"\n - Capture channel: {profile.get('capture_channel')}\n"
         text_report += "-" * 45
         text_report += "\n"
-        capabilities = profile.get('capabilities', [])
+        capabilities = profile.get("capabilities", [])
         if capabilities:
             capabilities.sort()
         for cap in capabilities:
@@ -245,7 +239,7 @@ class TsharkClientCapabilityParser:
         freq = int(packet.get("radiotap", {}).get("radiotap.channel.freq", 0))
         channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
         return channel
-        
+
     def _extract_frequency_band(self, packet: Dict) -> str:
         """Extract frequency band from packet"""
         freq = int(packet.get("radiotap", {}).get("radiotap.channel.freq", 0))
@@ -269,11 +263,13 @@ class TsharkClientCapabilityParser:
         except (KeyError, TypeError):
             self.log.warning("Unable to extract AP manufacturer")
             return "Unknown"
-    
+
     def _extract_manufacturer(self, packet: Dict) -> str:
         """Extract manufacturer from packet"""
         try:
-            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.sa_tree"]["wlan.sa_resolved"])
+            manuf = self.lookup.get_manuf(
+                packet["wlan"]["wlan.sa_tree"]["wlan.sa_resolved"]
+            )
             if not manuf:
                 return packet["wlan"]["wlan.sa_tree"]["wlan.sa.oui_resolved"]
             return manuf
@@ -304,24 +300,26 @@ class TsharkClientCapabilityParser:
             "samsunge": "Samsung",
             "samsungelect": "Samsung",
         }
-        
+
         for tag in vendor_tags:
             try:
-                if 'wlan.tag.oui' in tag:
-                    oui_value = tag['wlan.tag.oui']
-                    
+                if "wlan.tag.oui" in tag:
+                    oui_value = tag["wlan.tag.oui"]
+
                     oui_int = int(oui_value)
                     oui_formatted = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
-                        (oui_int >> 16) & 0xFF,
-                        (oui_int >> 8) & 0xFF,
-                        oui_int & 0xFF
+                        (oui_int >> 16) & 0xFF, (oui_int >> 8) & 0xFF, oui_int & 0xFF
                     )
                     manuf = self.lookup.get_manuf(oui_formatted)
                     if manuf and manuf.lower() in sanitize:
                         manuf = sanitize[manuf.lower()]
-                    if manuf and not any(manuf.lower().startswith(lq) for lq in low_quality):
+                    if manuf and not any(
+                        manuf.lower().startswith(lq) for lq in low_quality
+                    ):
                         manufs.append(manuf)
-                        self.log.debug(f"Found manufacturer: {manuf} from OUI: {oui_formatted}")
+                        self.log.debug(
+                            f"Found manufacturer: {manuf} from OUI: {oui_formatted}"
+                        )
             except (ValueError, KeyError) as e:
                 self.log.debug(f"Error processing vendor tag: {str(e)}")
 
@@ -348,7 +346,7 @@ class TsharkClientCapabilityParser:
         except (KeyError, TypeError, ValueError):
             self.log.warning("Unable to extract SSID")
             return "Unknown"
-        
+
     def _extract_information_elements(self, packet: Dict) -> Dict:
         """Extract information elements from the packet"""
         dot11_elt_dict = {}
@@ -375,11 +373,11 @@ class TsharkClientCapabilityParser:
 
                 for tag in tags:
                     tag_number = int(tag["wlan.tag.number"])
-                    
+
                     # Initialize a list for this tag number if it doesn't exist yet
                     if tag_number not in dot11_elt_dict:
                         dot11_elt_dict[tag_number] = []
-                    
+
                     # Append the tag to the list
                     dot11_elt_dict[tag_number].append(tag)
 
@@ -417,7 +415,9 @@ class TsharkClientCapabilityParser:
             name="802.11n", value="Not reported*", db_key="dot11n", db_value=-1
         )
 
-        dot11n_nss = Capability(name="802.11n/NSS", value="Not reported*", db_key="dot11n_nss", db_value=-1)
+        dot11n_nss = Capability(
+            name="802.11n/NSS", value="Not reported*", db_key="dot11n_nss", db_value=-1
+        )
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             dot11n.value = "Supported"
@@ -459,17 +459,47 @@ class TsharkClientCapabilityParser:
             name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=-1
         )
 
-        dot11ac_nss = Capability(name="802.11ac/VHT NSS", value="Not reported*", db_key="dot11ac_nss", db_value=-1)
+        dot11ac_nss = Capability(
+            name="802.11ac/VHT NSS",
+            value="Not reported*",
+            db_key="dot11ac_nss",
+            db_value=-1,
+        )
 
-        dot11ac_mcs = Capability(name="802.11ac/VHT MCS", value="Not reported*", db_key="dot11ac_mcs", db_value=-1)
+        dot11ac_mcs = Capability(
+            name="802.11ac/VHT MCS",
+            value="Not reported*",
+            db_key="dot11ac_mcs",
+            db_value=-1,
+        )
 
-        dot11ac_su_bf = Capability(name="802.11ac/SU BF", value="Not reported*", db_key="dot11ac_su_bf", db_value=-1)
+        dot11ac_su_bf = Capability(
+            name="802.11ac/SU BF",
+            value="Not reported*",
+            db_key="dot11ac_su_bf",
+            db_value=-1,
+        )
 
-        dot11ac_mu_bf = Capability(name="802.11ac/MU BF", value="Not reported*", db_key="dot11ac_mu_bf", db_value=-1)
+        dot11ac_mu_bf = Capability(
+            name="802.11ac/MU BF",
+            value="Not reported*",
+            db_key="dot11ac_mu_bf",
+            db_value=-1,
+        )
 
-        dot11ac_bf_sts = Capability(name="802.11ac/BF STS", value="Not reported*", db_key="dot11ac_bf_sts", db_value=-1)
+        dot11ac_bf_sts = Capability(
+            name="802.11ac/BF STS",
+            value="Not reported*",
+            db_key="dot11ac_bf_sts",
+            db_value=-1,
+        )
 
-        dot11ac_160_mhz = Capability(name="802.11ac/160 MHz", value="Not reported*", db_key="dot11ac_160_mhz", db_value=-1)
+        dot11ac_160_mhz = Capability(
+            name="802.11ac/160 MHz",
+            value="Not reported*",
+            db_key="dot11ac_160_mhz",
+            db_value=-1,
+        )
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             dot11ac.value = "Supported"
@@ -557,7 +587,7 @@ class TsharkClientCapabilityParser:
                             dot11ac_mu_bf.value = 0
 
                     if "wlan.vht.capabilities.beamformee_sts_cap" in caps:
-                        
+
                         bf_sts = int(
                             caps["wlan.vht.capabilities.beamformee_sts_cap"], 0
                         )
@@ -654,7 +684,9 @@ class TsharkClientCapabilityParser:
             name="Max Power", value="Not reported*", db_key="max_power", db_value=-1
         )
 
-        min_power = Capability(name="Min Power", value="Not reported*", db_key="min_power", db_value=-1)
+        min_power = Capability(
+            name="Min Power", value="Not reported*", db_key="min_power", db_value=-1
+        )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict:
             power_tag = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][0]
@@ -703,18 +735,18 @@ class TsharkClientCapabilityParser:
                 # Format 1: wlan.supchan format
                 if "wlan.supchan" in channel_tag:
                     supchan = channel_tag["wlan.supchan"]
-                    
+
                     if not isinstance(supchan, list):
                         supchan = [supchan]
-                        
+
                     has_2ghz = False
                     has_5ghz = False
-                    
+
                     for chanset in supchan:
                         try:
                             start_channel = int(chanset["wlan.supchan.first"])
                             channel_range = int(chanset["wlan.supchan.range"])
-                            
+
                             if start_channel > 14 or is_6ghz:
                                 channel_multiplier = 4
                                 if start_channel <= 14 and is_6ghz:
@@ -726,10 +758,13 @@ class TsharkClientCapabilityParser:
                                 channel_multiplier = 1
 
                             for i in range(channel_range):
-                                channel_list.append(start_channel + (i * channel_multiplier))
+                                channel_list.append(
+                                    start_channel + (i * channel_multiplier)
+                                )
                         except (KeyError, TypeError, ValueError) as e:
-                            self.log.debug(f"Error processing channel set: {e}, chanset type: {type(chanset)}")
-
+                            self.log.debug(
+                                f"Error processing channel set: {e}, chanset type: {type(chanset)}"
+                            )
 
                 # Format 2: ap_channel_report format
                 if "wlan.ap_channel_report.channel_list" in channel_tag:
@@ -757,7 +792,7 @@ class TsharkClientCapabilityParser:
                         has_2ghz = any(ch <= 14 for ch in channel_list)
                         has_5ghz = any(ch > 14 for ch in channel_list)
                         mixed_bands = has_2ghz and has_5ghz
-                        
+
                         ranges = []
                         placeholder = []
 
@@ -765,21 +800,23 @@ class TsharkClientCapabilityParser:
                             if index == 0:
                                 placeholder.append(channel)
                                 continue
-                            
+
                             if mixed_bands:
                                 if channel <= 14:
                                     current_multiplier = 1
                                 else:
                                     current_multiplier = 4
-                                
+
                                 prev_channel = placeholder[-1]
                                 if prev_channel <= 14:
                                     prev_multiplier = 1
                                 else:
                                     prev_multiplier = 4
-                                    
-                                if (prev_channel <= 14 and channel > 14) or (prev_channel > 14 and channel <= 14):
-                                    expected_gap = None 
+
+                                if (prev_channel <= 14 and channel > 14) or (
+                                    prev_channel > 14 and channel <= 14
+                                ):
+                                    expected_gap = None
                                 else:
                                     expected_gap = prev_multiplier
                             else:
@@ -789,13 +826,16 @@ class TsharkClientCapabilityParser:
                                     current_multiplier = 1
                                 expected_gap = current_multiplier
 
-                            if expected_gap and channel - placeholder[-1] == expected_gap:
+                            if (
+                                expected_gap
+                                and channel - placeholder[-1] == expected_gap
+                            ):
                                 placeholder.append(channel)
                             else:
                                 if placeholder:
                                     ranges.append(placeholder)
                                 placeholder = [channel]
-                                
+
                         if placeholder and placeholder not in ranges:
                             ranges.append(placeholder)
 
@@ -822,26 +862,75 @@ class TsharkClientCapabilityParser:
             name="802.11ax", value="Not supported", db_key="dot11ax", db_value=-1
         )
 
-        dot11ax_nss = Capability(name="802.11ax/HE NSS", value="Not reported*", db_key="dot11ax_nss", db_value=-1)
+        dot11ax_nss = Capability(
+            name="802.11ax/HE NSS",
+            value="Not reported*",
+            db_key="dot11ax_nss",
+            db_value=-1,
+        )
 
-        dot11ax_mcs = Capability(name="802.11ax/HE MCS", value="Not reported*", db_key="dot11ax_mcs", db_value=-1)
+        dot11ax_mcs = Capability(
+            name="802.11ax/HE MCS",
+            value="Not reported*",
+            db_key="dot11ax_mcs",
+            db_value=-1,
+        )
 
         # Additional 802.11ax capabilities
         dot11ax_punctured_preamble = Capability(
-            name="802.11ax/Punctured Preamble", value="Not reported*", db_key="dot11ax_punctured_preamble", db_value=-1
+            name="802.11ax/Punctured Preamble",
+            value="Not reported*",
+            db_key="dot11ax_punctured_preamble",
+            db_value=-1,
         )
         dot11ax_he_su_beamformee = Capability(
-            name="802.11ax/SU BF", value="Not reported*", db_key="dot11ax_he_su_beamformee", db_value=-1
+            name="802.11ax/SU BF",
+            value="Not reported*",
+            db_key="dot11ax_he_su_beamformee",
+            db_value=-1,
         )
         dot11ax_he_beamformee_sts = Capability(
-            name="802.11ax/BF STS", value="Not reported*", db_key="dot11ax_he_beamformee_sts", db_value=-1
+            name="802.11ax/BF STS",
+            value="Not reported*",
+            db_key="dot11ax_he_beamformee_sts",
+            db_value=-1,
         )
-        dot11ax_twt = Capability(name="802.11ax/TWT", value="Not reported*", db_key="dot11ax_twt", db_value=-1)
-        dot11ax_bsr = Capability(name="802.11ax/BSR", value="Not reported*", db_key="dot11ax_bsr", db_value=-1)
-        dot11ax_he_er_su_ppdu = Capability(name="802.11ax/ER SU PPDU", value="Not reported*", db_key="dot11ax_he_er_su_ppdu", db_value=-1)
-        dot11ax_spatial_reuse = Capability(name="802.11ax/Spatial Reuse", value="Not reported*", db_key="dot11ax_spatial_reuse", db_value=-1)
-        dot11ax_160_mhz = Capability(name="802.11ax/160 MHz", value="Not reported*", db_key="dot11ax_160_mhz", db_value=-1)
-        dot11ax_six_ghz = Capability(name="802.11ax/6 GHz", value="Not reported*", db_key="dot11ax_six_ghz", db_value=-1)
+        dot11ax_twt = Capability(
+            name="802.11ax/TWT",
+            value="Not reported*",
+            db_key="dot11ax_twt",
+            db_value=-1,
+        )
+        dot11ax_bsr = Capability(
+            name="802.11ax/BSR",
+            value="Not reported*",
+            db_key="dot11ax_bsr",
+            db_value=-1,
+        )
+        dot11ax_he_er_su_ppdu = Capability(
+            name="802.11ax/ER SU PPDU",
+            value="Not reported*",
+            db_key="dot11ax_he_er_su_ppdu",
+            db_value=-1,
+        )
+        dot11ax_spatial_reuse = Capability(
+            name="802.11ax/Spatial Reuse",
+            value="Not reported*",
+            db_key="dot11ax_spatial_reuse",
+            db_value=-1,
+        )
+        dot11ax_160_mhz = Capability(
+            name="802.11ax/160 MHz",
+            value="Not reported*",
+            db_key="dot11ax_160_mhz",
+            db_value=-1,
+        )
+        dot11ax_six_ghz = Capability(
+            name="802.11ax/6 GHz",
+            value="Not reported*",
+            db_key="dot11ax_six_ghz",
+            db_value=-1,
+        )
 
         # Check for HE capabilities in extended tags
         if IE_EXT_TAG in dot11_elt_dict:
@@ -889,9 +978,8 @@ class TsharkClientCapabilityParser:
                         if "HE PHY Capabilities Information" in tag_data:
                             phy_caps = tag_data["HE PHY Capabilities Information"]
 
-
                             # wlan.ext_tag.he_phy_cap.chan_width_set.160_in_5ghz
-                            
+
                             # Check for 160 MHz support
                             if "wlan.ext_tag.he_phy_cap.fbytes_tree" in phy_caps:
                                 chan_width = phy_caps[
@@ -944,7 +1032,7 @@ class TsharkClientCapabilityParser:
                                 bf_bits = phy_caps[
                                     "wlan.ext_tag.he_phy_cap.bits_24_to_39_tree"
                                 ]
-                                
+
                                 if "wlan.ext_tag.he_phy_cap.su_beamformee" in bf_bits:
                                     if (
                                         bf_bits["wlan.ext_tag.he_phy_cap.su_beamformee"]
@@ -1114,17 +1202,26 @@ class TsharkClientCapabilityParser:
 
         # MLE
         mle = Capability(
-            name="802.11be/MLE (Multi-Link Element)", value="Not reported*", db_key="dot11be_mle", db_value=-1
+            name="802.11be/MLE (Multi-Link Element)",
+            value="Not reported*",
+            db_key="dot11be_mle",
+            db_value=-1,
         )
-        
+
         # MLC Type
         mlc_type = Capability(
-            name="802.11be/MLE/MLC Type", value="Not reported*", db_key="dot11be_mle_mlc_type", db_value=-1
+            name="802.11be/MLE/MLC Type",
+            value="Not reported*",
+            db_key="dot11be_mle_mlc_type",
+            db_value=-1,
         )
 
         # EMLSR Support
         emlsr_support = Capability(
-            name="802.11be/MLE/EMLSR", value="Not reported*", db_key="dot11be_mle_emlsr_support", db_value=-1
+            name="802.11be/MLE/EMLSR",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_support",
+            db_value=-1,
         )
 
         # EMLSR Padding Delay
@@ -1145,7 +1242,10 @@ class TsharkClientCapabilityParser:
 
         # EMLMR Support
         emlmr_support = Capability(
-            name="802.11be/MLE/EMLMR", value="Not reported*", db_key="dot11be_mle_emlmr_support", db_value=-1
+            name="802.11be/MLE/EMLMR",
+            value="Not reported*",
+            db_key="dot11be_mle_emlmr_support",
+            db_value=-1,
         )
 
         # Max Simultaneous Links
@@ -1307,7 +1407,6 @@ class TsharkClientCapabilityParser:
                                     )
                                 t2lm_negotiation_support.value = str(t2lm_value)
                                 t2lm_negotiation_support.db_value = t2lm_value
-                                    
 
                                 # Link Reconfiguration Operation Support
                                 if (
@@ -1327,7 +1426,9 @@ class TsharkClientCapabilityParser:
                                         link_reconfig_support.db_value = 0
 
                     except (KeyError, TypeError, ValueError) as e:
-                        self.log.debug(f"Error parsing Multi-Link capabilities: {str(e)}")
+                        self.log.debug(
+                            f"Error parsing Multi-Link capabilities: {str(e)}"
+                        )
 
         capabilities.extend(
             [
@@ -1356,7 +1457,10 @@ class TsharkClientCapabilityParser:
 
         # EPCS Support
         epcs_support = Capability(
-            name="802.11be/EPCS Support", value="No", db_key="dot11be_epcs_support", db_value=-1
+            name="802.11be/EPCS Support",
+            value="No",
+            db_key="dot11be_epcs_support",
+            db_value=-1,
         )
 
         # EHT OM Control Support
@@ -1369,7 +1473,10 @@ class TsharkClientCapabilityParser:
 
         # R-TWT Support
         rtwt_support = Capability(
-            name="802.11be/R-TWT Support", value="No", db_key="dot11be_rtwt_support", db_value=-1
+            name="802.11be/R-TWT Support",
+            value="No",
+            db_key="dot11be_rtwt_support",
+            db_value=-1,
         )
 
         # SCS Traffic Description Support
@@ -1382,25 +1489,40 @@ class TsharkClientCapabilityParser:
 
         # 320 MHz Support
         support_320mhz = Capability(
-            name="802.11be/320 MHz support (6G)", value="No", db_key="dot11be_320mhz", db_value=-1
+            name="802.11be/320 MHz support (6G)",
+            value="No",
+            db_key="dot11be_320mhz",
+            db_value=-1,
         )
 
         # MCS 14 Support (EHT Duplicate 6 GHz)
         mcs14_support = Capability(
-            name="802.11be/MCS 14", value="No", db_key="dot11be_mcs14_support", db_value=-1
+            name="802.11be/MCS 14",
+            value="No",
+            db_key="dot11be_mcs14_support",
+            db_value=-1,
         )
 
         # MCS 15 Support
         mcs15_support = Capability(
-            name="802.11be/MCS 15", value="No", db_key="dot11be_mcs15_support", db_value=-1
+            name="802.11be/MCS 15",
+            value="No",
+            db_key="dot11be_mcs15_support",
+            db_value=-1,
         )
 
         eht_nss = Capability(
-            name="802.11be/EHT SS", value="Not reported*", db_key="dot11be_nss", db_value=-1
+            name="802.11be/EHT SS",
+            value="Not reported*",
+            db_key="dot11be_nss",
+            db_value=-1,
         )
 
         eht_mcs = Capability(
-            name="802.11be/EHT MCS", value="Not reported*", db_key="dot11be_mcs", db_value=-1
+            name="802.11be/EHT MCS",
+            value="Not reported*",
+            db_key="dot11be_mcs",
+            db_value=-1,
         )
 
         # Check for EHT capabilities in extended tags
@@ -1433,7 +1555,6 @@ class TsharkClientCapabilityParser:
                                 else:
                                     epcs_support.value = "No"
                                     epcs_support.db_value = 0
-                                    
 
                             # EHT OM Control Support
                             if (
@@ -1451,7 +1572,7 @@ class TsharkClientCapabilityParser:
                                 else:
                                     eht_om_support.value = "No"
                                     eht_om_support.db_value = 0
-                                
+
                             # R-TWT Support
                             if (
                                 "wlan.eht.mac_capabilities.restricted_twt_support"
@@ -1485,7 +1606,6 @@ class TsharkClientCapabilityParser:
                                 else:
                                     scs_support.value = "No"
                                     scs_support.db_value = 0
-                                    
 
                         # Parse PHY capabilities
                         if "EHT PHY Capabilities Information" in tag_data:
@@ -1755,7 +1875,9 @@ class Profiler:
         if self.pcap_analysis:
             self.tshark = self.get_tshark_path()
             self.log.debug(self.get_tshark_version(self.tshark))
-            self.tshark_single_frame_raw_output = self.get_tshark_raw(self.pcap_analysis)
+            self.tshark_single_frame_raw_output = self.get_tshark_raw(
+                self.pcap_analysis
+            )
             self.tshark_output = self.run_tshark_json(self.pcap_analysis)
             # self.log.debug(json.dumps(self.tshark_output, indent=2))
 
@@ -1770,21 +1892,21 @@ class Profiler:
             results = tsharkparser.parse_tshark_json(self.tshark_output)
             results["pcapng"] = self.tshark_single_frame_raw_output
             ascii_report = tsharkparser.generate_text_report(results)
-            client = results.get('mac')
+            client = results.get("mac")
             self.log.info("generating text report for %s\n%s\n", client, ascii_report)
-            del results['capabilities']
+            del results["capabilities"]
             self.log.info(json.dumps(results, indent=2))
             self.write_tshark_json_and_text(results, ascii_report)
 
         # self.run(queue)  # TODO MAKE COMPAT WITH TSHARK
 
     def write_tshark_json_and_text(self, results, ascii_report) -> None:
-        client_mac = results.get('mac')
+        client_mac = results.get("mac")
         client_mac = client_mac.replace(":", "-", 5)
-        band = results.get('capture_band')
-        features = results.get('features')
+        band = results.get("capture_band")
+        features = results.get("features")
         dest = os.path.join(self.clients_dir, client_mac)
-        
+
         if not os.path.isdir(dest):
             try:
                 os.mkdir(dest)
@@ -1796,7 +1918,7 @@ class Profiler:
             band = ""
         else:
             band = f"_{band}GHz"
-    
+
         text_filename = os.path.join(dest, f"{client_mac}{band}.txt")
 
         json_filename = os.path.join(dest, f"{client_mac}{band}.json")
@@ -1849,7 +1971,7 @@ class Profiler:
                 "error creating flat files to dump client info (%s)", text_filename
             )
             sys.exit(signal.SIGHUP)
-            
+
     def get_tshark_path(self) -> str:
         """Get the tshark executable path for the current platform."""
         system = platform.system().lower()
@@ -1900,10 +2022,12 @@ class Profiler:
             result = subprocess.run(cmd, capture_output=True, text=False, check=True)
             if result.stdout:
                 packet_data = result.stdout
-                encoded = base64.b64encode(packet_data).decode('ascii')
+                encoded = base64.b64encode(packet_data).decode("ascii")
                 out = json.dumps(encoded)
         except subprocess.CalledProcessError as e:
-            self.log.error("tshark command failed with exit code %d: %s", e.returncode, e)
+            self.log.error(
+                "tshark command failed with exit code %d: %s", e.returncode, e
+            )
         except Exception as e:
             self.log.error("Error in get_tshark_raw: %s", e)
         return out
