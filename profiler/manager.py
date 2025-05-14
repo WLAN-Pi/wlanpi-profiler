@@ -220,7 +220,7 @@ def start(args: argparse.Namespace):
         try:
             if args.no_interface_prep:
                 log.warning(
-                    "user provided `--noprep` argument meaning profiler will not handle staging the interface"
+                    "we got `--noprep` argument meaning profiler will not handle staging the interface for Tx"
                 )
                 # get channel from `iw`
                 __IFACE.no_interface_prep = True
@@ -234,7 +234,7 @@ def start(args: argparse.Namespace):
                 # need to set freq in config for banner
                 if __IFACE.frequency:
                     config["GENERAL"]["frequency"] = __IFACE.frequency
-                log.debug("finish interface setup with no staging ...")
+                log.debug("finish interface setup with no staging for Tx ...")
             else:
                 # get channel from config setup by helpers.py (either passed in via CLI option or config.ini)
                 channel = int(config.get("GENERAL").get("channel"))

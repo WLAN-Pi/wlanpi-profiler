@@ -12,8 +12,9 @@ profiler.profiler
 profiler code goes here, separate from fake ap code.
 """
 
-# standard library imports
+import base64
 import csv
+from functools import total_ordering
 import inspect
 import json
 import logging
@@ -67,6 +68,7 @@ EHT_OPERATION_IE_EXT_TAG = 109  # 802.11be EHT Operation IE
 RSNX_TAG = 244  # RSNX tag number
 
 
+@total_ordering
 @dataclass
 class Capability:
     """Define custom fields for reporting"""
@@ -76,18 +78,25 @@ class Capability:
     db_key: str = ""
     db_value: Union[int, str, List[str]] = 0
 
+    def __lt__(self, other):
+        """Make capabilities sortable by name by default"""
+        if not isinstance(other, Capability):
+            return NotImplemented
+        return self.name < other.name
+    
+    def __eq__(self, other):
+        """Define equality based on name"""
+        if not isinstance(other, Capability):
+            return NotImplemented
+        return self.name == other.name
 
-class ClientCapabilityParser:
+class TsharkClientCapabilityParser:
     """Parse WiFi client capabilities from tshark JSON output"""
 
-    def __init__(self):
+    def __init__(self, logger):
         self.capabilities = []
-        self.debug = False
-
-    def _log(self, message):
-        """Print debug messages if debug is enabled"""
-        if self.debug:
-            print(f"DEBUG: {message}")
+        self.lookup = manuf.MacParser(update=False)
+        self.log = logger
 
     def parse_tshark_json(self, json_data: str) -> Dict:
         """Parse tshark JSON output and extract client capabilities"""
@@ -99,30 +108,32 @@ class ClientCapabilityParser:
             # Extract the layers from the packet
             packet = data[0]["_source"]["layers"]
 
-            # Get basic client and network information
             client_mac = self._extract_client_mac(packet)
-            bssid = self._extract_bssid(packet)
-            freq_band = self._extract_frequency_band(packet)
-            manufacturer = self._extract_manufacturer(packet)
-            ssid = self._extract_ssid(packet)
+            client_manuf = self._extract_manufacturer(packet)
+            
+            capture_bssid = self._extract_bssid(packet)
+            capture_manuf = self._extract_ap_manufacturer(packet)
+            capture_freq_band = self._extract_frequency_band(packet)
+            capture_channel = self._extract_channel(packet)
+            capture_ssid = self._extract_ssid(packet)
 
-            # Extract capabilities from IEs
             capabilities = []
 
-            # Extract IEs from packet
             dot11_elt_dict = self._extract_information_elements(packet)
             # print(json.dumps(dot11_elt_dict, indent=2))
             if not dot11_elt_dict:
                 return {
                     "client_mac": client_mac,
-                    "bssid": bssid,
-                    "freq_band": freq_band,
-                    "manufacturer": manufacturer,
-                    "ssid": ssid,
+                    "bssid": capture_bssid,
+                    "freq_band": capture_freq_band,
+                    "manufacturer": client_manuf,
+                    "ssid": capture_ssid,
                     "capabilities": {},
                     "warning": "No information elements found",
                 }
 
+            chipset = self._extract_chipset(dot11_elt_dict)
+            
             capabilities += self._analyze_ht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_vht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_rm_capabilities(dot11_elt_dict)
@@ -131,33 +142,95 @@ class ClientCapabilityParser:
             capabilities += self._analyze_rsn_capabilities(dot11_elt_dict)
             capabilities += self._analyze_he_capabilities(dot11_elt_dict)
             capabilities += self._analyze_power_capabilities(dot11_elt_dict)
+            is_6ghz = False
+            if "6" in str(capture_freq_band):
+                is_6ghz = True
             capabilities += self._analyze_supported_channels(
                 dot11_elt_dict,
-                freq_band == "6 GHz",  # TODO THIS NEEDS TO BE FED IN CORRECTLY
+                is_6ghz
             )
             capabilities += self._analyze_rsnx_capabilities(dot11_elt_dict)
             capabilities += self._analyze_6ghz_capabilities(dot11_elt_dict)
             capabilities += self._analyze_eht_capabilities(dot11_elt_dict)
             capabilities += self._analyze_multi_link_capabilities(dot11_elt_dict)
-
+            
             result = {
-                "client_mac": client_mac,
-                "bssid": bssid,
-                "freq_band": freq_band,
-                "manufacturer": manufacturer,
-                "ssid": ssid,
-                "capabilities": {},
+                "mac": client_mac,
+                "is_laa": is_randomized(client_mac),
+                "manuf": client_manuf,
+                "chipset": chipset,
+                "capture_ssid": capture_ssid,
+                "capture_bssid": capture_bssid,
+                "capture_manuf": capture_manuf,
+                "capture_band": capture_freq_band,
+                "capture_channel": capture_channel,
+                "capabilities": capabilities,
+                "features": {},
+                "pcapng": {},
+                "schema_version": 2,
+                "profiler_version": __version__,
             }
 
             # Add capabilities to result
             for cap in capabilities:
                 if cap.db_key and cap.db_value is not None:
-                    result["capabilities"][cap.db_key] = cap.db_value
-
+                    result["features"][cap.db_key] = cap.db_value
+            result["features"] = dict(sorted(result["features"].items()))
             return result
 
         except KeyError as e:
             return {"error": f"Failed to parse packet data: {str(e)}"}
+
+
+    def generate_text_report(
+        self,
+        profile: dict
+    ) -> str:
+        """Generate a report for profile"""
+        mac = profile.get('mac')
+        manuf = profile.get('manuf', None)
+        if is_randomized(mac):
+            if manuf is None:
+                manuf = "Randomized MAC"
+            else:
+                manuf = f"{manuf} (Randomized MAC)"
+
+        text_report = "-" * 45
+        text_report += f"\n - SSID: {profile.get('capture_ssid')}"
+        text_report += f"\n - Client MAC: {mac}"
+        text_report += f"\n - OUI manufacturer lookup: {manuf}"
+        text_report += f"\n - Chipset lookup: {profile.get('chipset', 'Unknown')}"
+        band_label = ""
+        band = profile.get('capture_band')
+        if band[0] == "2":
+            band_label = "2.4 GHz"
+        elif band[0] == "5":
+            band_label = "5 GHz"
+        elif band[0] == "6":
+            band_label = "6 GHz"
+        else:
+            band_label = "Unknown"
+        text_report += f"\n - Frequency band: {band_label}"
+        text_report += f"\n - Capture channel: {profile.get('capture_channel')}\n"
+        text_report += "-" * 45
+        text_report += "\n"
+        capabilities = profile.get('capabilities', [])
+        if capabilities:
+            capabilities.sort()
+        for cap in capabilities:
+            if cap:
+                self.log.debug(cap)
+                if cap.name and cap.value:
+                    out = "{0:<40} {1}".format(cap.name, cap.value)
+                    if out.strip():
+                        text_report += out + "\n"
+            else:
+                self.log.warning("No capabilities found")
+
+        text_report += "\nKey: [X]: Supported, [ ]: Not supported"
+        text_report += "\n* Reported client capabilities are dependent on available features at the time of client association."
+        text_report += "\n** Reported channels do not factor local regulatory domain. Detected channel sets are assumed contiguous."
+        return text_report
 
     def _extract_client_mac(self, packet: Dict) -> str:
         """Extract client MAC address from packet"""
@@ -167,24 +240,97 @@ class ClientCapabilityParser:
         """Extract BSSID from packet"""
         return packet.get("wlan", {}).get("wlan.bssid", "Unknown")
 
+    def _extract_channel(self, packet: Dict) -> str:
+        """Extract frequency band from packet"""
+        freq = int(packet.get("radiotap", {}).get("radiotap.channel.freq", 0))
+        channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
+        return channel
+        
     def _extract_frequency_band(self, packet: Dict) -> str:
         """Extract frequency band from packet"""
         freq = int(packet.get("radiotap", {}).get("radiotap.channel.freq", 0))
-        if 2400 <= freq <= 2500:
-            return "2.4 GHz"
-        elif 5000 <= freq <= 6000:
-            return "5 GHz"
-        elif 6000 <= freq <= 7000:
-            return "6 GHz"
+        if 2401 <= freq <= 2495:
+            return "2"
+        elif 5150 <= freq <= 5895:
+            return "5"
+        elif 5925 <= freq <= 7125:
+            return "6"
         else:
+            self.log.warning("Unable to extract capture frequency band")
             return "Unknown"
 
+    def _extract_ap_manufacturer(self, packet: Dict) -> str:
+        """Extract manufacturer from packet"""
+        try:
+            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.ra_tree"]["wlan.ra_resolved"])
+            if not manuf:
+                return packet["wlan"]["wlan.ra_tree"]["wlan.ra.oui_resolved"]
+            return manuf
+        except (KeyError, TypeError):
+            self.log.warning("Unable to extract AP manufacturer")
+            return "Unknown"
+    
     def _extract_manufacturer(self, packet: Dict) -> str:
         """Extract manufacturer from packet"""
         try:
-            return packet["wlan"]["wlan.sa_tree"]["wlan.sa.oui_resolved"]
+            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.sa_tree"]["wlan.sa_resolved"])
+            if not manuf:
+                return packet["wlan"]["wlan.sa_tree"]["wlan.sa.oui_resolved"]
+            return manuf
         except (KeyError, TypeError):
+            self.log.warning("Unable to extract client manufacturer")
             return "Unknown"
+
+    def _extract_chipset(self, dot11_elt_dict: Dict) -> str:
+        try:
+            if 221 in dot11_elt_dict:
+                vendor_tags = dot11_elt_dict[221]
+                chipset = self._resolve_chipset_from_vendor_tags(vendor_tags)
+                return chipset if chipset else "Unknown"
+            else:
+                self.log.debug("No vendor specific IE (221) found")
+                return "Unknown"
+        except (KeyError, TypeError) as e:
+            self.log.warning(f"Unable to extract chipset: {str(e)}")
+            return "Unknown"
+
+    def _resolve_chipset_from_vendor_tags(self, vendor_tags: list) -> str:
+        """Resolve chipset from vendor specific tags"""
+        manufs = []
+        low_quality = ["muratama"]
+        sanitize = {
+            "intelwir": "Intel",
+            "intelcor": "Intel",
+            "samsunge": "Samsung",
+            "samsungelect": "Samsung",
+        }
+        
+        for tag in vendor_tags:
+            try:
+                if 'wlan.tag.oui' in tag:
+                    oui_value = tag['wlan.tag.oui']
+                    
+                    oui_int = int(oui_value)
+                    oui_formatted = "{0:02X}:{1:02X}:{2:02X}:00:00:00".format(
+                        (oui_int >> 16) & 0xFF,
+                        (oui_int >> 8) & 0xFF,
+                        oui_int & 0xFF
+                    )
+                    manuf = self.lookup.get_manuf(oui_formatted)
+                    if manuf and manuf.lower() in sanitize:
+                        manuf = sanitize[manuf.lower()]
+                    if manuf and not any(manuf.lower().startswith(lq) for lq in low_quality):
+                        manufs.append(manuf)
+                        self.log.debug(f"Found manufacturer: {manuf} from OUI: {oui_formatted}")
+            except (ValueError, KeyError) as e:
+                self.log.debug(f"Error processing vendor tag: {str(e)}")
+
+        matches = ["broadcom", "qualcomm", "mediatek", "intel", "infineon"]
+        for manuf in manufs:
+            for match in matches:
+                if manuf and manuf.lower().startswith(match):
+                    return match.title()
+        return None
 
     def _extract_ssid(self, packet: Dict) -> str:
         """Extract SSID from packet"""
@@ -197,10 +343,12 @@ class ClientCapabilityParser:
                         "utf-8", errors="replace"
                     )
                     return ssid
+            self.log.warning("Unable to extract SSID")
             return "Unknown"
         except (KeyError, TypeError, ValueError):
+            self.log.warning("Unable to extract SSID")
             return "Unknown"
-
+        
     def _extract_information_elements(self, packet: Dict) -> Dict:
         """Extract information elements from the packet"""
         dot11_elt_dict = {}
@@ -208,12 +356,12 @@ class ClientCapabilityParser:
         try:
             # Make sure wlan.mgt exists
             if "wlan.mgt" not in packet:
-                self._log("No wlan.mgt found in packet")
+                self.log.warning("No wlan.mgt found in packet")
                 return dot11_elt_dict
 
             # Make sure wlan.tagged.all exists
             if "wlan.tagged.all" not in packet["wlan.mgt"]:
-                self._log("No wlan.tagged.all found in packet")
+                self.log.warning("No wlan.tagged.all found in packet")
                 return dot11_elt_dict
 
             tagged = packet["wlan.mgt"]["wlan.tagged.all"]
@@ -227,7 +375,13 @@ class ClientCapabilityParser:
 
                 for tag in tags:
                     tag_number = int(tag["wlan.tag.number"])
-                    dot11_elt_dict[tag_number] = tag
+                    
+                    # Initialize a list for this tag number if it doesn't exist yet
+                    if tag_number not in dot11_elt_dict:
+                        dot11_elt_dict[tag_number] = []
+                    
+                    # Append the tag to the list
+                    dot11_elt_dict[tag_number].append(tag)
 
             # Process extended tag if present
             if "wlan.ext_tag" in tagged:
@@ -249,7 +403,7 @@ class ClientCapabilityParser:
                     )
 
         except (KeyError, TypeError, ValueError) as e:
-            self._log(f"Error extracting IEs: {str(e)}")
+            self.log.error(f"Error extracting IEs: {str(e)}")
 
         return dot11_elt_dict
 
@@ -260,10 +414,10 @@ class ClientCapabilityParser:
     def _analyze_ht_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11n support"""
         dot11n = Capability(
-            name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
+            name="802.11n", value="Not reported*", db_key="dot11n", db_value=-1
         )
 
-        dot11n_nss = Capability(db_key="dot11n_nss", db_value=0)
+        dot11n_nss = Capability(name="802.11n/NSS", value="Not reported*", db_key="dot11n_nss", db_value=-1)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             dot11n.value = "Supported"
@@ -271,7 +425,7 @@ class ClientCapabilityParser:
 
             try:
                 # Get MCS set data
-                ht_tag = dot11_elt_dict[HT_CAPABILITIES_IE_TAG]
+                ht_tag = dot11_elt_dict[HT_CAPABILITIES_IE_TAG][0]
 
                 if "wlan.ht.mcsset" in ht_tag:
                     mcs_set = ht_tag["wlan.ht.mcsset"]
@@ -292,41 +446,37 @@ class ClientCapabilityParser:
                                 if int(mcs_set["wlan.ht.mcsset.rxbitmask"][bitmask], 0):
                                     spatial_streams += 1
 
-                    dot11n_nss.db_value = (
-                        spatial_streams or 2
-                    )  # Default to 2 if parsing fails
-                    dot11n.value = f"Supported ({dot11n_nss.db_value}ss)"
+                    dot11n_nss.db_value = spatial_streams
+                    dot11n_nss.value = spatial_streams
             except (KeyError, TypeError, ValueError) as e:
-                self._log(f"Error parsing HT capabilities: {str(e)}")
-                dot11n_nss.db_value = 2  # Default
-                dot11n.value = f"Supported ({dot11n_nss.db_value}ss)"
+                self.log.debug(f"Error parsing HT capabilities: {str(e)}")
 
         return [dot11n, dot11n_nss]
 
     def _analyze_vht_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11ac support"""
         dot11ac = Capability(
-            name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
+            name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=-1
         )
 
-        dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
+        dot11ac_nss = Capability(name="802.11ac/VHT NSS", value="Not reported*", db_key="dot11ac_nss", db_value=-1)
 
-        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value="")
+        dot11ac_mcs = Capability(name="802.11ac/VHT MCS", value="Not reported*", db_key="dot11ac_mcs", db_value=-1)
 
-        dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
+        dot11ac_su_bf = Capability(name="802.11ac/SU BF", value="Not reported*", db_key="dot11ac_su_bf", db_value=-1)
 
-        dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
+        dot11ac_mu_bf = Capability(name="802.11ac/MU BF", value="Not reported*", db_key="dot11ac_mu_bf", db_value=-1)
 
-        dot11ac_bf_sts = Capability(db_key="dot11ac_bf_sts", db_value=0)
+        dot11ac_bf_sts = Capability(name="802.11ac/BF STS", value="Not reported*", db_key="dot11ac_bf_sts", db_value=-1)
 
-        dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
+        dot11ac_160_mhz = Capability(name="802.11ac/160 MHz", value="Not reported*", db_key="dot11ac_160_mhz", db_value=-1)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             dot11ac.value = "Supported"
             dot11ac.db_value = 1
 
             try:
-                vht_tag = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG]
+                vht_tag = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG][0]
 
                 # Check for VHT MCS set
                 if "wlan.vht.mcsset" in vht_tag:
@@ -361,7 +511,9 @@ class ClientCapabilityParser:
 
                         dot11ac_nss.db_value = nss
                         dot11ac_mcs.db_value = mcs_list
-                        dot11ac.value = f"Supported ({nss}ss), MCS {mcs_list}"
+                        dot11ac_nss.value = nss
+                        dot11ac_mcs.value = mcs_list
+                        # dot11ac.value = f"Supported ({nss}ss), MCS {mcs_list}"
 
                 # Check for 160 MHz support
                 if "wlan.vht.capabilities_tree" in vht_tag:
@@ -374,41 +526,47 @@ class ClientCapabilityParser:
                         )
                         if chan_width & 0x2:  # Bit 1 indicates 160 MHz support
                             dot11ac_160_mhz.db_value = 1
-                            dot11ac.value += ", [X] 160 MHz"
+                            dot11ac_160_mhz.value = 1
+                            # dot11ac.value += ", [X] 160 MHz"
                         else:
-                            dot11ac.value += ", [ ] 160 MHz"
+                            # dot11ac.value += ", [ ] 160 MHz"
+                            dot11ac_160_mhz.db_value = 0
+                            dot11ac_160_mhz.value = 0
 
                     # Check for beamforming capabilities
                     if "wlan.vht.capabilities.subeamformer" in caps:
                         su_bf = int(caps["wlan.vht.capabilities.subeamformer"], 0)
                         if su_bf:
                             dot11ac_su_bf.db_value = 1
-                            dot11ac.value += ", [X] SU BF"
+                            dot11ac_su_bf.value = 1
+                            # dot11ac.value += ", [X] SU BF"
                         else:
-                            dot11ac.value += ", [ ] SU BF"
+                            # dot11ac.value += ", [ ] SU BF"
+                            dot11ac_su_bf.db_value = 0
+                            dot11ac_su_bf.value = 0
 
                     if "wlan.vht.capabilities.mubeamformer" in caps:
                         mu_bf = int(caps["wlan.vht.capabilities.mubeamformer"], 0)
                         if mu_bf:
                             dot11ac_mu_bf.db_value = 1
-                            dot11ac.value += ", [X] MU BF"
+                            dot11ac_mu_bf.value = 1
+                            # dot11ac.value += ", [X] MU BF"
                         else:
-                            dot11ac.value += ", [ ] MU BF"
+                            # dot11ac.value += ", [ ] MU BF"
+                            dot11ac_mu_bf.db_value = 0
+                            dot11ac_mu_bf.value = 0
 
                     if "wlan.vht.capabilities.beamformee_sts_cap" in caps:
+                        
                         bf_sts = int(
                             caps["wlan.vht.capabilities.beamformee_sts_cap"], 0
                         )
                         dot11ac_bf_sts.db_value = bf_sts
-                        dot11ac.value += f", Beamformee STS={bf_sts}"
+                        dot11ac_bf_sts.value = bf_sts
+                        # dot11ac.value += f", Beamformee STS={bf_sts}"
 
             except (KeyError, TypeError, ValueError) as e:
-                self._log(f"Error parsing VHT capabilities: {str(e)}")
-                dot11ac_nss.db_value = 2
-                dot11ac_mcs.db_value = "0-9"
-                dot11ac.value = (
-                    f"Supported ({dot11ac_nss.db_value}ss), MCS {dot11ac_mcs.db_value}"
-                )
+                self.log.debug(f"Error parsing VHT capabilities: {str(e)}")
 
         return [
             dot11ac,
@@ -423,7 +581,7 @@ class ClientCapabilityParser:
     def _analyze_rm_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11k support"""
         dot11k = Capability(
-            name="802.11k", value="Not reported*", db_key="dot11k", db_value=0
+            name="802.11k", value="Not reported*", db_key="dot11k", db_value=-1
         )
 
         if RM_CAPABILITIES_IE_TAG in dot11_elt_dict:
@@ -435,7 +593,7 @@ class ClientCapabilityParser:
     def _analyze_ft_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11r support"""
         dot11r = Capability(
-            name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
+            name="802.11r", value="Not reported*", db_key="dot11r", db_value=-1
         )
 
         if FT_CAPABILITIES_IE_TAG in dot11_elt_dict:
@@ -447,11 +605,11 @@ class ClientCapabilityParser:
     def _analyze_ext_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11v support"""
         dot11v = Capability(
-            name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
+            name="802.11v", value="Not reported*", db_key="dot11v", db_value=-1
         )
 
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict:
-            ext_cap_tag = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG]
+            ext_cap_tag = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG][0]
 
             try:
                 if "wlan.extcap_tree" in ext_cap_tag:
@@ -464,18 +622,18 @@ class ClientCapabilityParser:
                             dot11v.value = "Supported"
                             dot11v.db_value = 1
             except (KeyError, TypeError, IndexError) as e:
-                self._log(f"Error parsing extended capabilities: {str(e)}")
+                self.log.debug(f"Error parsing extended capabilities: {str(e)}")
 
         return [dot11v]
 
     def _analyze_rsn_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11w support"""
         dot11w = Capability(
-            name="802.11w", value="Not reported*", db_key="dot11w", db_value=0
+            name="802.11w", value="Not reported*", db_key="dot11w", db_value=-1
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict:
-            rsn_tag = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG]
+            rsn_tag = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG][0]
 
             try:
                 if "wlan.rsn.capabilities_tree" in rsn_tag:
@@ -486,20 +644,20 @@ class ClientCapabilityParser:
                             dot11w.value = "Supported"
                             dot11w.db_value = 1
             except (KeyError, TypeError) as e:
-                self._log(f"Error parsing RSN capabilities: {str(e)}")
+                self.log.debug(f"Error parsing RSN capabilities: {str(e)}")
 
         return [dot11w]
 
     def _analyze_power_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for power capabilities"""
         max_power = Capability(
-            name="Max Power", value="Not reported", db_key="max_power", db_value=0
+            name="Max Power", value="Not reported*", db_key="max_power", db_value=-1
         )
 
-        min_power = Capability(db_key="min_power", db_value=0)
+        min_power = Capability(name="Min Power", value="Not reported*", db_key="min_power", db_value=-1)
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict:
-            power_tag = dot11_elt_dict[POWER_MIN_MAX_IE_TAG]
+            power_tag = dot11_elt_dict[POWER_MIN_MAX_IE_TAG][0]
 
             try:
                 if (
@@ -518,7 +676,7 @@ class ClientCapabilityParser:
                     min_power.value = f"{min_val} dBm"
                     min_power.db_value = min_val
             except (KeyError, TypeError, ValueError) as e:
-                self._log(f"Error parsing power capabilities: {str(e)}")
+                self.log.debug(f"Error parsing power capabilities: {str(e)}")
 
         return [max_power, min_power]
 
@@ -528,42 +686,49 @@ class ClientCapabilityParser:
         """Check supported channels"""
         supported_channels = Capability(
             name="Supported Channels",
-            value="Not reported",
+            value="Not reported*",
             db_key="supported_channels",
             db_value=[],
         )
 
         num_channels = Capability(
-            name="Number of Channels", value="0", db_key="num_channels", db_value=0
+            name="Number of Channels", value="0", db_key="num_channels", db_value=-1
         )
 
         if SUPPORTED_CHANNELS_IE_TAG in dot11_elt_dict:
             try:
-                # Get the channel sets from the IE
-                channel_tag = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG]
+                channel_tag = dot11_elt_dict[SUPPORTED_CHANNELS_IE_TAG][0]
                 channel_list = []
 
                 # Format 1: wlan.supchan format
                 if "wlan.supchan" in channel_tag:
                     supchan = channel_tag["wlan.supchan"]
-                    start_channel = int(supchan["wlan.supchan.first"])
-                    channel_range = int(supchan["wlan.supchan.range"])
+                    
+                    has_2ghz = False
+                    has_5ghz = False
+                    
+                    for chanset in supchan:
+                        start_channel = int(chanset["wlan.supchan.first"])
+                        if start_channel <= 14 and not is_6ghz:
+                            has_2ghz = True
+                        elif start_channel > 14 or is_6ghz:
+                            has_5ghz = True
+                    
+                    for chanset in supchan:
+                        
+                        start_channel = int(chanset["wlan.supchan.first"])
+                        channel_range = int(chanset["wlan.supchan.range"])
 
-                    # Determine channel multiplier based on starting channel
-                    if start_channel > 14 or is_6ghz:
-                        channel_multiplier = 4  # 5GHz or 6GHz
-                    else:
-                        channel_multiplier = 1  # 2.4GHz
+                        if start_channel > 14 or is_6ghz:
+                            channel_multiplier = 4  # 5 GHz or 6 GHz
+                        else:
+                            channel_multiplier = 1  # 2.4 GHz
 
-                    # Add all channels in range
-                    for i in range(channel_range):
-                        channel_list.append(start_channel + (i * channel_multiplier))
-
-                    num_channels.value = str(channel_range)
-                    num_channels.db_value = channel_range
+                        for i in range(channel_range):
+                            channel_list.append(start_channel + (i * channel_multiplier))
 
                 # Format 2: ap_channel_report format
-                elif "wlan.ap_channel_report.channel_list" in channel_tag:
+                if "wlan.ap_channel_report.channel_list" in channel_tag:
                     channel_list_raw = channel_tag[
                         "wlan.ap_channel_report.channel_list"
                     ]
@@ -575,68 +740,15 @@ class ClientCapabilityParser:
                         # Single channel
                         channel_list.append(int(channel_list_raw))
 
+                if channel_list:
+                    channel_list.sort()
                     num_channels.value = str(len(channel_list))
                     num_channels.db_value = len(channel_list)
-
-                # Format 3: Raw format with sets of first channel and range
-                else:
-                    # Need to determine if we can parse from key-value pairs or need to iterate
-                    # Create a list of channel sets
-                    channel_sets = []
-
-                    # Try to find multiple first/range pairs
-                    for key in channel_tag:
-                        if key.endswith(".first"):
-                            set_prefix = key[:-6]  # Remove '.first'
-                            range_key = f"{set_prefix}.range"
-                            if range_key in channel_tag:
-                                channel_sets.append(
-                                    (int(channel_tag[key]), int(channel_tag[range_key]))
-                                )
-
-                    # If we couldn't find pairs, try to parse as a flat list
-                    if not channel_sets:
-                        channel_sets_list = list(channel_tag.values())
-                        # Remove non-numeric values
-                        channel_sets_list = [
-                            int(val)
-                            for val in channel_sets_list
-                            if isinstance(val, (int, str)) and str(val).isdigit()
-                        ]
-
-                        while len(channel_sets_list) >= 2:
-                            start_channel = channel_sets_list[0]
-                            channel_range = channel_sets_list[1]
-                            channel_sets.append((start_channel, channel_range))
-                            channel_sets_list = channel_sets_list[2:]
-
-                    # Process all channel sets
-                    total_channels = 0
-
-                    for start_channel, channel_range in channel_sets:
-                        # Determine channel multiplier based on band
-                        if start_channel > 14 or is_6ghz:
-                            if not is_6ghz:
-                                pass
-                            channel_multiplier = 4
-                        else:
-                            channel_multiplier = 1
-
-                        total_channels += channel_range
-                        for i in range(channel_range):
-                            channel_list.append(
-                                start_channel + (i * channel_multiplier)
-                            )
-
-                    num_channels.value = str(total_channels)
-                    num_channels.db_value = total_channels
-
-                # Process channel ranges for display (common for all formats)
-                if channel_list:
-                    # Sort channels for proper display
-                    channel_list.sort()
-
-                    # Group channels into contiguous ranges
+                    
+                    has_2ghz = any(ch <= 14 for ch in channel_list)
+                    has_5ghz = any(ch > 14 for ch in channel_list)
+                    mixed_bands = has_2ghz and has_5ghz
+                    
                     ranges = []
                     placeholder = []
 
@@ -644,27 +756,40 @@ class ClientCapabilityParser:
                         if index == 0:
                             placeholder.append(channel)
                             continue
-
-                        # Determine if we need different multipliers for mixed bands
-                        if channel > 14:  # 5GHz or 6GHz
-                            channel_multiplier = 4
-                        else:  # 2.4GHz
-                            channel_multiplier = 1
-
-                        if channel - placeholder[-1] == channel_multiplier:
-                            placeholder.append(channel)
-                            # Last channel - add this range
-                            if index == len(channel_list) - 1:
-                                ranges.append(placeholder)
+                        
+                        if mixed_bands:
+                            if channel <= 14:
+                                current_multiplier = 1
+                            else:
+                                current_multiplier = 4
+                            
+                            prev_channel = placeholder[-1]
+                            if prev_channel <= 14:
+                                prev_multiplier = 1
+                            else:
+                                prev_multiplier = 4
+                                
+                            if (prev_channel <= 14 and channel > 14) or (prev_channel > 14 and channel <= 14):
+                                expected_gap = None 
+                            else:
+                                expected_gap = prev_multiplier
                         else:
-                            ranges.append(placeholder)
-                            placeholder = [channel]
+                            if channel > 14 or is_6ghz:
+                                current_multiplier = 4
+                            else:
+                                current_multiplier = 1
+                            expected_gap = current_multiplier
 
-                    # Add any remaining channels
+                        if expected_gap and channel - placeholder[-1] == expected_gap:
+                            placeholder.append(channel)
+                        else:
+                            if placeholder:
+                                ranges.append(placeholder)
+                            placeholder = [channel]
+                            
                     if placeholder and placeholder not in ranges:
                         ranges.append(placeholder)
 
-                    # Format the ranges for display
                     channel_ranges = []
                     for _range in ranges:
                         if len(_range) > 1:
@@ -676,7 +801,7 @@ class ClientCapabilityParser:
                     supported_channels.db_value = channel_list
 
             except (KeyError, TypeError, ValueError, IndexError) as e:
-                self._log(f"Error parsing supported channels: {str(e)}")
+                self.log.debug(f"Error parsing supported channels: {str(e)}")
                 supported_channels.value = "Error parsing supported channels"
                 num_channels.value = "Error"
 
@@ -685,33 +810,29 @@ class ClientCapabilityParser:
     def _analyze_he_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for 802.11ax support and capabilities"""
         dot11ax = Capability(
-            name="802.11ax", value="Not supported", db_key="dot11ax", db_value=0
+            name="802.11ax", value="Not supported", db_key="dot11ax", db_value=-1
         )
 
-        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
+        dot11ax_nss = Capability(name="802.11ax/HE NSS", value="Not reported*", db_key="dot11ax_nss", db_value=-1)
 
-        dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
+        dot11ax_mcs = Capability(name="802.11ax/HE MCS", value="Not reported*", db_key="dot11ax_mcs", db_value=-1)
 
         # Additional 802.11ax capabilities
         dot11ax_punctured_preamble = Capability(
-            db_key="dot11ax_punctured_preamble", db_value=0
-        )
-        dot11ax_he_su_beamformer = Capability(
-            db_key="dot11ax_he_su_beamformer", db_value=0
+            name="802.11ax/Punctured Preamble", value="Not reported*", db_key="dot11ax_punctured_preamble", db_value=-1
         )
         dot11ax_he_su_beamformee = Capability(
-            db_key="dot11ax_he_su_beamformee", db_value=0
+            name="802.11ax/SU BF", value="Not reported*", db_key="dot11ax_he_su_beamformee", db_value=-1
         )
         dot11ax_he_beamformee_sts = Capability(
-            db_key="dot11ax_he_beamformee_sts", db_value=0
+            name="802.11ax/BF STS", value="Not reported*", db_key="dot11ax_he_beamformee_sts", db_value=-1
         )
-        dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
-        dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=0)
-        dot11ax_bsr = Capability(db_key="dot11ax_bsr", db_value=0)
-        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
-        dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
-        dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
-        dot11ax_six_ghz = Capability(db_key="dot11ax_six_ghz", db_value=0)
+        dot11ax_twt = Capability(name="802.11ax/TWT", value="Not reported*", db_key="dot11ax_twt", db_value=-1)
+        dot11ax_bsr = Capability(name="802.11ax/BSR", value="Not reported*", db_key="dot11ax_bsr", db_value=-1)
+        dot11ax_he_er_su_ppdu = Capability(name="802.11ax/ER SU PPDU", value="Not reported*", db_key="dot11ax_he_er_su_ppdu", db_value=-1)
+        dot11ax_spatial_reuse = Capability(name="802.11ax/Spatial Reuse", value="Not reported*", db_key="dot11ax_spatial_reuse", db_value=-1)
+        dot11ax_160_mhz = Capability(name="802.11ax/160 MHz", value="Not reported*", db_key="dot11ax_160_mhz", db_value=-1)
+        dot11ax_six_ghz = Capability(name="802.11ax/6 GHz", value="Not reported*", db_key="dot11ax_six_ghz", db_value=-1)
 
         # Check for HE capabilities in extended tags
         if IE_EXT_TAG in dot11_elt_dict:
@@ -723,7 +844,7 @@ class ClientCapabilityParser:
                     try:
                         tag_data = ext_tag["data"]
 
-                        # Process HE capabilities
+                        # Process HE MAC capabilities
                         if "wlan.ext_tag.he_mac_caps_tree" in tag_data:
                             mac_caps = tag_data["wlan.ext_tag.he_mac_caps_tree"]
 
@@ -734,9 +855,12 @@ class ClientCapabilityParser:
                                     == "1"
                                 ):
                                     dot11ax_twt.db_value = 1
-                                    dot11ax.value += ", [X] TWT"
+                                    dot11ax_twt.value = "Yes"
+                                    # dot11ax.value += ", [X] TWT"
                                 else:
-                                    dot11ax.value += ", [ ] TWT"
+                                    # dot11ax.value += ", [ ] TWT"
+                                    dot11ax_twt.db_value = 0
+                                    dot11ax_twt.value = "No"
 
                             # Check for BSR support
                             if "wlan.ext_tag.he_mac_cap.bsr_support" in mac_caps:
@@ -745,14 +869,20 @@ class ClientCapabilityParser:
                                     == "1"
                                 ):
                                     dot11ax_bsr.db_value = 1
-                                    dot11ax.value += ", [X] BSR"
+                                    dot11ax_bsr.value = "Yes"
+                                    # dot11ax.value += ", [X] BSR"
                                 else:
-                                    dot11ax.value += ", [ ] BSR"
+                                    # dot11ax.value += ", [ ] BSR"
+                                    dot11ax_bsr.db_value = 0
+                                    dot11ax_bsr.value = "No"
 
                         # Process HE PHY capabilities
                         if "HE PHY Capabilities Information" in tag_data:
                             phy_caps = tag_data["HE PHY Capabilities Information"]
 
+
+                            # wlan.ext_tag.he_phy_cap.chan_width_set.160_in_5ghz
+                            
                             # Check for 160 MHz support
                             if "wlan.ext_tag.he_phy_cap.fbytes_tree" in phy_caps:
                                 chan_width = phy_caps[
@@ -769,9 +899,12 @@ class ClientCapabilityParser:
                                         == "1"
                                     ):
                                         dot11ax_160_mhz.db_value = 1
-                                        dot11ax.value += ", [X] 160 MHz"
+                                        dot11ax_160_mhz.value = "Yes"
+                                        # dot11ax.value += ", [X] 160 MHz"
                                     else:
-                                        dot11ax.value += ", [ ] 160 MHz"
+                                        # dot11ax.value += ", [ ] 160 MHz"
+                                        dot11ax_160_mhz.db_value = 0
+                                        dot11ax_160_mhz.value = "No"
 
                             # Check for punctured preamble support
                             if "wlan.ext_tag.he_phy_cap.bits_8_to_23_tree" in phy_caps:
@@ -790,37 +923,34 @@ class ClientCapabilityParser:
                                     )
                                     if punc_val > 0:
                                         dot11ax_punctured_preamble.db_value = 1
-                                        dot11ax.value += ", [X] Punctured Preamble"
+                                        dot11ax_punctured_preamble.value = "Yes"
+                                        # dot11ax.value += ", [X] Punctured Preamble"
                                     else:
-                                        dot11ax.value += ", [ ] Punctured Preamble"
+                                        # dot11ax.value += ", [ ] Punctured Preamble"
+                                        dot11ax_punctured_preamble.db_value = 0
+                                        dot11ax_punctured_preamble.value = "No"
 
                             # Check for beamforming capabilities
                             if "wlan.ext_tag.he_phy_cap.bits_24_to_39_tree" in phy_caps:
                                 bf_bits = phy_caps[
                                     "wlan.ext_tag.he_phy_cap.bits_24_to_39_tree"
                                 ]
-
-                                if "wlan.ext_tag.he_phy_cap.su_beamformer" in bf_bits:
-                                    if (
-                                        bf_bits["wlan.ext_tag.he_phy_cap.su_beamformer"]
-                                        == "1"
-                                    ):
-                                        dot11ax_he_su_beamformer.db_value = 1
-                                        dot11ax.value += ", [X] SU Beamformer"
-                                    else:
-                                        dot11ax.value += ", [ ] SU Beamformer"
-
+                                
                                 if "wlan.ext_tag.he_phy_cap.su_beamformee" in bf_bits:
                                     if (
                                         bf_bits["wlan.ext_tag.he_phy_cap.su_beamformee"]
                                         == "1"
                                     ):
                                         dot11ax_he_su_beamformee.db_value = 1
-                                        dot11ax.value += ", [X] SU Beamformee"
+                                        dot11ax_he_su_beamformee.value = "Yes"
+                                        # dot11ax.value += ", [X] SU Beamformee"
                                     else:
-                                        dot11ax.value += ", [ ] SU Beamformee"
+                                        # dot11ax.value += ", [ ] SU Beamformee"
+                                        dot11ax_he_su_beamformee.db_value = 0
+                                        dot11ax_he_su_beamformee.value = "No"
 
                                 # Beamformee STS (for ≤ 80 MHz)
+                                bf_sts = 0
                                 if (
                                     "wlan.ext_tag.he_phy_cap.beamformee_sts_lte_80mhz"
                                     in bf_bits
@@ -831,8 +961,9 @@ class ClientCapabilityParser:
                                         ],
                                         0,
                                     )
-                                    dot11ax_he_beamformee_sts.db_value = bf_sts
-                                    dot11ax.value += f", Beamformee STS={bf_sts}"
+                                dot11ax_he_beamformee_sts.db_value = bf_sts
+                                dot11ax_he_beamformee_sts.value = bf_sts
+                                # dot11ax.value += f", Beamformee STS={bf_sts}"
 
                         # Process HE MCS capabilities
                         if "Supported HE-MCS and NSS Set" in tag_data:
@@ -874,17 +1005,19 @@ class ClientCapabilityParser:
                                     )
 
                                     dot11ax_nss.db_value = nss
+                                    dot11ax_nss.value = nss
                                     dot11ax_mcs.db_value = mcs_list
-                                    if not dot11ax.value.startswith("Supported ("):
-                                        dot11ax.value = (
-                                            f"Supported ({nss}ss), MCS {mcs_list}"
-                                            + dot11ax.value[9:]
-                                        )
+                                    dot11ax_mcs.value = mcs_list
+                                    # if not dot11ax.value.startswith("Supported ("):
+                                    #     dot11ax.value = (
+                                    #         f"Supported ({nss}ss), MCS {mcs_list}"
+                                    #         + dot11ax.value[9:]
+                                    #     )
 
                     except (KeyError, TypeError, ValueError) as e:
-                        self._log(f"Error parsing HE capabilities: {str(e)}")
-                        dot11ax_nss.db_value = 2  # Default
-                        dot11ax_mcs.db_value = "0-11"  # Default
+                        self.log.debug(f"Error parsing HE capabilities: {str(e)}")
+                        dot11ax_nss.db_value = -2
+                        dot11ax_mcs.db_value = -2
                         if not "ss" in dot11ax.value:
                             dot11ax.value = f"Supported ({dot11ax_nss.db_value}ss), MCS {dot11ax_mcs.db_value}"
 
@@ -903,10 +1036,8 @@ class ClientCapabilityParser:
             dot11ax_nss,
             dot11ax_mcs,
             dot11ax_twt,
-            dot11ax_uora,
             dot11ax_bsr,
             dot11ax_punctured_preamble,
-            dot11ax_he_su_beamformer,
             dot11ax_he_su_beamformee,
             dot11ax_he_beamformee_sts,
             dot11ax_he_er_su_ppdu,
@@ -918,11 +1049,11 @@ class ClientCapabilityParser:
     def _analyze_rsnx_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Check for RSNX capabilities, including SAE Hash-to-Element"""
         sae_h2e = Capability(
-            name="RSNX H2E", value="No", db_key="rsnx_sae_h2e", db_value=0
+            name="RSNX H2E", value="No", db_key="rsnx_sae_h2e", db_value=-1
         )
 
         if RSNX_TAG in dot11_elt_dict:
-            rsnx_tag = dot11_elt_dict[RSNX_TAG]
+            rsnx_tag = dot11_elt_dict[RSNX_TAG][0]
             try:
                 if "wlan.rsnx_tree" in rsnx_tag:
                     rsnx_tree = rsnx_tag["wlan.rsnx_tree"]
@@ -933,17 +1064,17 @@ class ClientCapabilityParser:
                         sae_h2e.value = "Yes"
                         sae_h2e.db_value = 1
             except (KeyError, TypeError) as e:
-                self._log(f"Error parsing RSNX capabilities: {str(e)}")
+                self.log.debug(f"Error parsing RSNX capabilities: {str(e)}")
 
         return [sae_h2e]
 
     def _analyze_6ghz_capabilities(self, dot11_elt_dict: Dict) -> List[Capability]:
         """Parse 6 GHz specific capabilities"""
         sm_power_save = Capability(
-            name="HE 6 GHz SM Power Save",
+            name="802.11ax/HE 6 GHz SM Power Save",
             value="No",
-            db_key="he_6ghz_sm_power_save",
-            db_value=0,
+            db_key="dot11ax_6ghz_sm_power_save",
+            db_value=-1,
         )
 
         # Extended tags - look for HE 6 GHz band capabilities
@@ -962,7 +1093,7 @@ class ClientCapabilityParser:
                                     sm_power_save.value = "Yes"
                                     sm_power_save.db_value = sm_ps_value
                     except (KeyError, TypeError, ValueError) as e:
-                        self._log(f"Error parsing 6 GHz capabilities: {str(e)}")
+                        self.log.debug(f"Error parsing 6 GHz capabilities: {str(e)}")
 
         return [sm_power_save]
 
@@ -972,77 +1103,85 @@ class ClientCapabilityParser:
         """Parse Multi-Link Control (MLC) capabilities"""
         capabilities = []
 
+        # MLE
+        mle = Capability(
+            name="802.11be/MLE (Multi-Link Element)", value="Not reported*", db_key="dot11be_mle", db_value=-1
+        )
+        
         # MLC Type
         mlc_type = Capability(
-            name="MLC Type", value="Not present", db_key="mlc_type", db_value=-1
+            name="802.11be/MLE/MLC Type", value="Not reported*", db_key="dot11be_mle_mlc_type", db_value=-1
         )
 
         # EMLSR Support
         emlsr_support = Capability(
-            name="EMLSR", value="No", db_key="emlsr_support", db_value=0
+            name="802.11be/MLE/EMLSR", value="Not reported*", db_key="dot11be_mle_emlsr_support", db_value=-1
         )
 
         # EMLSR Padding Delay
         emlsr_padding_delay = Capability(
-            name="EMLSR Padding Delay",
-            value="Not reported",
-            db_key="emlsr_padding_delay",
+            name="802.11be/MLE/EMLSR Padding Delay",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_padding_delay",
             db_value=-1,
         )
 
         # EMLSR Transition Delay
         emlsr_transition_delay = Capability(
-            name="EMLSR Transition Delay",
-            value="Not reported",
-            db_key="emlsr_transition_delay",
+            name="802.11be/MLE/EMLSR Transition Delay",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_transition_delay",
             db_value=-1,
         )
 
         # EMLMR Support
         emlmr_support = Capability(
-            name="EMLMR", value="No", db_key="emlmr_support", db_value=0
+            name="802.11be/MLE/EMLMR", value="Not reported*", db_key="dot11be_mle_emlmr_support", db_value=-1
         )
 
         # Max Simultaneous Links
         max_simultaneous_links = Capability(
-            name="Max Simultaneous Links",
-            value="Not reported",
-            db_key="max_simultaneous_links",
+            name="802.11be/MLE/Max Sim. Links",
+            value="Not reported*",
+            db_key="dot11be_mle_max_simultaneous_links",
             db_value=-1,
         )
 
         # T2LM Negotiation Support
         t2lm_negotiation_support = Capability(
-            name="T2LM Negotiation Support",
-            value="Not reported",
-            db_key="t2lm_negotiation_support",
+            name="802.11be/MLE/T2LM Negot. Spt.",
+            value="Not reported*",
+            db_key="dot11be_mle_t2lm_negotiation_support",
             db_value=-1,
         )
 
         # Link Reconfiguration Operation Support
         link_reconfig_support = Capability(
-            name="Link Reconfiguration Operation Support",
-            value="No",
-            db_key="link_reconfig_support",
-            db_value=0,
+            name="802.11be/MLE/Link Reconf Oper. Spt.",
+            value="Not reported*",
+            db_key="dot11be_mle_link_reconfig_support",
+            db_value=-1,
         )
 
         # Extended tags - look for Multi-Link Element
         if IE_EXT_TAG in dot11_elt_dict:
             for ext_tag in dot11_elt_dict[IE_EXT_TAG]:
                 if ext_tag["number"] == MLE_EXT_TAG:
+                    mle.value = "Present"
+                    mle.db_value = 1
                     try:
                         tag_data = ext_tag["data"]
 
                         # Parse MLC Type
                         if "wlan.eht.multi_link.control_tree" in tag_data:
                             mlc_control = tag_data["wlan.eht.multi_link.control_tree"]
+                            type_value = 0
                             if "wlan.eht.multi_link.control.type" in mlc_control:
                                 type_value = int(
                                     mlc_control["wlan.eht.multi_link.control.type"], 0
                                 )
-                                mlc_type.value = str(type_value)
-                                mlc_type.db_value = type_value
+                            mlc_type.value = str(type_value)
+                            mlc_type.db_value = type_value
 
                         # Parse Common Info section
                         if "Common Info" in tag_data:
@@ -1070,8 +1209,12 @@ class ClientCapabilityParser:
                                     ):
                                         emlsr_support.value = "Yes"
                                         emlsr_support.db_value = 1
+                                    else:
+                                        emlsr_support.value = "No"
+                                        emlsr_support.db_value = 0
 
                                 # EMLSR Padding Delay
+                                padding_value = 0
                                 if (
                                     "wlan.eht.multi_link.common_info.eml_capabilities.emlsr_padding_delay"
                                     in eml_caps
@@ -1082,10 +1225,11 @@ class ClientCapabilityParser:
                                         ],
                                         0,
                                     )
-                                    emlsr_padding_delay.value = str(padding_value)
-                                    emlsr_padding_delay.db_value = padding_value
+                                emlsr_padding_delay.value = str(padding_value)
+                                emlsr_padding_delay.db_value = padding_value
 
                                 # EMLSR Transition Delay
+                                transition_value = 0
                                 if (
                                     "wlan.eht.multi_link.common_info.eml_capabilities.emlsr_transition_delay"
                                     in eml_caps
@@ -1096,8 +1240,8 @@ class ClientCapabilityParser:
                                         ],
                                         0,
                                     )
-                                    emlsr_transition_delay.value = str(transition_value)
-                                    emlsr_transition_delay.db_value = transition_value
+                                emlsr_transition_delay.value = str(transition_value)
+                                emlsr_transition_delay.db_value = transition_value
 
                                 # EMLMR Support
                                 if (
@@ -1112,6 +1256,9 @@ class ClientCapabilityParser:
                                     ):
                                         emlmr_support.value = "Yes"
                                         emlmr_support.db_value = 1
+                                    else:
+                                        emlmr_support.value = "No"
+                                        emlmr_support.db_value = 0
 
                             # Parse MLD Capabilities
                             if (
@@ -1123,6 +1270,7 @@ class ClientCapabilityParser:
                                 ]
 
                                 # Max Simultaneous Links
+                                links_value = 0
                                 if (
                                     "wlan.eht.multi_link.common_info.mld_capabilities.max_simultaneous_links"
                                     in mld_caps
@@ -1133,10 +1281,11 @@ class ClientCapabilityParser:
                                         ],
                                         0,
                                     )
-                                    max_simultaneous_links.value = str(links_value)
-                                    max_simultaneous_links.db_value = links_value
+                                max_simultaneous_links.value = str(links_value)
+                                max_simultaneous_links.db_value = links_value
 
                                 # T2LM Negotiation Support
+                                t2lm_value = 0
                                 if (
                                     "wlan.eht.multi_link.common_info.mld_capabilities.tid_to_link_neg_sup"
                                     in mld_caps
@@ -1147,8 +1296,9 @@ class ClientCapabilityParser:
                                         ],
                                         0,
                                     )
-                                    t2lm_negotiation_support.value = str(t2lm_value)
-                                    t2lm_negotiation_support.db_value = t2lm_value
+                                t2lm_negotiation_support.value = str(t2lm_value)
+                                t2lm_negotiation_support.db_value = t2lm_value
+                                    
 
                                 # Link Reconfiguration Operation Support
                                 if (
@@ -1163,12 +1313,16 @@ class ClientCapabilityParser:
                                     ):
                                         link_reconfig_support.value = "Yes"
                                         link_reconfig_support.db_value = 1
+                                    else:
+                                        link_reconfig_support.value = "No"
+                                        link_reconfig_support.db_value = 0
 
                     except (KeyError, TypeError, ValueError) as e:
-                        self._log(f"Error parsing Multi-Link capabilities: {str(e)}")
+                        self.log.debug(f"Error parsing Multi-Link capabilities: {str(e)}")
 
         capabilities.extend(
             [
+                mle,
                 mlc_type,
                 emlsr_support,
                 emlsr_padding_delay,
@@ -1188,56 +1342,56 @@ class ClientCapabilityParser:
 
         # Basic EHT support
         eht_support = Capability(
-            name="802.11be", value="Not supported", db_key="eht_support", db_value=0
+            name="802.11be", value="Not supported", db_key="dot11be", db_value=-1
         )
 
         # EPCS Support
         epcs_support = Capability(
-            name="EPCS Support", value="No", db_key="epcs_support", db_value=0
+            name="802.11be/EPCS Support", value="No", db_key="dot11be_epcs_support", db_value=-1
         )
 
         # EHT OM Control Support
         eht_om_support = Capability(
-            name="EHT OM Control Support",
+            name="802.11be/EHT OM Ctrl. Spt.",
             value="No",
-            db_key="eht_om_support",
-            db_value=0,
+            db_key="dot11be_om_support",
+            db_value=-1,
         )
 
         # R-TWT Support
         rtwt_support = Capability(
-            name="R-TWT Support", value="No", db_key="rtwt_support", db_value=0
+            name="802.11be/R-TWT Support", value="No", db_key="dot11be_rtwt_support", db_value=-1
         )
 
         # SCS Traffic Description Support
         scs_support = Capability(
-            name="SCS Traffic Description Support",
+            name="802.11be/SCS Traffic Desc.",
             value="No",
-            db_key="scs_support",
-            db_value=0,
+            db_key="dot11be_scs_support",
+            db_value=-1,
         )
 
         # 320 MHz Support
         support_320mhz = Capability(
-            name="320 MHz support", value="No", db_key="support_320mhz", db_value=0
+            name="802.11be/320 MHz support (6G)", value="No", db_key="dot11be_320mhz", db_value=-1
         )
 
         # MCS 14 Support (EHT Duplicate 6 GHz)
         mcs14_support = Capability(
-            name="MCS 14 support", value="No", db_key="mcs14_support", db_value=0
+            name="802.11be/MCS 14", value="No", db_key="dot11be_mcs14_support", db_value=-1
         )
 
         # MCS 15 Support
         mcs15_support = Capability(
-            name="MCS 15 support", value="No", db_key="mcs15_support", db_value=0
+            name="802.11be/MCS 15", value="No", db_key="dot11be_mcs15_support", db_value=-1
         )
 
         eht_nss = Capability(
-            name="EHT SS", value="Not reported", db_key="eht_nss", db_value=""
+            name="802.11be/EHT SS", value="Not reported*", db_key="dot11be_nss", db_value=-1
         )
 
         eht_mcs = Capability(
-            name="EHT MCS", value="Not reported", db_key="eht_mcs", db_value=""
+            name="802.11be/EHT MCS", value="Not reported*", db_key="dot11be_mcs", db_value=-1
         )
 
         # Check for EHT capabilities in extended tags
@@ -1267,6 +1421,10 @@ class ClientCapabilityParser:
                                 ):
                                     epcs_support.value = "Yes"
                                     epcs_support.db_value = 1
+                                else:
+                                    epcs_support.value = "No"
+                                    epcs_support.db_value = 0
+                                    
 
                             # EHT OM Control Support
                             if (
@@ -1281,7 +1439,10 @@ class ClientCapabilityParser:
                                 ):
                                     eht_om_support.value = "Yes"
                                     eht_om_support.db_value = 1
-
+                                else:
+                                    eht_om_support.value = "No"
+                                    eht_om_support.db_value = 0
+                                
                             # R-TWT Support
                             if (
                                 "wlan.eht.mac_capabilities.restricted_twt_support"
@@ -1295,6 +1456,9 @@ class ClientCapabilityParser:
                                 ):
                                     rtwt_support.value = "Yes"
                                     rtwt_support.db_value = 1
+                                else:
+                                    rtwt_support.value = "No"
+                                    rtwt_support.db_value = 0
 
                             # SCS Traffic Description Support
                             if (
@@ -1309,6 +1473,10 @@ class ClientCapabilityParser:
                                 ):
                                     scs_support.value = "Yes"
                                     scs_support.db_value = 1
+                                else:
+                                    scs_support.value = "No"
+                                    scs_support.db_value = 0
+                                    
 
                         # Parse PHY capabilities
                         if "EHT PHY Capabilities Information" in tag_data:
@@ -1331,6 +1499,9 @@ class ClientCapabilityParser:
                                     ):
                                         support_320mhz.value = "Yes"
                                         support_320mhz.db_value = 1
+                                    else:
+                                        support_320mhz.value = "No"
+                                        support_320mhz.db_value = 0
 
                             # MCS 14/15 Support
                             if "wlan.eht.phy_capabilities.bits_40_63_tree" in phy_caps:
@@ -1351,6 +1522,9 @@ class ClientCapabilityParser:
                                     ):
                                         mcs15_support.value = "Yes"
                                         mcs15_support.db_value = 1
+                                    else:
+                                        mcs15_support.value = "No"
+                                        mcs15_support.db_value = 0
 
                                 # MCS 14 Support (EHT Duplicate 6 GHz)
                                 if (
@@ -1365,6 +1539,9 @@ class ClientCapabilityParser:
                                     ):
                                         mcs14_support.value = "Yes"
                                         mcs14_support.db_value = 1
+                                    else:
+                                        mcs14_support.value = "No"
+                                        mcs14_support.db_value = 0
 
                         # Parse MCS and NSS sets
                         if "Supported EHT-MCS and NSS Set" in tag_data:
@@ -1504,7 +1681,7 @@ class ClientCapabilityParser:
 
                             eht_mcs.db_value = highest_mcs
                     except (KeyError, TypeError, ValueError) as e:
-                        self._log(f"Error parsing EHT capabilities: {str(e)}")
+                        self.log.debug(f"Error parsing EHT capabilities: {str(e)}")
 
         capabilities.extend(
             [
@@ -1568,7 +1745,8 @@ class Profiler:
         self.running = True
         if self.pcap_analysis:
             self.tshark = self.get_tshark_path()
-            # self.log.debug(self.debug_tshark_version(self.tshark))
+            self.log.debug(self.get_tshark_version(self.tshark))
+            self.tshark_single_frame_raw_output = self.get_tshark_raw(self.pcap_analysis)
             self.tshark_output = self.run_tshark_json(self.pcap_analysis)
             # self.log.debug(json.dumps(self.tshark_output, indent=2))
 
@@ -1578,13 +1756,84 @@ class Profiler:
             with open(filepath, "w") as f:
                 json.dump(json.loads(self.tshark_output), f, indent=2)
 
-            parser = ClientCapabilityParser()
-            results = parser.parse_tshark_json(self.tshark_output)
+            tsharkparser = TsharkClientCapabilityParser(self.log)
+            self.log.debug("tshark path at %s", self.tshark)
+            results = tsharkparser.parse_tshark_json(self.tshark_output)
+            results["pcapng"] = self.tshark_single_frame_raw_output
+            ascii_report = tsharkparser.generate_text_report(results)
+            client = results.get('mac')
+            self.log.info("generating text report for %s\n%s\n", client, ascii_report)
+            del results['capabilities']
             self.log.info(json.dumps(results, indent=2))
+            self.write_tshark_json_and_text(results, ascii_report)
 
-        self.log.debug("tshark path at %s", self.tshark)
-        self.run(queue)
+        # self.run(queue)  # TODO MAKE COMPAT WITH TSHARK
 
+    def write_tshark_json_and_text(self, results, ascii_report) -> None:
+        client_mac = results.get('mac')
+        client_mac = client_mac.replace(":", "-", 5)
+        band = results.get('capture_band')
+        features = results.get('features')
+        dest = os.path.join(self.clients_dir, client_mac)
+        
+        if not band:
+            band = ""
+        else:
+            band = f"_{band}GHz"
+    
+        text_filename = os.path.join(dest, f"{client_mac}{band}.txt")
+
+        json_filename = os.path.join(dest, f"{client_mac}{band}.json")
+
+        try:
+            same = False
+            write_time = strftime("%Y%m%dt%H%M%S")
+            if os.path.exists(json_filename):
+                with open(json_filename, "r") as _file:
+                    existing_json = json.load(_file)
+
+                if hash(str(json.dumps(existing_json.get("features")))) == hash(
+                    str(json.dumps(features))
+                ):
+                    # previously profiled client has the same features
+                    same = True
+
+                if not same:
+                    json_filename = json_filename.replace(
+                        ".json", f"_diff.{write_time}.json"
+                    )
+
+            self.log.debug("writing json report to %s", json_filename)
+            with open(json_filename, "w") as write_json_file:
+                json.dump(results, write_json_file)
+
+            if os.path.exists(text_filename):
+                with open(text_filename, "r") as read_file:
+                    existing_text = read_file.readlines()
+                    temp = []
+                    for line in existing_text:
+                        temp.append(line.replace("\n", ""))
+                    existing_text = temp
+
+                if not same:
+                    ascii_report = list(
+                        Differ().compare(existing_text, ascii_report.split("\n"))
+                    )
+                    text_filename = text_filename.replace(
+                        ".txt", f"_diff.{write_time}.txt"
+                    )
+                    ascii_report = "\n".join(ascii_report)
+
+            self.log.debug("writing to %s", text_filename)
+            with open(text_filename, "w") as file_writer:
+                file_writer.write(ascii_report)
+
+        except OSError:
+            self.log.exception(
+                "error creating flat files to dump client info (%s)", text_filename
+            )
+            sys.exit(signal.SIGHUP)
+            
     def get_tshark_path(self) -> str:
         """Get the tshark executable path for the current platform."""
         system = platform.system().lower()
@@ -1611,9 +1860,37 @@ class Profiler:
             f"Could not find tshark executable on this {system} system"
         )
 
-    def debug_tshark_version(self, tshark_path):
+    def get_tshark_version(self, tshark_path):
         cmd = [self.tshark, "-v"]
         return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+
+    def get_tshark_raw(self, pcap_file) -> str:
+        cmd = [
+            self.tshark,
+            "-r",
+            pcap_file,
+            "-Y",
+            "wlan.fc.type_subtype == 0",
+            "-c",
+            "1",
+            "-F",
+            "pcapng",
+            "-w",
+            "-",
+        ]
+        self.log.debug(" ".join(cmd))
+        out = ""
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=False, check=True)
+            if result.stdout:
+                packet_data = result.stdout
+                encoded = base64.b64encode(packet_data).decode('ascii')
+                out = json.dumps(encoded)
+        except subprocess.CalledProcessError as e:
+            self.log.error("tshark command failed with exit code %d: %s", e.returncode, e)
+        except Exception as e:
+            self.log.error("Error in get_tshark_raw: %s", e)
+        return out
 
     def run_tshark_json(self, pcap_file, display_filter=None):
         """
@@ -1637,6 +1914,7 @@ class Profiler:
             "-c",
             "1",
         ]
+        self.log.debug(" ".join(cmd))
         if display_filter:
             cmd.extend(["-Y", display_filter])
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -2305,7 +2583,7 @@ class Profiler:
     def analyze_rsn_capabilities_ie(dot11_elt_dict) -> List:
         """Check for 802.11w support"""
         dot11w = Capability(
-            name="802.11w", value="Not reported", db_key="dot11w", db_value=0
+            name="802.11w", value="Not reported*", db_key="dot11w", db_value=0
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -2325,13 +2603,13 @@ class Profiler:
         """Check for supported power capabilities"""
         max_power_cap = Capability(
             name="Max Power",
-            value="Not reported",
+            value="Not reported*",
             db_key="max_power",
             db_value=0,
         )
         min_power_cap = Capability(
-            # name="Min Power",
-            # value="Not reported",
+            name="Min Power",
+            value="Not reported*",
             db_key="min_power",
             db_value=0,
         )
@@ -2359,7 +2637,7 @@ class Profiler:
         """Check supported channels"""
         supported_channels = Capability(
             name="Supported Channels",
-            value="Not reported",
+            value="Not reported*",
             db_key="supported_channels",
             db_value=[],
         )
@@ -2479,7 +2757,6 @@ class Profiler:
         dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
         dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
         dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
-        dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=0)
         dot11ax_bsr = Capability(db_key="dot11ax_bsr", db_value=0)
         dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
         dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
@@ -2628,17 +2905,6 @@ class Profiler:
                                 f"{int(get_bit(uora_octet, bit_position))}"
                             )
 
-                        if int(uora_octet_binary_string[2]):
-                            uora_support = True
-                        else:
-                            uora_support = False
-                        if uora_support:
-                            dot11ax_uora.db_value = 1
-                            dot11ax.value += ", [X] UORA"
-                        else:
-                            dot11ax_uora.db_value = 0
-                            dot11ax.value += ", [ ] UORA"
-
                         bsr_octet = element_data[3]
                         bsr_octet_binary_string = ""
                         for bit_position in range(8):
@@ -2713,9 +2979,9 @@ class Profiler:
                         element_data[12]
                         element_data[13]
                         element_data[14]
-                        element_data[15]
-                        element_data[16]
-                        element_data[17]
+                        # element_data[15]  IndexError: list index out of range
+                        # element_data[16]
+                        # element_data[17]
 
                         if get_bit(eht_phy_cap_1, 2):
                             dot11be.value += ", [X] 320 MHz"
@@ -2728,7 +2994,6 @@ class Profiler:
             dot11ax_nss,
             dot11ax_mcs,
             dot11ax_twt,
-            dot11ax_uora,
             dot11ax_bsr,
             dot11ax_punctured_preamble,
             dot11ax_he_su_beamformer,
