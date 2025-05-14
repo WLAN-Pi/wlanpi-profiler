@@ -704,28 +704,32 @@ class TsharkClientCapabilityParser:
                 if "wlan.supchan" in channel_tag:
                     supchan = channel_tag["wlan.supchan"]
                     
+                    if not isinstance(supchan, list):
+                        supchan = [supchan]
+                        
                     has_2ghz = False
                     has_5ghz = False
                     
                     for chanset in supchan:
-                        start_channel = int(chanset["wlan.supchan.first"])
-                        if start_channel <= 14 and not is_6ghz:
-                            has_2ghz = True
-                        elif start_channel > 14 or is_6ghz:
-                            has_5ghz = True
-                    
-                    for chanset in supchan:
-                        
-                        start_channel = int(chanset["wlan.supchan.first"])
-                        channel_range = int(chanset["wlan.supchan.range"])
+                        try:
+                            start_channel = int(chanset["wlan.supchan.first"])
+                            channel_range = int(chanset["wlan.supchan.range"])
+                            
+                            if start_channel > 14 or is_6ghz:
+                                channel_multiplier = 4
+                                if start_channel <= 14 and is_6ghz:
+                                    has_5ghz = True
+                                else:
+                                    has_5ghz = True
+                            else:
+                                has_2ghz = True
+                                channel_multiplier = 1
 
-                        if start_channel > 14 or is_6ghz:
-                            channel_multiplier = 4  # 5 GHz or 6 GHz
-                        else:
-                            channel_multiplier = 1  # 2.4 GHz
+                            for i in range(channel_range):
+                                channel_list.append(start_channel + (i * channel_multiplier))
+                        except (KeyError, TypeError, ValueError) as e:
+                            self.log.debug(f"Error processing channel set: {e}, chanset type: {type(chanset)}")
 
-                        for i in range(channel_range):
-                            channel_list.append(start_channel + (i * channel_multiplier))
 
                 # Format 2: ap_channel_report format
                 if "wlan.ap_channel_report.channel_list" in channel_tag:
@@ -744,61 +748,66 @@ class TsharkClientCapabilityParser:
                     channel_list.sort()
                     num_channels.value = str(len(channel_list))
                     num_channels.db_value = len(channel_list)
-                    
-                    has_2ghz = any(ch <= 14 for ch in channel_list)
-                    has_5ghz = any(ch > 14 for ch in channel_list)
-                    mixed_bands = has_2ghz and has_5ghz
-                    
-                    ranges = []
-                    placeholder = []
-
-                    for index, channel in enumerate(channel_list):
-                        if index == 0:
-                            placeholder.append(channel)
-                            continue
+                    if is_6ghz and len(channel_list) > 10:
+                        min_channel = min(channel_list)
+                        max_channel = max(channel_list)
+                        supported_channels.value = f"{min_channel}-{max_channel}**"
+                        supported_channels.db_value = channel_list
+                    else:
+                        has_2ghz = any(ch <= 14 for ch in channel_list)
+                        has_5ghz = any(ch > 14 for ch in channel_list)
+                        mixed_bands = has_2ghz and has_5ghz
                         
-                        if mixed_bands:
-                            if channel <= 14:
-                                current_multiplier = 1
-                            else:
-                                current_multiplier = 4
+                        ranges = []
+                        placeholder = []
+
+                        for index, channel in enumerate(channel_list):
+                            if index == 0:
+                                placeholder.append(channel)
+                                continue
                             
-                            prev_channel = placeholder[-1]
-                            if prev_channel <= 14:
-                                prev_multiplier = 1
-                            else:
-                                prev_multiplier = 4
+                            if mixed_bands:
+                                if channel <= 14:
+                                    current_multiplier = 1
+                                else:
+                                    current_multiplier = 4
                                 
-                            if (prev_channel <= 14 and channel > 14) or (prev_channel > 14 and channel <= 14):
-                                expected_gap = None 
+                                prev_channel = placeholder[-1]
+                                if prev_channel <= 14:
+                                    prev_multiplier = 1
+                                else:
+                                    prev_multiplier = 4
+                                    
+                                if (prev_channel <= 14 and channel > 14) or (prev_channel > 14 and channel <= 14):
+                                    expected_gap = None 
+                                else:
+                                    expected_gap = prev_multiplier
                             else:
-                                expected_gap = prev_multiplier
-                        else:
-                            if channel > 14 or is_6ghz:
-                                current_multiplier = 4
+                                if channel > 14 or is_6ghz:
+                                    current_multiplier = 4
+                                else:
+                                    current_multiplier = 1
+                                expected_gap = current_multiplier
+
+                            if expected_gap and channel - placeholder[-1] == expected_gap:
+                                placeholder.append(channel)
                             else:
-                                current_multiplier = 1
-                            expected_gap = current_multiplier
+                                if placeholder:
+                                    ranges.append(placeholder)
+                                placeholder = [channel]
+                                
+                        if placeholder and placeholder not in ranges:
+                            ranges.append(placeholder)
 
-                        if expected_gap and channel - placeholder[-1] == expected_gap:
-                            placeholder.append(channel)
-                        else:
-                            if placeholder:
-                                ranges.append(placeholder)
-                            placeholder = [channel]
-                            
-                    if placeholder and placeholder not in ranges:
-                        ranges.append(placeholder)
+                        channel_ranges = []
+                        for _range in ranges:
+                            if len(_range) > 1:
+                                channel_ranges.append(f"{_range[0]}-{_range[-1]}")
+                            else:
+                                channel_ranges.append(str(_range[0]))
 
-                    channel_ranges = []
-                    for _range in ranges:
-                        if len(_range) > 1:
-                            channel_ranges.append(f"{_range[0]}-{_range[-1]}")
-                        else:
-                            channel_ranges.append(str(_range[0]))
-
-                    supported_channels.value = f"{', '.join(channel_ranges)}**"
-                    supported_channels.db_value = channel_list
+                        supported_channels.value = f"{', '.join(channel_ranges)}**"
+                        supported_channels.db_value = channel_list
 
             except (KeyError, TypeError, ValueError, IndexError) as e:
                 self.log.debug(f"Error parsing supported channels: {str(e)}")
@@ -1776,6 +1785,13 @@ class Profiler:
         features = results.get('features')
         dest = os.path.join(self.clients_dir, client_mac)
         
+        if not os.path.isdir(dest):
+            try:
+                os.mkdir(dest)
+            except OSError:
+                self.log.exception("problem creating %s directory", dest)
+                sys.exit(signal.SIGHUP)
+
         if not band:
             band = ""
         else:
