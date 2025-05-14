@@ -262,7 +262,7 @@ class TsharkClientCapabilityParser:
     def _extract_ap_manufacturer(self, packet: Dict) -> str:
         """Extract manufacturer from packet"""
         try:
-            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.ra_tree"]["wlan.ra_resolved"])
+            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.ra_tree"]["wlan.ra"])
             if not manuf:
                 return packet["wlan"]["wlan.ra_tree"]["wlan.ra.oui_resolved"]
             return manuf
