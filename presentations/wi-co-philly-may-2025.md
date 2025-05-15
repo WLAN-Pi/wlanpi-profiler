@@ -4,54 +4,72 @@ date: "May 15, 2025"
 paging: "-~={%d}=~-"
 ---
 
-<!--
-macOS depends installation:
+```
 
-brew install slides 
-brew install perl
-brew install cpanminus
-which cpanm
-cpanm Graph::Easy
+              d8b                         
+              Y8P                         
+                                          
+888  888  888 888         .d8888b .d88b.  
+888  888  888 888        d88P"   d88""88b 
+888  888  888 888 888888 888     888  888 
+Y88b 888 d88P 888        Y88b.   Y88..88P 
+ "Y8888888P"  888         "Y8888P "Y88P"  
+                                          
+                                          
+                                          
+         888      d8b 888 888             
+         888      Y8P 888 888             
+         888          888 888             
+88888b.  88888b.  888 888 888 888  888    
+888 "88b 888 "88b 888 888 888 888  888    
+888  888 888  888 888 888 888 888  888    
+888 d88P 888  888 888 888 888 Y88b 888    
+88888P"  888  888 888 888 888  "Y88888    
+888                                888    
+888                           Y8b d88P    
+888                            "Y88P"     
 
-find /usr/local/bin /usr/bin /opt /usr/local/Cellar -name graph-easy 2>/dev/null
+```
+---
 
-fish_add_path /opt/homebrew/Cellar/perl/5.40.2/bin
-
-pip install seqdiag
-
-Enable pre-processing on the file:
-
-chmod +x <file>
-
-Start presentation with:
-
-slides <file>
--->
+```
+༼ つ ◕_◕ ༽つ ▁ ▂ ▃ ▅ ▇
+```
 
 # whoami
 
-Josh Schmelzle
+Josh Schmelzle (_sh-mel-ts-eh_)
 
-## dayjob 
+## locale
 
-- HPE Aruba Networking
+Pittsburgh, PA
 
-## other 
+## where i play 
 
-- WLAN Pi
-
-- Big QAM, LLC
+- WLAN TME @ HPE Aruba Networking
+- Core @ WLAN Pi
+- Owner @ Big QAM, LLC
 
 ---
 
-# Profiling Wi-Fi 7 clients
+# Talk
+
+## Profiling Wi-Fi 7 clients
 
 ## Agenda
 
-- Wi-Fi 7
-- Client capabilities
-- Profiling
+### -~- Wi-Fi 7
 
+### -=- Client capabilities
+
+### -+- Profiling
+
+```
+▌ ▌ ▌ ▌
+▌ ▌ ▌
+▌ ▌
+▌
+```
 ---
 
 # Wi-Fi 7
@@ -62,16 +80,22 @@ Josh Schmelzle
 
 2. Improve link efficiency, reliability, and latency.
 
-## Key features
+## Key features aligned
 
-- Multi-link device (MLD) framework
-    - Single-link (single-radio/SR)
-    - Multi-link (multi-radio/MR)
-- Multiple resource units (MRU) per client
-- 4K QAM (MCS 12/13)
-- 320 MHz 
-- Triggered uplink access (TUA) and stream classification service (SCS)
-- Emergency preparedness communications services (EPCS)
+### 1. Speeds
+
+  - 4K QAM (MCS 12/13)
+  - 320 MHz 
+
+### 2. Reliability
+  
+  - Multi-link device (MLD) framework
+      - Single-link 
+      - Multi-link 
+  - Multiple resource units (MRU) per client
+  - Triggered uplink access (TUA)
+  - Stream classification service (SCS)
+  - Emergency preparedness communications services (EPCS)
 
 ---
 
@@ -122,7 +146,7 @@ Clients _may_ support one, two, or all three bands
     - B-TWT
 - Multi-link reconfiguration
 - TID to link mapping (T2LM)
-- Basic load balancing (BSS Transition Management)
+- Basic load balancing (BSS transition management)
 
 ---
 
@@ -147,19 +171,37 @@ Clients _may_ support one, two, or all three bands
 - EPCS (Emergency Preparedness Communications Services) priority access
 - Dynamic MU Spatial Multiplexing Power Save (SMPS)
 
+#### Conditional mandatory not discussed
+
 ---
 
 ## Terminology
 
 - MLO - multi-link operation 
 - MLD - multi-link device
+- MLE - multi-link element
+- MLC - multi-link control
 
 ### MLD operation
 
-- MLSR - multi-link sigle-radio
-- EMLSR - enhanced multi-link single-radio
-- MLMR - multi-link multi-radio
-- STR - simultaneous transmit and receive
+##### MLSR - multi-link sigle-radio
+
+- One link at a time
+
+##### EMLSR - enhanced multi-link single-radio
+
+- Listen on two links at a time
+- Use only one link at a time
+
+##### MLMR - multi-link multi-radio 
+
+#### STR
+
+- Use two links independently
+
+#### NSTR
+
+- Transmit or receive, on different links, at the same time
 
 ---
 
@@ -192,10 +234,6 @@ Clients _may_ support one, two, or all three bands
         |<-----Listen on all links--------->|
 ```
 
-- Listens on multiple links simultaneously
-- Receives initial control frame
-- Switches all resources to target link for subsequent data exchange
-- Uses padding delay and transition delay
 
 ---
 
@@ -251,16 +289,42 @@ MLD client:
 
 ---
 
+# Channel access
+
 ##### Channel access and frame exchange in a MLD is based on the capabilities exchanged during association.
 
+## 💡
+
+Great, same as previous generations.
+
 This means we can analyze and profile capabilities based on the association request-response exchange.
+
+```
++---------------+                       +---------------+
+|  +---------+  |                       |  +---------+  |
+|  |         |  |                       |  |         |  |
+|  |         |  |<----- Signaling ------|  |         |  |
+|  |  Client |  |                       |  |    AP   |  |
+|  |         |  |<--- Authentication -->|  |         |  |
+|  |         |  |                       |  |         |  |
+|  |         |  |---- Association ----->|  |         |  |
+|  +---------+  |      Request          |  +---------+  |
++---------------+                       +---------------+
+```
 
 ---
 
 ## Capabilities
 
-TODO
-
+```
+M""""""'YMM                              
+M  mmmm. `M                              
+M  MMMMM  M .d8888b. 88d8b.d8b. .d8888b. 
+M  MMMMM  M 88ooood8 88'`88'`88 88'  `88 
+M  MMMM' .M 88.  ... 88  88  88 88.  .88 
+M       .MM `88888P' dP  dP  dP `88888P' 
+MMMMMMMMMMM                              
+```
 ---
 
 # Challenges
@@ -271,14 +335,10 @@ Capabilities are mutually exclusive and the AP needs to match or exceed the capa
 
 ---
 
-# Thank you
-
-###### Happy profiling!
 
 ## Where to find profiler (and these slides)
 
-- https://wlanpi.com
-- https://github.com/wlan-pi/wlanpi-profiler
+- https://github.com/wlan-pi/wlanpi-profiler/tree/tshark
 
 ## Where to find me
 
@@ -287,3 +347,22 @@ Capabilities are mutually exclusive and the AP needs to match or exceed the capa
 - https://www.linkedin.com/in/schmelzle
 - https://joshschmelzle.com
 - https://bigqam.com
+
+```
+
+.___________. __    __       ___      .__   __.  __  ___ 
+|           ||  |  |  |     /   \     |  \ |  | |  |/  / 
+`---|  |----`|  |__|  |    /  ^  \    |   \|  | |  '  /  
+    |  |     |   __   |   /  /_\  \   |  . `  | |    <   
+    |  |     |  |  |  |  /  _____  \  |  |\   | |  .  \  
+    |__|     |__|  |__| /__/     \__\ |__| \__| |__|\__\ 
+                                                         
+____    ____  ______    __    __                         
+\   \  /   / /  __  \  |  |  |  |                        
+ \   \/   / |  |  |  | |  |  |  |                        
+  \_    _/  |  |  |  | |  |  |  |                        
+    |  |    |  `--'  | |  `--'  |                        
+    |__|     \______/   \______/                         
+                                                         
+
+```
