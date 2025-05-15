@@ -116,6 +116,10 @@ def start(args: argparse.Namespace):
     for k, v in info.items():
         log.debug("%s: %s", k, v)
 
+    if args.oui_update:
+        # run manuf oui update and exit
+        sys.exit(0) if helpers.update_manuf2() else sys.exit(-1)
+
     if not args.pcap_analysis:
         if "linux" not in sys.platform:
             log.error(
@@ -147,10 +151,6 @@ def start(args: argparse.Namespace):
         log.debug("scapy version is %s", scapy_version)
     except AttributeError:
         log.exception("could not get version information from scapy.__version__")
-
-    if args.oui_update:
-        # run manuf oui update and exit
-        sys.exit(0) if helpers.update_manuf2() else sys.exit(-1)
 
     config = helpers.setup_config(args)
 

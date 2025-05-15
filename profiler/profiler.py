@@ -267,9 +267,7 @@ class TsharkClientCapabilityParser:
     def _extract_manufacturer(self, packet: Dict) -> str:
         """Extract manufacturer from packet"""
         try:
-            manuf = self.lookup.get_manuf(
-                packet["wlan"]["wlan.sa_tree"]["wlan.sa"]
-            )
+            manuf = self.lookup.get_manuf(packet["wlan"]["wlan.sa"])
             if not manuf:
                 return packet["wlan"]["wlan.sa_tree"]["wlan.sa.oui_resolved"]
             return manuf
@@ -1881,11 +1879,11 @@ class Profiler:
             self.tshark_output = self.run_tshark_json(self.pcap_analysis)
             # self.log.debug(json.dumps(self.tshark_output, indent=2))
 
-            filepath = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "tshark.json"
-            )
-            with open(filepath, "w") as f:
-                json.dump(json.loads(self.tshark_output), f, indent=2)
+            # filepath = os.path.join(
+            #     os.path.dirname(os.path.abspath(__file__)), "tshark.json"
+            # )
+            # with open(filepath, "w") as f:
+            #     json.dump(json.loads(self.tshark_output), f, indent=2)
 
             tsharkparser = TsharkClientCapabilityParser(self.log)
             self.log.debug("tshark path at %s", self.tshark)
