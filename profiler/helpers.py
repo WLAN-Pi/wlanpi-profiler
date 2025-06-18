@@ -53,11 +53,16 @@ __tools = [
     "wpa_cli",
 ]
 
+is_wpa_cli_present = True
+
 # are the required tools installed?
 for tool in __tools:
     if shutil.which(tool) is None:
         print(f"It looks like you do not have {tool} installed.")
         print("Please install using your distro's package manager.")
+        if tool is "wpa_cli":
+            is_wpa_cli_present = False
+            continue
         sys.exit(signal.SIGABRT)
 
 

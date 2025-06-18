@@ -302,24 +302,26 @@ class Interface:
         """Prepare the interface for monitor mode and injection"""
         # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
-        wpa_cli_version = run_command(["wpa_cli", "-v"])
-        if wpa_cli_version:
+        try:
+            wpa_cli_version = run_command(["wpa_cli", "-v"])
             self.log.debug(
                 "wpa_cli version is %s",
                 wpa_cli_version.splitlines()[0].replace("wpa_cli ", ""),
             )
+            wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+            self.log.debug("running '%s'", wpa_cli_cmd)
+            run_command(wpa_cli_cmd)
+            self.log.debug("finished with '%s'", wpa_cli_cmd)
+        except FileNotFoundError:
+            self.log.warning("wpa_cli not present")
+            pass
+
         ip_version = run_command(["ip", "-V"])
         if ip_version:
             self.log.debug("%s", ip_version.strip())
         iw_version = run_command(["iw", "--version"])
         if iw_version:
             self.log.debug("%s", iw_version.strip())
-
-        # always run wpa_cli
-        wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
-        self.log.debug("running '%s'", wpa_cli_cmd)
-        run_command(wpa_cli_cmd)
-        self.log.debug("finished with '%s'", wpa_cli_cmd)
 
         cmds = []
         # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
