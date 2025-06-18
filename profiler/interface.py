@@ -314,7 +314,6 @@ class Interface:
             self.log.debug("finished with '%s'", wpa_cli_cmd)
         except FileNotFoundError:
             self.log.warning("wpa_cli not present")
-            pass
 
         ip_version = run_command(["ip", "-V"])
         if ip_version:
