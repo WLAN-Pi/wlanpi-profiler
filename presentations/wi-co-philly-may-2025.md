@@ -44,11 +44,10 @@ Josh Schmelzle (_sh-mel-ts-eh_)
 
 Pittsburgh, PA
 
-## where i play 
+## playground
 
 - WLAN TME @ HPE Aruba Networking
 - Core @ WLAN Pi
-- Owner @ Big QAM, LLC
 
 ---
 
@@ -152,6 +151,18 @@ Clients _may_ support one, two, or all three bands
 
 # Wi-Fi 7
 
+## Conditional mandatory
+
+If the client supports 2 NSS and 160 MHz channel bandwidth ...
+
+Then one of the EMLSR or STR modes required
+
+##### Doesn't apply to 20-MHz only clients!
+
+---
+
+# Wi-Fi 7
+
 ## Optional client features
 
 - SU MIMO with 2 SS
@@ -171,11 +182,17 @@ Clients _may_ support one, two, or all three bands
 - EPCS (Emergency Preparedness Communications Services) priority access
 - Dynamic MU Spatial Multiplexing Power Save (SMPS)
 
-#### Conditional mandatory not discussed
+--
+
+#### Others
+
+- BPSK-DCM (better range, robustness, and interference mitigation at cost of speed) 
+  - MCS 14
+  - MCS 15
 
 ---
 
-## Terminology
+## MLO terminology
 
 - MLO - multi-link operation 
 - MLD - multi-link device
@@ -191,7 +208,6 @@ Clients _may_ support one, two, or all three bands
 ##### EMLSR - enhanced multi-link single-radio
 
 - Listen on two links at a time
-- Use only one link at a time
 
 ##### MLMR - multi-link multi-radio 
 
@@ -202,6 +218,30 @@ Clients _may_ support one, two, or all three bands
 #### NSTR
 
 - Transmit or receive, on different links, at the same time
+
+---
+
+## Minimum viable multi-link operation
+
+Non 20-MHz only clients must support basic multi-link operation.
+
+### Basic multi-link opeation 
+
+Over multiple links the ability to:
+
+1. Discover
+2. Authenticate
+3. (re)Associate
+4. (re)Setup of multiple links
+5. support of multi-link control frames
+    - block ack
+    - power management
+
+MLD client:
+
+- Capable of supporting multiple links
+- May support more than 1 link in same band
+- May operate using fewer links compared to capability of the device
 
 ---
 
@@ -265,30 +305,6 @@ Clients _may_ support one, two, or all three bands
 
 ---
 
-## Minimum viable multi-link operation
-
-Non 20-MHz only clients must support basic multi-link operation.
-
-### Basic multi-link opeation 
-
-Over multiple links the ability to:
-
-1. Discover
-2. Authenticate
-3. (re)Associate
-4. (re)Setup of multiple links
-5. support of multi-link control frames
-    - block ack
-    - power management
-
-MLD client:
-
-- Capable of supporting multiple links
-- May support more than 1 link in same band
-- May operate using fewer links compared to capability of the device
-
----
-
 # Channel access
 
 ##### Channel access and frame exchange in a MLD is based on the capabilities exchanged during association.
@@ -331,7 +347,11 @@ MMMMMMMMMMM
 
 Clients will not signal capabilities exceeding the current AP capabilities.
 
-Capabilities are mutually exclusive and the AP needs to match or exceed the capabilities in order for the client to reveal their maximum capabilities.
+Capabilities are mutually exclusive.
+
+AP must match or exceed capabilities of client.
+
+##### Client only reveals a capability level up to what the AP advertises.
 
 ---
 

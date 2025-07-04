@@ -24,6 +24,7 @@ import sys
 from datetime import datetime
 from logging.handlers import QueueListener
 from multiprocessing import Queue
+from pathlib import Path
 from time import sleep
 
 from . import helpers
@@ -180,9 +181,14 @@ def start(args: argparse.Namespace):
     log.debug("%s pid %s", __name__, parent_pid)
 
     if pcap_analysis:
-        log.info(
-            "not starting beacon or sniffer because user requested pcap file analysis"
-        )
+        log.debug("User requested pcap file analysis ...")
+        pcap_path = Path(pcap_analysis)
+        if not pcap_path.is_file() and os.access(pcap_path, os.R_OK):
+            sys.exit(f"Error: {pcap_path} is not a readable file ...")
+
+        if pcap_path.suffix.lower() not in [".pcap", ".pcapng"]:
+            sys.exit(f"Error: {pcap_path} must be a .pcap or .pcapng file ...")
+
         helpers.verify_reporting_directories(config)
         try:
             frames = rdpcap(pcap_analysis)
@@ -191,13 +197,23 @@ def start(args: argparse.Namespace):
             print("exiting...")
             sys.exit(-1)
 
+        frames_queued = 0
         for frame in frames:
             # extract frames that are Association or Reassociation Request frames
             if frame.haslayer(scapy.layers.dot11.Dot11AssoReq) or frame.haslayer(
                 scapy.layers.dot11.Dot11ReassoReq
             ):
                 # put frame into the multiprocessing queue for the profiler to analyze
+                frames_queued += 1
                 queue.put(frame)
+        if frames_queued == 0:
+            log.error(
+                "No 802.11 (re)association frames found in %s ... exiting ...",
+                pcap_analysis,
+            )
+            sys.exit()
+        else:
+            log.info("%s frames put on the queue for profiling", frames_queued)
     else:
         if helpers.validate(config):
             log.debug("config %s", config)

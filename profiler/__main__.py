@@ -19,17 +19,7 @@ import platform
 import sys
 
 
-def main():
-    """Set up args and start the profiler manager"""
-    logging_level = logging.INFO
-
-    from . import helpers, manager
-
-    parser = helpers.setup_parser()
-    args = parser.parse_args()
-    if args.debug:
-        logging_level = logging.DEBUG
-
+def setup_logger(logging_level):
     default_logging = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -47,6 +37,19 @@ def main():
         "loggers": {"": {"handlers": ["default"], "level": logging_level}},
     }
     logging.config.dictConfig(default_logging)
+
+
+def main():
+    """Set up args and start the profiler manager"""
+    logging_level = logging.INFO
+    setup_logger(logging_level)
+    from . import helpers, manager
+
+    parser = helpers.setup_parser()
+    args = parser.parse_args()
+    if args.debug:
+        logging_level = logging.DEBUG
+        setup_logger(logging_level)
 
     manager.start(args)
 

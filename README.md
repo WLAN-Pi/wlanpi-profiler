@@ -119,7 +119,7 @@ Usage:
 
 ```
 usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug] [--noprep]
-                   [--noAP] [--no11r] [--no11ax] [--no11be] [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--read PCAP]
+                   [--noAP] [--no11r] [--no11ax] [--no11be] [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--pcap PCAP]
                    [--no_bpf_filters] [--list_interfaces] [--version]
 
 wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler
@@ -144,7 +144,7 @@ optional arguments:
                         enable WPA3 Personal Transition in the RSNE for 2.4 / 5 GHz
   --wpa3_personal       enable WPA3 Personal only in the RSNE for 2.4 / 5 GHz
   --oui_update          initiates update of OUI database (requires Internet connection)
-  --read PCAP           read and analyze association request frames from pcap
+  --pcap PCAP           analyze association request frames from pcap file
   --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance
   --list_interfaces     print out a list of interfaces with an 80211 stack
   --version, -V         show program's version number and exit
@@ -189,18 +189,20 @@ Do you want to capture passively? We can do that! If we use `--noAP`, we will li
 sudo profiler --noAP -c 100
 ```
 
-Already have some association requests in a pcap? We can analyze them. Use `--read <file.pcap>` to feed them into profiler:
-
-```
-# analyze an association request in a previously captured PCAP file
-sudo profiler --read assoc_frame.pcap
-```
-
 Something not working? Use `--debug` to get more logs printed to the shell.
 
 ```
 # increase output to screen for debugging
 sudo profiler --debug
+```
+
+## Offline analysis
+
+Already have some association requests in a pcap? We can analyze them. Use `--pcap <file.pcap>` to feed them into profiler:
+
+```
+# analyze an association request in a previously captured PCAP file
+sudo profiler --pcap assoc_frame.pcap
 ```
 
 ## Feature: overriding defaults with configuration file support

@@ -112,7 +112,7 @@ def get_app_data_path() -> str:
     app_name = "wlanpi-profiler"
     system = platform.system()
     candidate_paths = []
-    logging.getLogger(inspect.stack()[0][3])
+    log = logging.getLogger(inspect.stack()[0][3])
     if system == "Windows":
         userprofile = os.environ.get("USERPROFILE")
         if userprofile:
@@ -147,22 +147,22 @@ def get_app_data_path() -> str:
                 with open(test_file, "w") as f:
                     f.write("test")
                 os.remove(test_file)
-                print(f"Using application directory to save output: {path}")
+                log.info("Using application directory to save output: %s", path)
                 return path
             except (IOError, PermissionError):
                 continue
         except (IOError, PermissionError) as e:
-            print(f"Debug: Cannot use {path}: {str(e)}")
+            log.debug("Debug: Cannot use %s: %s", path, {str(e)})
             continue
     import tempfile
 
     temp_dir = Path(tempfile.gettempdir()) / app_name
     try:
         os.makedirs(temp_dir, exist_ok=True)
-        print(f"Falling back to temporary data directory: {temp_dir}")
+        log.info("Falling back to temporary data directory: %s", temp_dir)
         return temp_dir
     except Exception as e:
-        print(f"Failed to create temporary data directory: {str(e)}")
+        log.exception("Failed to create temporary data directory")
         raise RuntimeError(f"Cannot find a writable data directory for {app_name}")
 
 
@@ -340,10 +340,10 @@ def setup_parser() -> argparse.ArgumentParser:
         help="initiates update of OUI database (requires Internet connection)",
     )
     parser.add_argument(
-        "--read",
+        "--pcap",
         metavar="PCAP",
         dest="pcap_analysis",
-        help="read and analyze association request frames from pcap",
+        help="analyze association request frames from pcap",
     )
     parser.add_argument(
         "--no_bpf_filters",
