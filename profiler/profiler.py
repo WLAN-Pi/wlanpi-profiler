@@ -158,13 +158,16 @@ class Profiler(object):
             self.log.debug("detected freq from assoc maps to channel %s", channel)
 
         is_6ghz = False
-        if freq > 2411 and freq < 2485:
-            band = "2.4GHz"
-        elif freq > 5100 and freq < 5900:
-            band = "5.0GHz"
-        elif freq > 5900 and freq < 7120:
-            band = "6.0GHz"
-            is_6ghz = True
+        if freq:
+            if freq > 2411 and freq < 2485:
+                band = "2.4GHz"
+            elif freq > 5100 and freq < 5900:
+                band = "5.0GHz"
+            elif freq > 5900 and freq < 7120:
+                band = "6.0GHz"
+                is_6ghz = True
+            else:
+                band = "unknown"
         else:
             band = "unknown"
 
