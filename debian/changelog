@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.19-1) unstable; urgency=medium
+
+  * Don't exit if wpa_cli is not found
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 17 Jun 2025 23:00:00 -0800
+
 wlanpi-profiler (1.0.18-3) unstable; urgency=medium
 
   * Package size reductions

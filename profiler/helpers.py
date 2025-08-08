@@ -52,7 +52,6 @@ __tools = [
     "wpa_cli",
 ]
 
-
 def check_tools():
     # are the required tools installed?
     for tool in __tools:
