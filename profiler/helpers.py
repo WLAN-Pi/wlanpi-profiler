@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import platform
+import pwd
 import shutil
 import signal
 import socket
@@ -660,10 +661,28 @@ def update_manuf2() -> bool:
         return False
     return True
 
+def create_user_xdg_data_dir(app_name):
+   """Create XDG data directory with proper user ownership when running as root"""
+   actual_user = os.environ.get('SUDO_USER', pwd.getpwuid(os.getuid()).pw_name)
+   user_info = pwd.getpwnam(actual_user)
+   
+   user_home = Path(user_info.pw_dir)
+   xdg_data_home = Path(os.environ.get('XDG_DATA_HOME', user_home / '.local/share'))
+   app_dir = xdg_data_home / app_name
+   
+   app_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
+   
+   for path in [user_home / '.local', xdg_data_home, app_dir]:
+       if path.exists():
+           os.chown(path, user_info.pw_uid, user_info.pw_gid)
+   
+   return app_dir
 
 def verify_reporting_directories(config: Dict) -> None:
     """Check reporting directories exist and create if not"""
     log = logging.getLogger(inspect.stack()[0][3])
+
+    create_user_xdg_data_dir('wlanpi-profiler')
 
     if "GENERAL" in config:
         files_path = config["GENERAL"].get("files_path")
