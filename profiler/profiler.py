@@ -142,12 +142,12 @@ class Profiler(object):
                 if frame:
                     if isinstance(frame, RadioTap) or isinstance(frame, Dot11):
                         if frame.addr2 in buffer:
-                            toc = time.time() - buffer[frame.addr2]
-                            if toc < buffer_squelch:
+                            time_of_capture = time.time() - buffer[frame.addr2]
+                            if time_of_capture < buffer_squelch:
                                 self.log.debug(
                                     "already seen %s %s seconds ago; not sending to profiler process",
                                     frame.addr2,
-                                    f"{toc:.2f}",
+                                    f"{time_of_capture:.2f}",
                                 )
                                 continue
                             else:
