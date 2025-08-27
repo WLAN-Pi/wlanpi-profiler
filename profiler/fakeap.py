@@ -666,40 +666,43 @@ class Sniffer(multiprocessing.Process):
                 self.dot11_auth_cb(addr2)
 
         elif subtype == self._probe_subtype:
-            dot11elt = packet.get(Dot11Elt)
-            if dot11elt and dot11elt.ID == 0:
-                ssid = dot11elt.info
-                if ssid == self._ssid_bytes or dot11elt.len == 0:
-                    if self._log_debug_enabled:
-                        try:
-                            decoded = ssid.decode("latin-1")
-                        except UnicodeDecodeError:
-                            decoded = ""
-                        self._log_debug(
-                            "rx probe req for %s (%s) by MAC %s",
-                            ssid,
-                            decoded,
-                            packet.addr2,
-                        )
-                    self.dot11_probe_request_cb(packet)
+            if Dot11Elt in packet:
+                dot11elt = packet[Dot11Elt]
+                if dot11elt and dot11elt.ID == 0:
+                    ssid = dot11elt.info
+                    if ssid == self._ssid_bytes or dot11elt.len == 0:
+                        if self._log_debug_enabled:
+                            try:
+                                decoded = ssid.decode("latin-1")
+                            except UnicodeDecodeError:
+                                decoded = ""
+                            self._log_debug(
+                                "rx probe req for %s (%s) by MAC %s",
+                                ssid,
+                                decoded,
+                                packet.addr2,
+                            )
+                        self.dot11_probe_request_cb(packet)
 
         elif subtype in self._assoc_subtypes:
+            addr1 = packet.addr1
             addr2 = packet.addr2
 
-            if packet.addr1 == self._mac or self._listen_only:
+            if addr1 == self._mac or self._listen_only:
                 self.dot11_assoc_request_cb(packet)
 
             if self._log_debug_enabled:
-                dot11elt = packet.get(Dot11Elt)
-                if dot11elt and dot11elt.ID == 0:
-                    self._log_debug(
-                        "assoc req seen for %s (%s) by MAC %s",
-                        dot11elt.info,
-                        packet.addr1,
-                        addr2,
-                    )
-                else:
-                    self._log_debug("SSID missing in assoc req by MAC %s", addr2)
+                if Dot11Elt in packet:
+                    dot11elt = packet[Dot11Elt]
+                    if dot11elt and dot11elt.ID == 0:
+                        self._log_debug(
+                            "assoc req seen for %s (%s) by MAC %s",
+                            dot11elt.info,
+                            addr1,
+                            addr2,
+                        )
+                    else:
+                        self._log_debug("SSID missing in assoc req by MAC %s", addr2)
 
     def probe_response(self, probe_request) -> None:
         """Send probe resp to assist with profiler discovery"""
