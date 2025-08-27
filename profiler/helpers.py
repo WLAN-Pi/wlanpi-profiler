@@ -99,7 +99,25 @@ def frequency(freq) -> int:
     raise ValueError("%s not found in these frequency ranges: %s", freq, freq_ranges)
 
 
-def get_app_data_path() -> str:
+def create_user_xdg_data_dir(app_name):
+   """Create XDG data directory with proper user ownership when running as root"""
+   actual_user = os.environ.get('SUDO_USER', pwd.getpwuid(os.getuid()).pw_name)
+   user_info = pwd.getpwnam(actual_user)
+   
+   user_home = Path(user_info.pw_dir)
+   xdg_data_home = Path(os.environ.get('XDG_DATA_HOME', user_home / '.local/share'))
+   app_dir = xdg_data_home / app_name
+   
+   app_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
+   
+   for path in [user_home / '.local', xdg_data_home, app_dir]:
+       if path.exists():
+           os.chown(path, user_info.pw_uid, user_info.pw_gid)
+   
+   return app_dir
+
+
+def get_app_data_paths() -> str:
     """
     Returns the application data directory path based on the platform.
 
@@ -129,15 +147,15 @@ def get_app_data_path() -> str:
 
         xdg_data_home = os.environ.get("XDG_DATA_HOME")
         if xdg_data_home:
+            create_user_xdg_data_dir(app_name)
             candidate_paths.append(Path(xdg_data_home) / app_name)
 
         candidate_paths.append(Path.home() / ".local" / "share" / app_name)
 
-        candidate_paths.append(Path.home() / f".{app_name}")
-
     if not candidate_paths:
         candidate_paths.append(Path.home() / f".{app_name}")
 
+    paths = []
     for path in candidate_paths:
         try:
             os.makedirs(path, exist_ok=True)
@@ -148,28 +166,32 @@ def get_app_data_path() -> str:
                     f.write("test")
                 os.remove(test_file)
                 log.info("Using application directory to save output: %s", path)
-                return path
+                paths.append(path)
             except (IOError, PermissionError):
                 continue
         except (IOError, PermissionError) as e:
             log.debug("Debug: Cannot use %s: %s", path, {str(e)})
             continue
-    import tempfile
 
-    temp_dir = Path(tempfile.gettempdir()) / app_name
-    try:
-        os.makedirs(temp_dir, exist_ok=True)
-        log.info("Falling back to temporary data directory: %s", temp_dir)
-        return temp_dir
-    except Exception as e:
-        log.exception("Failed to create temporary data directory")
-        raise RuntimeError(f"Cannot find a writable data directory for {app_name}")
+    if not paths:
+        import tempfile
+
+        temp_dir = Path(tempfile.gettempdir()) / app_name
+        try:
+            os.makedirs(temp_dir, exist_ok=True)
+            log.info("Falling back to temporary data directory: %s", temp_dir)
+            paths.append(temp_dir)
+        except Exception as e:
+            log.exception("Failed to create temporary data directory")
+            raise RuntimeError(f"Cannot find a writable data directory for {app_name}")
+    
+    return paths
 
 
-def validate_path(path_str):
+def validate_paths(path_str):
     """Convert string path to a valid Path that exists."""
     path = Path(path_str)
-    return path
+    return [path]
 
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -216,8 +238,8 @@ def setup_parser() -> argparse.ArgumentParser:
         "--files_path",
         metavar="PATH",
         dest="files_path",
-        type=validate_path,
-        default=get_app_data_path(),
+        type=validate_paths,
+        default=get_app_data_paths(),
         help="customize default directory where analysis is saved on local system (default: %(default)s)",
     )
     ssid_group.add_argument(
@@ -661,43 +683,37 @@ def update_manuf2() -> bool:
         return False
     return True
 
-def create_user_xdg_data_dir(app_name):
-   """Create XDG data directory with proper user ownership when running as root"""
-   actual_user = os.environ.get('SUDO_USER', pwd.getpwuid(os.getuid()).pw_name)
-   user_info = pwd.getpwnam(actual_user)
-   
-   user_home = Path(user_info.pw_dir)
-   xdg_data_home = Path(os.environ.get('XDG_DATA_HOME', user_home / '.local/share'))
-   app_dir = xdg_data_home / app_name
-   
-   app_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
-   
-   for path in [user_home / '.local', xdg_data_home, app_dir]:
-       if path.exists():
-           os.chown(path, user_info.pw_uid, user_info.pw_gid)
-   
-   return app_dir
 
 def verify_reporting_directories(config: Dict) -> None:
     """Check reporting directories exist and create if not"""
     log = logging.getLogger(inspect.stack()[0][3])
-
-    create_user_xdg_data_dir('wlanpi-profiler')
+    actual_user = os.environ.get('SUDO_USER', pwd.getpwuid(os.getuid()).pw_name)
+    user_info = pwd.getpwnam(actual_user)
 
     if "GENERAL" in config:
         files_path = config["GENERAL"].get("files_path")
-        if not os.path.isdir(files_path):
-            log.debug(os.makedirs(files_path))  # type: ignore
+        for path in files_path:
+           try:
+               if not os.path.exists(path):
+                   os.makedirs(path, exist_ok=True)
+                   os.chown(path, user_info.pw_uid, user_info.pw_gid)
+                   log.debug("Created and configured directory: %s", path)
+               
+               clients_dir = os.path.join(path, "clients")
+               if not os.path.exists(clients_dir):
+                   os.makedirs(clients_dir, exist_ok=True)
+                   os.chown(clients_dir, user_info.pw_uid, user_info.pw_gid)
+                   log.debug("Created and configured directory: %s", clients_dir)
 
-        clients_dir = os.path.join(files_path, "clients")
-
-        if not os.path.isdir(clients_dir):
-            log.debug(os.makedirs(clients_dir))  # type: ignore
-
-        reports_dir = os.path.join(files_path, "reports")
-
-        if not os.path.isdir(reports_dir):
-            log.debug(os.makedirs(reports_dir))  # type: ignore
+               reports_dir = os.path.join(path, "reports")
+               if not os.path.exists(reports_dir):
+                   os.makedirs(reports_dir, exist_ok=True)
+                   os.chown(reports_dir, user_info.pw_uid, user_info.pw_gid)
+                   log.debug("Created and configured directory: %s", reports_dir)
+                       
+               log.debug("Verified directory structure: %s", path)
+           except (OSError, PermissionError) as e:
+               log.error("Failed to create directory %s: %s", path, e)
 
 
 def get_frequency_bytes(channel: int) -> bytes:

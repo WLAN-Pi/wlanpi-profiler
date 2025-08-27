@@ -156,13 +156,15 @@ def start(args: argparse.Namespace):
     config = helpers.setup_config(args)
 
     if args.clean and args.files:
-        clients_dir = os.path.join(config["GENERAL"].get("files_path"), "clients")
-        helpers.files_cleanup(clients_dir, args.yes)
+        for path in config["GENERAL"].get("files_path", []):
+            clients_dir = os.path.join(path, "clients")
+            helpers.files_cleanup(clients_dir, args.yes)
         sys.exit(0)
 
     if args.clean:
-        reports_dir = os.path.join(config["GENERAL"].get("files_path"), "reports")
-        helpers.files_cleanup(reports_dir, args.yes)
+        for path in config["GENERAL"].get("files_path", []):
+            reports_dir = os.path.join(path, "reports")
+            helpers.files_cleanup(reports_dir, args.yes)
         sys.exit(0)
 
     if args.list_interfaces:

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import platform
+import pwd
 import shutil
 import signal
 import subprocess
@@ -1850,12 +1851,12 @@ class Profiler:
             self.ft_disabled = config.get("GENERAL").get("ft_disabled")
             self.he_disabled = config.get("GENERAL").get("he_disabled")
             self.be_disabled = config.get("GENERAL").get("be_disabled")
-            self.reports_dir = os.path.join(self.files_path, "reports")
-            self.clients_dir = os.path.join(self.files_path, "clients")
+            # self.reports_dir = os.path.join(self.files_path, "reports")
+            # self.clients_dir = os.path.join(self.files_path, "clients")
+            # self.csv_file = os.path.join(
+            #     self.reports_dir, f"profiler-{time.strftime('%Y-%m-%d')}.csv"
+            # )
             self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
-            self.csv_file = os.path.join(
-                self.reports_dir, f"profiler-{time.strftime('%Y-%m-%d')}.csv"
-            )
         self.client_profiled_count = 0
         self.lookup = manuf.MacParser(update=False)
         self.last_manuf = "N/A"
@@ -1865,76 +1866,84 @@ class Profiler:
         self.run(queue)
 
     def write_tshark_json_and_text(self, results, ascii_report) -> None:
+        actual_user = os.environ.get('SUDO_USER', pwd.getpwuid(os.getuid()).pw_name)
+        user_info = pwd.getpwnam(actual_user)
+
         client_mac = results.get("mac")
         client_mac = client_mac.replace(":", "-", 5)
         band = results.get("capture_band")
         features = results.get("features")
-        dest = os.path.join(self.clients_dir, client_mac)
+        
+        for path in self.files_path:
+            client_dir_path = os.path.join(os.path.join(path, "clients"), client_mac)
 
-        if not os.path.isdir(dest):
+            if not os.path.isdir(client_dir_path):
+                try:
+                    os.mkdir(client_dir_path)
+                except OSError:
+                    self.log.exception("problem creating %s directory", client_dir_path)
+                    sys.exit(signal.SIGHUP)
+
+            if not band:
+                band = ""
+            else:
+                band = f"_{band}GHz"
+
+            text_filename = os.path.join(client_dir_path, f"{client_mac}{band}.txt")
+
+            json_filename = os.path.join(client_dir_path, f"{client_mac}{band}.json")
+
             try:
-                os.mkdir(dest)
+                same = False
+                write_time = strftime("%Y%m%dt%H%M%S")
+                if os.path.exists(json_filename):
+                    with open(json_filename, "r") as _file:
+                        existing_json = json.load(_file)
+
+                    if hash(str(json.dumps(existing_json.get("features")))) == hash(
+                        str(json.dumps(features))
+                    ):
+                        # previously profiled client has the same features
+                        same = True
+
+                    if not same:
+                        json_filename = json_filename.replace(
+                            ".json", f"_diff.{write_time}.json"
+                        )
+
+                self.log.debug("writing json report to %s", json_filename)
+                with open(json_filename, "w") as write_json_file:
+                    json.dump(results, write_json_file)
+
+                if os.path.exists(text_filename):
+                    with open(text_filename, "r") as read_file:
+                        existing_text = read_file.readlines()
+                        temp = []
+                        for line in existing_text:
+                            temp.append(line.replace("\n", ""))
+                        existing_text = temp
+
+                    if not same:
+                        ascii_report = list(
+                            Differ().compare(existing_text, ascii_report.split("\n"))
+                        )
+                        text_filename = text_filename.replace(
+                            ".txt", f"_diff.{write_time}.txt"
+                        )
+                        ascii_report = "\n".join(ascii_report)
+
+                self.log.debug("writing to %s", text_filename)
+                with open(text_filename, "w") as file_writer:
+                    file_writer.write(ascii_report)
+
+                os.chown(client_dir_path, user_info.pw_uid, user_info.pw_gid)
+                for file in [text_filename, json_filename]:
+                    os.chown(os.path.join(path, file), user_info.pw_uid, user_info.pw_gid)
             except OSError:
-                self.log.exception("problem creating %s directory", dest)
+                self.log.exception(
+                    "error creating flat files to dump client info (%s)", text_filename
+                )
                 sys.exit(signal.SIGHUP)
-
-        if not band:
-            band = ""
-        else:
-            band = f"_{band}GHz"
-
-        text_filename = os.path.join(dest, f"{client_mac}{band}.txt")
-
-        json_filename = os.path.join(dest, f"{client_mac}{band}.json")
-
-        try:
-            same = False
-            write_time = strftime("%Y%m%dt%H%M%S")
-            if os.path.exists(json_filename):
-                with open(json_filename, "r") as _file:
-                    existing_json = json.load(_file)
-
-                if hash(str(json.dumps(existing_json.get("features")))) == hash(
-                    str(json.dumps(features))
-                ):
-                    # previously profiled client has the same features
-                    same = True
-
-                if not same:
-                    json_filename = json_filename.replace(
-                        ".json", f"_diff.{write_time}.json"
-                    )
-
-            self.log.debug("writing json report to %s", json_filename)
-            with open(json_filename, "w") as write_json_file:
-                json.dump(results, write_json_file)
-
-            if os.path.exists(text_filename):
-                with open(text_filename, "r") as read_file:
-                    existing_text = read_file.readlines()
-                    temp = []
-                    for line in existing_text:
-                        temp.append(line.replace("\n", ""))
-                    existing_text = temp
-
-                if not same:
-                    ascii_report = list(
-                        Differ().compare(existing_text, ascii_report.split("\n"))
-                    )
-                    text_filename = text_filename.replace(
-                        ".txt", f"_diff.{write_time}.txt"
-                    )
-                    ascii_report = "\n".join(ascii_report)
-
-            self.log.debug("writing to %s", text_filename)
-            with open(text_filename, "w") as file_writer:
-                file_writer.write(ascii_report)
-
-        except OSError:
-            self.log.exception(
-                "error creating flat files to dump client info (%s)", text_filename
-            )
-            sys.exit(signal.SIGHUP)
 
     def get_tshark_path(self) -> str:
         """Get the tshark executable path for the current platform."""
