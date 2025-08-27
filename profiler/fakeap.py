@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2024 Josh Schmelzle
+# Copyright : (c) 2025 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -31,7 +31,12 @@ try:
     from scapy.all import Dot11Beacon  # type: ignore
     from scapy.all import Dot11Elt  # type: ignore
     from scapy.all import Dot11ProbeResp  # type: ignore
-    from scapy.all import Dot11, Dot11Auth, RadioTap, Scapy_Exception  # type: ignore
+    from scapy.all import (  # type: ignore
+        Dot11,
+        Dot11Auth,
+        RadioTap,
+        Scapy_Exception,
+    )
     from scapy.all import conf as scapyconf  # type: ignore
     from scapy.all import (  # type: ignore
         get_if_hwaddr,
@@ -517,6 +522,9 @@ class TxBeacons(multiprocessing.Process):
 class Sniffer(multiprocessing.Process):
     """Handle sniffing probes and association requests"""
 
+    _NETWORK_ERRORS = ("Network is down", "No such device")
+    _NETWORK_ERROR_MSG = "network error ... exiting ..."
+
     def __init__(
         self,
         config,
@@ -527,6 +535,7 @@ class Sniffer(multiprocessing.Process):
         args,
     ):
         super(Sniffer, self).__init__()
+
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
 
@@ -535,6 +544,9 @@ class Sniffer(multiprocessing.Process):
         self.config = config
         self.sequence_number = sequence_number
         self.ssid: "str" = config.get("GENERAL").get("ssid")
+        self._ssid_bytes = self.ssid.encode()  # Pre-encode for comparison
+        self._mac = None
+
         self.interface: "str" = config.get("GENERAL").get("interface")
         channel: "str" = config.get("GENERAL").get("channel")
         if not channel:
@@ -565,6 +577,23 @@ class Sniffer(multiprocessing.Process):
                 self.interface,
             )
             sys.exit(signal.SIGALRM)
+
+        self._send = self.l2socket.send
+        self._get_next_seq = _Utils.next_sequence_number
+        self._queue_put = self.queue.put
+        self._log_debug = self.log.debug
+        self._log_warning = self.log.warning
+        self._log_exception = self.log.exception
+        self._log_debug_enabled = self.log.isEnabledFor(logging.DEBUG)
+        self._dot11_layer = Dot11
+        self._check_network_error = self._create_error_checker()
+        self._seq_lock = self.sequence_number.get_lock()
+        self._auth_subtype = DOT11_SUBTYPE_AUTH_REQ
+        self._probe_subtype = DOT11_SUBTYPE_PROBE_REQ
+        self._assoc_subtypes = frozenset(
+            (DOT11_SUBTYPE_ASSOC_REQ, DOT11_SUBTYPE_REASSOC_REQ)
+        )
+        self._listen_only = self.listen_only
         self.log.debug(self.l2socket.outs)
 
         self.received_frame_cb = self.received_frame
@@ -572,21 +601,27 @@ class Sniffer(multiprocessing.Process):
         self.dot11_assoc_request_cb = self.assoc_req
         self.dot11_auth_cb = self.auth
         with lock:
-            self.mac = _Utils.get_mac(self.interface)
-            probe_resp_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
+            self._mac = _Utils.get_mac(self.interface)
+            probe_resp_ies = _Utils.build_fake_frame_ies(self.config, self._mac)
             self.probe_response_frame = (
                 RadioTap()
                 / Dot11(
-                    subtype=DOT11_SUBTYPE_PROBE_RESP, addr2=self.mac, addr3=self.mac
+                    subtype=DOT11_SUBTYPE_PROBE_RESP, addr2=self._mac, addr3=self._mac
                 )
                 / Dot11ProbeResp(cap=0x1111)
                 / probe_resp_ies
             )
             self.auth_frame = (
                 RadioTap()
-                / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
+                / Dot11(
+                    subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self._mac, addr3=self._mac
+                )
                 / Dot11Auth(seqnum=0x02)
             )
+
+            self._probe_dot11_layer = self.probe_response_frame[self._dot11_layer]
+            self._auth_dot11_layer = self.auth_frame[self._dot11_layer]
+
         try:
             sniff(
                 iface=self.interface,
@@ -609,89 +644,109 @@ class Sniffer(multiprocessing.Process):
                 )
             signal.SIGALRM
 
+    def _create_error_checker(self):
+        """Create optimized error checker"""
+        errors = self._NETWORK_ERRORS
+
+        def check_error(error_str):
+            return any(err in error_str for err in errors)
+
+        return check_error
+
     def received_frame(self, packet) -> None:
         """Handle incoming packets for profiling"""
-        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-            if packet.addr1 == self.mac:  # if we are the receiver
-                self.log.debug("rx auth sent from MAC %s", packet.addr2)
-                self.dot11_auth_cb(packet.addr2)
-        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:  # probe request
-            if Dot11Elt in packet:
-                if packet[Dot11Elt].ID == 0:
-                    ssid = packet[Dot11Elt].info
-                    try:
-                        decoded = ssid.decode("latin-1")
-                    except UnicodeDecodeError:
-                        decoded = ""
-                    self.log.debug(
-                        "rx probe req for %s (%s) by MAC %s",
-                        ssid,
-                        decoded,
-                        packet.addr2,
-                    )
-                    if ssid == self.ssid.encode() or packet[Dot11Elt].len == 0:
-                        self.dot11_probe_request_cb(packet)
-        elif (
-            packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
-            or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
-        ):
-            if packet.addr1 == self.mac:  # if we are the receiver
-                self.dot11_assoc_request_cb(packet)
-            if self.listen_only:
+        subtype = packet.subtype
+
+        if subtype == self._auth_subtype:
+            addr1 = packet.addr1
+            if addr1 == self._mac:
+                addr2 = packet.addr2
+                if self._log_debug_enabled:
+                    self._log_debug("rx auth sent from MAC %s", addr2)
+                self.dot11_auth_cb(addr2)
+
+        elif subtype == self._probe_subtype:
+            dot11elt = packet.get(Dot11Elt)
+            if dot11elt and dot11elt.ID == 0:
+                ssid = dot11elt.info
+                if ssid == self._ssid_bytes or dot11elt.len == 0:
+                    if self._log_debug_enabled:
+                        try:
+                            decoded = ssid.decode("latin-1")
+                        except UnicodeDecodeError:
+                            decoded = ""
+                        self._log_debug(
+                            "rx probe req for %s (%s) by MAC %s",
+                            ssid,
+                            decoded,
+                            packet.addr2,
+                        )
+                    self.dot11_probe_request_cb(packet)
+
+        elif subtype in self._assoc_subtypes:
+            addr2 = packet.addr2
+
+            if packet.addr1 == self._mac or self._listen_only:
                 self.dot11_assoc_request_cb(packet)
 
-            # self.log.debug("packet dump for %s %s", packet.addr2, packet.show(dump=True))
-            if Dot11Elt in packet:
-                if packet[Dot11Elt].ID == 0:
-                    self.log.debug(
+            if self._log_debug_enabled:
+                dot11elt = packet.get(Dot11Elt)
+                if dot11elt and dot11elt.ID == 0:
+                    self._log_debug(
                         "assoc req seen for %s (%s) by MAC %s",
-                        packet[Dot11Elt].info,
+                        dot11elt.info,
                         packet.addr1,
-                        packet.addr2,
+                        addr2,
                     )
-            else:
-                self.log.debug("SSID missing in assoc req by MAC %s", packet.addr2)
+                else:
+                    self._log_debug("SSID missing in assoc req by MAC %s", addr2)
 
     def probe_response(self, probe_request) -> None:
         """Send probe resp to assist with profiler discovery"""
-        frame = self.probe_response_frame
-        with self.sequence_number.get_lock():
-            frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
-        frame[Dot11].addr1 = probe_request.addr2
+        addr2 = probe_request.addr2
+
+        with self._seq_lock:
+            self.probe_response_frame.sequence_number = self._get_next_seq(
+                self.sequence_number
+            )
+
+        self._probe_dot11_layer.addr1 = addr2
+
         try:
-            self.l2socket.send(frame)  # type: ignore
+            self._send(self.probe_response_frame)
         except OSError as error:
-            for event in ("Network is down", "No such device"):
-                if event in error.strerror:
-                    self.log.exception(
-                        "probe_response(): network is down or no such device ... exiting ..."
-                    )
-                    sys.exit(signal.SIGALRM)
-        self.log.debug("tx probe resp to %s", probe_request.addr2)
+            if self._check_network_error(error.strerror):
+                self._log_exception("probe_response(): %s", self._NETWORK_ERROR_MSG)
+                sys.exit(signal.SIGALRM)
+            raise
+
+        if self._log_debug_enabled:
+            self._log_debug("tx probe resp to %s", addr2)
 
     def assoc_req(self, frame) -> None:
         """Put association request on queue for the Profiler"""
-        self.assoc_reqs[frame.addr2] = frame
-        self.log.debug("adding assoc req from %s to queue", frame.addr2)
-        self.queue.put(frame)
+        addr2 = frame.addr2
+        self.assoc_reqs[addr2] = frame
+        if self._log_debug_enabled:
+            self._log_debug("adding assoc req from %s to queue", addr2)
+        self._queue_put(frame)
 
     def auth(self, receiver) -> None:
         """Send authentication frame to get the station to prompt an assoc request"""
-        frame = self.auth_frame
-        frame[Dot11].addr1 = receiver
-        with self.sequence_number.get_lock():
-            frame.sequence_number = (
-                _Utils.next_sequence_number(self.sequence_number) - 1
+        self._auth_dot11_layer.addr1 = receiver
+
+        with self._seq_lock:
+            self.auth_frame.sequence_number = (
+                self._get_next_seq(self.sequence_number) - 1
             )
 
-        self.log.debug("tx authentication (0x0B) to %s", receiver)
+        if self._log_debug_enabled:
+            self._log_debug("tx authentication (0x0B) to %s", receiver)
 
         try:
-            self.l2socket.send(frame)  # type: ignore
+            self._send(self.auth_frame)
         except OSError as error:
-            for event in ("Network is down", "No such device"):
-                if event in error.strerror:
-                    self.log.warning(
-                        "auth(): network is down or no such device ... exiting ..."
-                    )
-                    sys.exit(signal.SIGALRM)
+            if self._check_network_error(error.strerror):
+                self._log_warning("auth(): %s", self._NETWORK_ERROR_MSG)
+                sys.exit(signal.SIGALRM)
+            raise

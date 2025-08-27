@@ -17,15 +17,15 @@ import csv
 import inspect
 import json
 import logging
-from logging.handlers import QueueHandler
 import os
 import signal
 import sys
 import time
-from difflib import Differ
 from dataclasses import dataclass
-from time import strftime
+from difflib import Differ
 from functools import total_ordering
+from logging.handlers import QueueHandler
+from time import strftime
 from typing import Dict, List, Tuple, Union
 
 # third party imports
@@ -34,7 +34,7 @@ from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
 
 # app imports
 from .__version__ import __version__
-from .constants import  _20MHZ_FREQUENCY_CHANNEL_MAP
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .helpers import (
     Base64Encoder,
     flag_last_object,
@@ -86,7 +86,8 @@ class Capability:
         if not isinstance(other, Capability):
             return NotImplemented
         return self.name == other.name
-    
+
+
 class Profiler(object):
     """Code handling analysis of client capablities"""
 
@@ -623,9 +624,9 @@ class Profiler(object):
     def analyze_ht_capabilities_ie(dot11_elt_dict) -> List:
         """Check for 802.11n support"""
         dot11n = Capability(
-            name="802.11n", value="Not reported*", db_key="dot11n", db_value=0
+            name="802.11n", value="Not reported*", db_key="dot11n", db_value=-1
         )
-        dot11n_nss = Capability(db_key="dot11n_nss", db_value=0)
+        dot11n_nss = Capability(db_key="dot11n_nss", db_value=-1)
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             spatial_streams = 0
@@ -647,14 +648,14 @@ class Profiler(object):
     def analyze_vht_capabilities_ie(dot11_elt_dict) -> List:
         """Check for 802.11ac support"""
         dot11ac = Capability(
-            name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=0
+            name="802.11ac", value="Not reported*", db_key="dot11ac", db_value=-1
         )
-        dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=0)
-        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value="")
-        dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=0)
-        dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=0)
-        dot11ac_bf_sts = Capability(db_key="dot11ac_bf_sts", db_value=0)
-        dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=0)
+        dot11ac_nss = Capability(db_key="dot11ac_nss", db_value=-1)
+        dot11ac_mcs = Capability(db_key="dot11ac_mcs", db_value=-1)
+        dot11ac_su_bf = Capability(db_key="dot11ac_su_bf", db_value=-1)
+        dot11ac_mu_bf = Capability(db_key="dot11ac_mu_bf", db_value=-1)
+        dot11ac_bf_sts = Capability(db_key="dot11ac_bf_sts", db_value=-1)
+        dot11ac_160_mhz = Capability(db_key="dot11ac_160_mhz", db_value=-1)
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             # determine number of spatial streams (NSS) supported
@@ -744,7 +745,7 @@ class Profiler(object):
             name="802.11k",
             value="Not reported* - treat with caution, many clients lie about this",
             db_key="dot11k",
-            db_value=0,
+            db_value=-1,
         )
         if RM_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
             dot11k.value = "Supported"
@@ -756,7 +757,7 @@ class Profiler(object):
     def analyze_ft_capabilities_ie(dot11_elt_dict, ft_disabled: bool) -> List:
         """Check for 802.11r support"""
         dot11r = Capability(
-            name="802.11r", value="Not reported*", db_key="dot11r", db_value=0
+            name="802.11r", value="Not reported*", db_key="dot11r", db_value=-1
         )
         if ft_disabled:
             dot11r.value = "Reporting disabled (--no11r option used)"
@@ -772,7 +773,7 @@ class Profiler(object):
     def analyze_ext_capabilities_ie(dot11_elt_dict) -> List:
         """Check for 802.11v support"""
         dot11v = Capability(
-            name="802.11v", value="Not reported*", db_key="dot11v", db_value=0
+            name="802.11v", value="Not reported*", db_key="dot11v", db_value=-1
         )
 
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -795,7 +796,7 @@ class Profiler(object):
     def analyze_rsn_capabilities_ie(dot11_elt_dict) -> List:
         """Check for 802.11w support"""
         dot11w = Capability(
-            name="802.11w", value="Not reported", db_key="dot11w", db_value=0
+            name="802.11w", value="Not reported", db_key="dot11w", db_value=-1
         )
 
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict.keys():
@@ -817,13 +818,13 @@ class Profiler(object):
             name="Max Power",
             value="Not reported",
             db_key="max_power",
-            db_value=0,
+            db_value=-1,
         )
         min_power_cap = Capability(
             # name="Min Power",
             # value="Not reported",
             db_key="min_power",
-            db_value=0,
+            db_value=-1,
         )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict.keys():
@@ -915,7 +916,7 @@ class Profiler(object):
         """Check if 6 GHz is a supported alternative operating class"""
         six_ghz_operating_class_cap = Capability(
             db_key="six_ghz_operating_class_supported",
-            db_value=0,
+            db_value=-1,
         )
 
         supported_6ghz_alternative_operating_classes = []
@@ -939,42 +940,58 @@ class Profiler(object):
 
         return [six_ghz_operating_class_cap]
 
+    def analyze_rsnx_capabilities(dot11_elt_dict) -> List[Capability]:
+        """Check for RSNX capabilities, including SAE Hash-to-Element"""
+        sae_h2e = Capability(
+            name="RSNX H2E", value="No", db_key="rsnx_sae_h2e", db_value=-1
+        )
+
+        # TODO
+
+        return [sae_h2e]
+
+    # TODO
     @staticmethod
     def analyze_extension_ies(
         dot11_elt_dict, he_disabled: bool, be_disabled: bool
-    ) -> List:
+    ) -> List[Capability]:
         """Check for 802.11ax and 802.11be support"""
         dot11ax = Capability(
             name="802.11ax",
             value="Not supported",
             db_key="dot11ax",
-            db_value=0,
+            db_value=-1,
         )
         dot11ax_six_ghz = Capability(
             db_key="dot11ax_six_ghz",
-            db_value=0,
+            db_value=-1,
         )
         dot11ax_punctured_preamble = Capability(
-            db_key="dot11ax_punctured_preamble", db_value=0
+            db_key="dot11ax_punctured_preamble", db_value=-1
         )
         dot11ax_he_su_beamformer = Capability(
-            db_key="dot11ax_he_su_beamformer", db_value=0
+            db_key="dot11ax_he_su_beamformer", db_value=-1
         )
         dot11ax_he_su_beamformee = Capability(
-            db_key="dot11ax_he_su_beamformee", db_value=0
+            db_key="dot11ax_he_su_beamformee", db_value=-1
         )
         dot11ax_he_beamformee_sts = Capability(
-            db_key="dot11ax_he_beamformee_sts", db_value=0
+            db_key="dot11ax_he_beamformee_sts", db_value=-1
         )
-        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=0)
-        dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value="")
-        dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=0)
-        dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=0)
-        dot11ax_bsr = Capability(db_key="dot11ax_bsr", db_value=0)
-        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=0)
-        dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=0)
-        dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=0)
-
+        dot11ax_nss = Capability(db_key="dot11ax_nss", db_value=-1)
+        dot11ax_mcs = Capability(db_key="dot11ax_mcs", db_value=-1)
+        dot11ax_twt = Capability(db_key="dot11ax_twt", db_value=-1)
+        dot11ax_uora = Capability(db_key="dot11ax_uora", db_value=-1)
+        dot11ax_bsr = Capability(db_key="dot11ax_bsr", db_value=-1)
+        dot11ax_he_er_su_ppdu = Capability(db_key="dot11ax_he_er_su_ppdu", db_value=-1)
+        dot11ax_spatial_reuse = Capability(db_key="dot11ax_spatial_reuse", db_value=-1)
+        dot11ax_160_mhz = Capability(db_key="dot11ax_160_mhz", db_value=-1)
+        dot11ax_sm_power_save = Capability(
+            name="802.11ax/HE 6 GHz SM Power Save",
+            value="No",
+            db_key="dot11ax_6ghz_sm_power_save",
+            db_value=-1,
+        )
         if he_disabled:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
         else:
@@ -1165,18 +1182,118 @@ class Profiler(object):
             name="802.11be",
             value="Not supported",
             db_key="dot11be",
-            db_value=0,
+            db_value=-1,
         )
         dot11be_nss = Capability(
+            name="802.11be/EHT SS",
+            value="Not reported*",
             db_key="dot11be_nss",
-            db_value=0,
+            db_value=-1,
         )
         dot11be_mcs = Capability(
+            name="802.11be/EHT MCS",
+            value="Not reported*",
             db_key="dot11be_mcs",
-            db_value="",
+            db_value=-1,
         )
-        dot11be_320_mhz = Capability(db_key="dot11be_320_mhz", db_value=0)
+        dot11be_epcs_support = Capability(
+            name="802.11be/EPCS Support",
+            value="No",
+            db_key="dot11be_epcs_support",
+            db_value=-1,
+        )
+        dot11be_eht_om_support = Capability(
+            name="802.11be/EHT OM Ctrl. Spt.",
+            value="No",
+            db_key="dot11be_om_support",
+            db_value=-1,
+        )
+        dot11be_rtwt_support = Capability(
+            name="802.11be/R-TWT Support",
+            value="No",
+            db_key="dot11be_rtwt_support",
+            db_value=-1,
+        )
+        dot11be_scs_support = Capability(
+            name="802.11be/SCS Traffic Desc.",
+            value="No",
+            db_key="dot11be_scs_support",
+            db_value=-1,
+        )
+        dot11be_320mhz_support = Capability(
+            name="802.11be/320 MHz support (6G)",
+            value="No",
+            db_key="dot11be_320mhz",
+            db_value=-1,
+        )
+        dot11be_mcs14_support = Capability(
+            name="802.11be/MCS 14",
+            value="No",
+            db_key="dot11be_mcs14_support",
+            db_value=-1,
+        )
+        dot11be_mcs15_support = Capability(
+            name="802.11be/MCS 15",
+            value="No",
+            db_key="dot11be_mcs15_support",
+            db_value=-1,
+        )
 
+        # Multi-Link Control (MLC) capabilities)
+        dot11be_mle = Capability(
+            name="802.11be/MLE (Multi-Link Element)",
+            value="Not reported*",
+            db_key="dot11be_mle",
+            db_value=-1,
+        )
+        dot11be_mlc_type = Capability(
+            name="802.11be/MLE/MLC Type",
+            value="Not reported*",
+            db_key="dot11be_mle_mlc_type",
+            db_value=-1,
+        )
+        dot11be_emlsr_support = Capability(
+            name="802.11be/MLE/EMLSR",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_support",
+            db_value=-1,
+        )
+        dot11be_emlsr_padding_delay = Capability(
+            name="802.11be/MLE/EMLSR Padding Delay",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_padding_delay",
+            db_value=-1,
+        )
+        dot11be_emlsr_transition_delay = Capability(
+            name="802.11be/MLE/EMLSR Transition Delay",
+            value="Not reported*",
+            db_key="dot11be_mle_emlsr_transition_delay",
+            db_value=-1,
+        )
+        dot11be_emlmr_support = Capability(
+            name="802.11be/MLE/EMLMR",
+            value="Not reported*",
+            db_key="dot11be_mle_emlmr_support",
+            db_value=-1,
+        )
+        dot11be_max_simultaneous_links = Capability(
+            name="802.11be/MLE/Max Sim. Links",
+            value="Not reported*",
+            db_key="dot11be_mle_max_simultaneous_links",
+            db_value=-1,
+        )
+        dot11be_t2lm_negotiation_support = Capability(
+            name="802.11be/MLE/T2LM Negot. Spt.",
+            value="Not reported*",
+            db_key="dot11be_mle_t2lm_negotiation_support",
+            db_value=-1,
+        )
+        dot11be_link_reconfiguration_operation_support = Capability(
+            name="802.11be/MLE/Link Reconf Oper. Spt.",
+            value="Not reported*",
+            db_key="dot11be_mle_link_reconfig_support",
+            db_value=-1,
+        )
         if be_disabled:
             dot11be.value = "Reporting disabled (--no11be option used)"
         else:
@@ -1209,7 +1326,7 @@ class Profiler(object):
 
                         if get_bit(eht_phy_cap_1, 2):
                             dot11be.value += ", [X] 320 MHz"
-                            dot11be_320_mhz.db_value = 1
+                            dot11be_320mhz_support.db_value = 1
                         else:
                             dot11be.value += ", [ ] 320 MHz"
 
@@ -1230,7 +1347,7 @@ class Profiler(object):
             dot11be,
             dot11be_nss,
             dot11be_mcs,
-            dot11be_320_mhz,
+            dot11be_320mhz_support,
         ]
 
     def analyze_assoc_req(self, frame, is_6ghz: bool) -> Tuple[str, str, list]:
