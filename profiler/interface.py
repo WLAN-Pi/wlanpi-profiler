@@ -250,6 +250,7 @@ class Interface:
         ]
 
     def get_iwlwifi_staging_commands(self) -> List:
+    def get_iwlwifi_staging_commands_oneshot(self) -> List:
         """Retrieve interface staging commands for iwlwifi cards"""
         cmds = [
             [
@@ -263,6 +264,31 @@ class Interface:
                 "flags",
                 "none",
             ],
+            ["ip", "link", "set", f"{self.mon}", "up"],
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
+        ]
+        return cmds
+    def get_iwlwifi_prestaging_commands(self) -> List:
+        """Retrieve interface staging commands for iwlwifi cards"""
+        cmds = [
+            [
+                "iw",
+                f"{self.phy}",
+                "interface",
+                "add",
+                f"{self.mon}",
+                "type",
+                "monitor",
+                "flags",
+                "control",
+            ],
+        ]
+        return cmds
+    
+    def get_iwlwifi_staging_commands(self) -> List:
+        """Retrieve interface staging commands for iwlwifi cards"""
+        cmds = [
             ["ip", "link", "set", f"{self.mon}", "up"],
             ["ip", "link", "set", f"{self.name}", "down"],
             ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
@@ -298,6 +324,7 @@ class Interface:
                             return True
         return False
 
+
     def stage_interface(self) -> None:
         """Prepare the interface for monitor mode and injection"""
         # get and print debugs for versions of system utilities
@@ -323,12 +350,36 @@ class Interface:
             self.log.debug("%s", iw_version.strip())
 
         cmds = []
+        prestage_cmds = []
         # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
         if "88XXau" in self.driver:
             # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
             cmds = self.get_generic_staging_commands()
         else:
+            # cmds = self.get_iwlwifi_staging_commands()
             cmds = self.get_iwlwifi_staging_commands()
+            prestage_cmds = self.get_iwlwifi_prestaging_commands()
+
+            # run the prestaging commands
+            for cmd in prestage_cmds:
+                self.log.debug("Prestaging the monitor interface")
+                self.log.debug("run: %s", " ".join(cmd))
+                if "monitor" in cmd:
+                    stdout = run_command(cmd).strip()
+                    if "non-zero" not in stdout:
+                        self.log.debug(stdout)
+                        if "not supported" in stdout:
+                            raise InterfaceError(
+                                f"{self.name} does not appear to support monitor mode"
+                            )
+                else:
+                    run_command(cmd)
+
+            self.log.debug(
+                    "initiating scan on %s because checks found disabled or No IR on %s",
+                    self.name,
+                    self.frequency,
+                )
 
             if self.check_for_disabled_or_noir_channels(
                 self.frequency, run_command(["iw", "phy", f"{self.phy}", "channels"])
@@ -338,6 +389,7 @@ class Interface:
                     self.name,
                     self.frequency,
                 )
+
                 self.scan()
                 self.log.debug("finished scan on %s", self.name)
         self.log.debug("finish stage_interface")
