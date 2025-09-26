@@ -249,7 +249,6 @@ class Interface:
             ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
         ]
 
-    def get_iwlwifi_staging_commands(self) -> List:
     def get_iwlwifi_staging_commands_oneshot(self) -> List:
         """Retrieve interface staging commands for iwlwifi cards"""
         cmds = [
@@ -269,6 +268,7 @@ class Interface:
             ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
         ]
         return cmds
+    
     def get_iwlwifi_prestaging_commands(self) -> List:
         """Retrieve interface staging commands for iwlwifi cards"""
         cmds = [
