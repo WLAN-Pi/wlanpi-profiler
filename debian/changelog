@@ -1,3 +1,9 @@
+wlanpi-profiler (1.0.20-1) unstable; urgency=medium
+
+  * refactor: inline interface staging commands and streamline scan logic
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Sep, 29 Sep 2025 23:00:00 -0800
+
 wlanpi-profiler (1.0.19-1) unstable; urgency=medium
 
   * Don't exit if wpa_cli is not found
