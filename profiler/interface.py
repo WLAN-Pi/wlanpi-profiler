@@ -228,47 +228,6 @@ class Interface:
             self.log.debug("run: %s", " ".join(cmd))
             run_command(cmd)
 
-    def scan(self) -> None:
-        """Perform scan in attempt to enable a disabled channel"""
-        iwlwifi_scan_commands = [
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
-            ["ip", "link", "set", f"{self.name}", "up"],
-            ["iw", f"{self.name}", "scan"],
-        ]
-        for cmd in iwlwifi_scan_commands:
-            self.log.debug("run: %s", " ".join(cmd))
-            run_command(cmd, suppress_output=True)
-
-    def get_generic_staging_commands(self) -> List:
-        """Retrieve generic interface staging commands"""
-        return [
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
-            ["ip", "link", "set", f"{self.name}", "up"],
-            ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
-        ]
-
-    def get_iwlwifi_staging_commands(self) -> List:
-        """Retrieve interface staging commands for iwlwifi cards"""
-        cmds = [
-            [
-                "iw",
-                f"{self.phy}",
-                "interface",
-                "add",
-                f"{self.mon}",
-                "type",
-                "monitor",
-                "flags",
-                "none",
-            ],
-            ["ip", "link", "set", f"{self.mon}", "up"],
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
-        ]
-        return cmds
-
     def check_for_disabled_or_noir_channels(
         self, freq: int, iw_phy_channels, verbose=False
     ) -> bool:
@@ -302,12 +261,19 @@ class Interface:
         """Prepare the interface for monitor mode and injection"""
         # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
-        wpa_cli_version = run_command(["wpa_cli", "-v"])
-        if wpa_cli_version:
+        try:
+            wpa_cli_version = run_command(["wpa_cli", "-v"])
             self.log.debug(
                 "wpa_cli version is %s",
                 wpa_cli_version.splitlines()[0].replace("wpa_cli ", ""),
             )
+            wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+            self.log.debug("running '%s'", wpa_cli_cmd)
+            run_command(wpa_cli_cmd)
+            self.log.debug("finished with '%s'", wpa_cli_cmd)
+        except FileNotFoundError:
+            self.log.warning("wpa_cli not present")
+
         ip_version = run_command(["ip", "-V"])
         if ip_version:
             self.log.debug("%s", ip_version.strip())
@@ -315,31 +281,37 @@ class Interface:
         if iw_version:
             self.log.debug("%s", iw_version.strip())
 
-        # always run wpa_cli
-        wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
-        self.log.debug("running '%s'", wpa_cli_cmd)
-        run_command(wpa_cli_cmd)
-        self.log.debug("finished with '%s'", wpa_cli_cmd)
-
         cmds = []
         # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
         if "88XXau" in self.driver:
             # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
-            cmds = self.get_generic_staging_commands()
+            cmds = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+            ]
         else:
-            cmds = self.get_iwlwifi_staging_commands()
-
-            if self.check_for_disabled_or_noir_channels(
-                self.frequency, run_command(["iw", "phy", f"{self.phy}", "channels"])
-            ):
-                self.log.debug(
-                    "initiating scan on %s because checks found disabled or No IR on %s",
-                    self.name,
-                    self.frequency,
-                )
-                self.scan()
-                self.log.debug("finished scan on %s", self.name)
-        self.log.debug("finish stage_interface")
+            cmds = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "type", "managed"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                [
+                    "iw",
+                    f"{self.phy}",
+                    "interface",
+                    "add",
+                    f"{self.mon}",
+                    "type",
+                    "monitor",
+                    "flags",
+                    "none",
+                ],
+                ["ip", "link", "set", f"{self.mon}", "up"],
+                ["iw", f"{self.name}", "scan"],
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
+            ]
 
         # run the staging commands
         for cmd in cmds:
@@ -352,6 +324,8 @@ class Interface:
                         raise InterfaceError(
                             f"{self.name} does not appear to support monitor mode"
                         )
+            elif "scan" in cmd:
+                run_command(cmd, suppress_output=True)
             else:
                 run_command(cmd)
 
@@ -367,6 +341,8 @@ class Interface:
             run_command(["iw", "phy", f"{self.phy}", "channels"]),
             verbose=True,
         )
+
+        self.log.debug("finish stage_interface")
 
     @staticmethod
     def get_channels_status(iw_phy_channels) -> Dict:
