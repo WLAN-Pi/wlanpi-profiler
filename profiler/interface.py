@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-#
 # profiler : a Wi-Fi client capability analyzer tool
 # Copyright : (c) 2024 Josh Schmelzle
 # License : BSD-3-Clause
@@ -12,14 +10,14 @@ profiler.interface
 wlan interface data class
 """
 
-# standard library imports
+import contextlib
 import inspect
 import logging
 import os
+import subprocess
+import time
 from collections import namedtuple
-from typing import Dict, List
 
-# app imports
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .helpers import flag_last_object, run_command
 
@@ -84,21 +82,37 @@ class Interface:
         else:
             # the rtl88XXau is crap and doesn't support vifs, otherwise lets create a mon interface for iwlwifi, mt76x2u, etc
             if "88XXau" not in self.driver:
-                # if <iface>mon is not already created. we will create it.
-                self.mon = f"{self.name}mon"
-                if self.mon == self.name:
-                    self.log.warning(
-                        "proposed %s interface matches provided %s and already maps to phy%s",
+                # if <iface>profiler is not already created. we will create it.
+                # Check if the provided interface name already ends with 'profiler'
+                if self.name.endswith("profiler"):
+                    # Interface already has profiler suffix, assume it's the monitor interface
+                    # This handles cases where the user provides wlanXprofiler directly
+                    self.mon = self.name
+                    self.log.debug(
+                        "Provided interface '%s' already has 'profiler' suffix. "
+                        "Treating it as pre-existing monitor interface.",
                         self.mon,
-                        self.name,
-                        self.phy_id,
                     )
-                    raise InterfaceError(
-                        "iwlwifi requires use of a separate monitor interface. did you already handle interface staging and mean to run with --noprep option?"
-                    )
+                    # We still need a VIF, but won't create a new one
+                    self.requires_vif = True
                 else:
+                    # Normal case: append 'profiler' to create monitor interface name
+                    self.mon = f"{self.name}profiler"
+
+                    # Sanity check: ensure mon != name (shouldn't happen in normal flow)
+                    if self.mon == self.name:
+                        self.log.warning(
+                            "proposed %s interface matches provided %s and already maps to phy%s",
+                            self.mon,
+                            self.name,
+                            self.phy_id,
+                        )
+                        raise InterfaceError(
+                            "iwlwifi requires use of a separate monitor interface. did you already handle interface staging and mean to run with --noprep option?"
+                        )
+
                     self.log.debug("new %s will map to phy%s", self.mon, self.phy_id)
-                self.requires_vif = True
+                    self.requires_vif = True
         if not self.channel:
             raise InterfaceError("unknown channel setting for %s", self.name)
         if not self.frequency:
@@ -129,9 +143,13 @@ class Interface:
 
     def print_interface_information(self) -> None:
         """Print wiphys to the screen"""
-        lsb_release = run_command(["lsb_release", "-a"])
-        print(lsb_release)
-        self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
+        try:
+            lsb_release = run_command(["lsb_release", "-a"])
+            print(lsb_release)
+        except FileNotFoundError:
+            # lsb_release not installed (e.g., minimal containers)
+            print("OS: lsb_release not available")
+        self.phys = self.build_iw_phy_list()
         self.log.debug("phys: %s", self.phys)
 
         ifaces = []
@@ -238,41 +256,48 @@ class Interface:
             for _band, channels in channels_status.items():
                 # loop through channels and check if we need to do a scan before staging
                 for ch in channels:
-                    if int(freq) == int(ch.freq):
-                        # if channel we want to use is disabled or No IR, attempt scan to enable it
-                        if ch.disabled or ch.no_ir:
-                            if verbose:
-                                if ch.disabled:
-                                    self.log.warning(
-                                        "Channel is disabled for %s (%s)",
-                                        ch.ch,
-                                        ch.freq,
-                                    )
-                                if ch.no_ir:
-                                    self.log.warning(
-                                        "No IR found in iw channel information for %s (%s) which _may_ cause packet injection to fail! Problem with discovery? Try a different channel / frequency. Confirm we're beaconing via OTA capture from a different interface or device.",
-                                        ch.ch,
-                                        ch.freq,
-                                    )
-                            return True
+                    if int(freq) == int(ch.freq) and (ch.disabled or ch.no_ir):
+                        if verbose:
+                            if ch.disabled:
+                                self.log.warning(
+                                    "Channel is disabled for %s (%s)",
+                                    ch.ch,
+                                    ch.freq,
+                                )
+                            if ch.no_ir:
+                                self.log.warning(
+                                    "No IR found in iw channel information for %s (%s) which _may_ cause packet injection to fail! Problem with discovery? Try a different channel / frequency. Confirm we're beaconing via OTA capture from a different interface or device.",
+                                    ch.ch,
+                                    ch.freq,
+                                )
+                        return True
         return False
 
-    def stage_interface(self) -> None:
-        """Prepare the interface for monitor mode and injection"""
+    def stage_interface_fakeap(self) -> None:
+        """Prepare the interface for fakeAP monitor mode and injection"""
+        import shutil
+
         # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
-        try:
-            wpa_cli_version = run_command(["wpa_cli", "-v"])
-            self.log.debug(
-                "wpa_cli version is %s",
-                wpa_cli_version.splitlines()[0].replace("wpa_cli ", ""),
-            )
-            wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
-            self.log.debug("running '%s'", wpa_cli_cmd)
-            run_command(wpa_cli_cmd)
-            self.log.debug("finished with '%s'", wpa_cli_cmd)
-        except FileNotFoundError:
-            self.log.warning("wpa_cli not present")
+
+        # Only try wpa_cli if wpa_supplicant is present
+        if shutil.which("wpa_supplicant") is not None:
+            try:
+                wpa_cli_version = run_command(["wpa_cli", "-v"])
+                self.log.debug(
+                    "wpa_cli version is %s",
+                    wpa_cli_version.splitlines()[0].replace("wpa_cli ", ""),
+                )
+                wpa_cli_cmd = ["wpa_cli", "-i", f"{self.name}", "terminate"]
+                self.log.debug("running '%s'", wpa_cli_cmd)
+                run_command(wpa_cli_cmd)
+                self.log.debug("finished with '%s'", wpa_cli_cmd)
+            except FileNotFoundError:
+                self.log.warning(
+                    "wpa_cli not found but wpa_supplicant is installed - may cause interface staging issues"
+                )
+        else:
+            self.log.debug("wpa_supplicant not installed, skipping wpa_cli termination")
 
         ip_version = run_command(["ip", "-V"])
         if ip_version:
@@ -344,8 +369,189 @@ class Interface:
 
         self.log.debug("finish stage_interface")
 
+    def is_up(self, iface="") -> bool:
+        """Check if interface has the UP flag set"""
+        if not iface:
+            iface = self.name
+        try:
+            res = run_command(["ip", "-j", "link", "show", iface])
+            import json
+
+            data = json.loads(res)
+            if data and "UP" in data[0].get("flags", []):
+                return True
+        except Exception:
+            pass
+        return False
+
+    def stage_interface_hostapd(self) -> None:
+        """Prepare the interface for hostapd AP mode"""
+        self.log.debug("start stage_interface_hostapd")
+
+        # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
+        # We need to scan to unlock channels and remove NO IR flags
+        # The scan must NOT specify a frequency - we need a blanket scan
+        # across all frequencies to properly unlock the regulatory domain
+        scan_cmds = [
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
+            ["ip", "link", "set", f"{self.name}", "up"],
+            ["iw", f"{self.name}", "scan"],  # Triggers LAR update (no freq param!)
+        ]
+
+        # Run LAR scan
+        for cmd in scan_cmds:
+            self.log.debug("run: %s", " ".join(cmd))
+            if "scan" in cmd:
+                run_command(cmd, suppress_output=True)
+            else:
+                run_command(cmd)
+
+        # Set primary interface to AP mode
+        cmds = [
+            ["iw", "dev", f"{self.name}", "set", "type", "__ap"],
+            ["ip", "link", "set", f"{self.name}", "up"],
+        ]
+
+        # Explicitly remove existing monitor vif if it already exists
+        with contextlib.suppress(Exception):
+            subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
+
+        # Create monitor interface on same phy if needed
+        if self.requires_vif:
+            cmds.extend(
+                [
+                    [
+                        "iw",
+                        "phy",
+                        f"{self.phy}",
+                        "interface",
+                        "add",
+                        f"{self.mon}",
+                        "type",
+                        "monitor",
+                    ],
+                    ["ip", "link", "set", f"{self.mon}", "up"],
+                    # NOTE: We do NOT set monitor vif frequency here for hostapd mode.
+                    # The monitor vif will automatically inherit the channel/bandwidth
+                    # from the primary interface once hostapd starts. Setting it here
+                    # to HT20 conflicts with hostapd's HT80 configuration and causes
+                    # "Beacon set failed: -22 (Invalid argument)" errors.
+                ]
+            )
+
+        # Run the staging commands
+        for cmd in cmds:
+            self.log.debug("run: %s", " ".join(cmd))
+            stdout = run_command(cmd).strip()
+            if stdout and "not supported" in stdout:
+                raise InterfaceError(
+                    f"{self.name} does not support required interface types"
+                )
+            # Short sleep between commands to allow driver to process
+            time.sleep(0.1)
+
+        # Verify monitor interface is up
+        if self.requires_vif:
+            self.mode = self.get_mode(iface=self.mon)
+            if "monitor" not in self.mode:
+                raise InterfaceError(
+                    f"monitor interface {self.mon} not in monitor mode"
+                )
+
+            # Log monitor interface state for debugging
+            # Note: Monitor interfaces typically report "unknown" operstate, which is normal
+            operstate = self.get_operstate(iface=self.mon)
+            self.log.debug(
+                "monitor interface %s created (operstate: %s)",
+                self.mon,
+                operstate,
+            )
+
+        # NOTE: We do NOT bring the primary interface UP here.
+        # hostapd will manage its state. Bringing it UP manually causes
+        # "Name not unique on network" errors and crashes on some hardware.
+
+        self.log.debug("finish stage_interface_hostapd")
+
+    def stage_interface_listen_only(self) -> None:
+        """Prepare the interface for passive monitor mode (no TX/injection)"""
+        self.log.debug("start stage_interface_listen_only")
+
+        # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
+        # We need to scan to unlock channels and remove NO IR flags
+        scan_cmds = [
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
+            ["ip", "link", "set", f"{self.name}", "up"],
+            ["iw", f"{self.name}", "scan"],  # Triggers LAR update
+        ]
+
+        # Run LAR scan
+        for cmd in scan_cmds:
+            self.log.debug("run: %s", " ".join(cmd))
+            if "scan" in cmd:
+                run_command(cmd, suppress_output=True)
+            else:
+                run_command(cmd)
+
+        # Explicitly remove existing monitor vif if it already exists
+        with contextlib.suppress(Exception):
+            subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
+
+        # Create monitor interface for passive sniffing
+        if self.requires_vif:
+            cmds = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                [
+                    "iw",
+                    "phy",
+                    f"{self.phy}",
+                    "interface",
+                    "add",
+                    f"{self.mon}",
+                    "type",
+                    "monitor",
+                ],
+                ["ip", "link", "set", f"{self.mon}", "up"],
+                ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
+            ]
+        else:
+            # Driver doesn't support VIF (e.g., 88XXau) - put main interface in monitor mode
+            cmds = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+            ]
+
+        # Run the staging commands
+        for cmd in cmds:
+            self.log.debug("run: %s", " ".join(cmd))
+            stdout = run_command(cmd).strip()
+            if stdout and "not supported" in stdout:
+                raise InterfaceError(
+                    f"{self.name} does not support required interface types"
+                )
+            time.sleep(0.1)
+
+        # Verify monitor interface is in monitor mode
+        mon_iface = self.mon if self.requires_vif else self.name
+        self.mode = self.get_mode(iface=mon_iface)
+        if "monitor" not in self.mode:
+            raise InterfaceError(f"interface {mon_iface} not in monitor mode")
+
+        # Check for No IR or disabled channels
+        self.check_for_disabled_or_noir_channels(
+            self.frequency,
+            run_command(["iw", "phy", f"{self.phy}", "channels"]),
+            verbose=True,
+        )
+
+        self.log.debug("finish stage_interface_listen_only")
+
     @staticmethod
-    def get_channels_status(iw_phy_channels) -> Dict:
+    def get_channels_status(iw_phy_channels) -> dict:
         """Run `iw phy phyX channels` and analyze channel information"""
         log = logging.getLogger(inspect.stack()[0][3])
         if not iw_phy_channels or "command failed" in iw_phy_channels:
@@ -404,13 +610,12 @@ class Interface:
 
     def checks(self, staged=False) -> None:
         """Perform self checks and warn as neccessary"""
-        if self.no_interface_prep or staged:
-            if "monitor" not in self.mode:
-                self.log.warning(
-                    "%s mode is in %s mode when we expected monitor mode",
-                    self.name,
-                    self.mode,
-                )
+        if self.no_interface_prep or staged and "monitor" not in self.mode:
+            self.log.warning(
+                "%s mode is in %s mode when we expected monitor mode",
+                self.name,
+                self.mode,
+            )
 
         if self.no_interface_prep or staged:
             name = self.name
@@ -427,24 +632,46 @@ class Interface:
 
     def check_interface_stack(self, interface: str) -> str:
         """Check that the interface we've been asked to run on actually exists and has an mac80211 stack"""
+        all_interfaces = []
         discovered_interfaces = []
+
         for iface in os.listdir("/sys/class/net"):
             iface_path = os.path.join("/sys/class/net", iface)
-            # ieee80211
-            # device_path = os.path.join(iface_path, "device")
             if os.path.isdir(iface_path):
+                all_interfaces.append(iface)
                 if "phy80211" in os.listdir(iface_path):
                     discovered_interfaces.append(iface)
+
+        if interface not in all_interfaces:
+            if discovered_interfaces:
+                self.log.error(
+                    "%s interface does not exist. Available wireless interfaces: %s",
+                    interface,
+                    ", ".join(discovered_interfaces),
+                )
+            else:
+                self.log.error(
+                    "%s interface does not exist and no wireless interfaces found on system",
+                    interface,
+                )
+            raise InterfaceError(f"{interface} interface not found")
+
         if interface not in discovered_interfaces:
-            self.log.warning(
-                "%s interface does not support the mac80211 stack. here are some interfaces which do: %s",
-                interface,
-                ", ".join(discovered_interfaces),
-            )
-            raise InterfaceError(f"{interface} is not detected as a valid interface")
-        else:
-            self.log.debug("%s has a mac80211 stack", interface)
-            return interface
+            if discovered_interfaces:
+                self.log.error(
+                    "%s exists but does not support the mac80211 stack. Available wireless interfaces: %s",
+                    interface,
+                    ", ".join(discovered_interfaces),
+                )
+            else:
+                self.log.error(
+                    "%s exists but does not support the mac80211 stack and no wireless interfaces found on system",
+                    interface,
+                )
+            raise InterfaceError(f"{interface} is not a valid wireless interface")
+
+        self.log.debug("%s has a mac80211 stack", interface)
+        return interface
 
     def log_debug(self) -> None:
         """Send debug information to logger"""
@@ -530,6 +757,9 @@ class Interface:
             device = run_command(
                 ["cat", f"/sys/class/net/{iface}/device/device"]
             ).strip()
+            # Remove 0x prefix if present (sysfs returns IDs as 0x8086, lspci expects 8086)
+            vendor = vendor.replace("0x", "")
+            device = device.replace("0x", "")
             chipset = run_command(["lspci", "-d", f"{vendor}:{device}", "-q"])
             chipset = chipset.split(":")[2].strip().splitlines()[0]
             chipset = self.cleanup_chipset(chipset)
@@ -621,90 +851,97 @@ class Interface:
         return operstate.strip().lower()
 
     @staticmethod
-    def build_iw_phy_list(iw_devs) -> List:
-        """Create map of phy to iface"""
-        log = logging.getLogger(inspect.stack()[0][3])
+    def build_iw_phy_list() -> list:
+        """Create map of phy to iface using /sys filesystem"""
         iface = namedtuple("iface", ["name", "ifindex", "addr", "type"])
         phy = namedtuple("phy", ["phy_id", "interfaces"])
         phys = []
-        ifaces = []
-        first_phy = True
 
-        # init vars
-        phy_id = ""
-        iface_name = ""
-        ifindex = ""
-        addr = ""
-        _type = ""
-        for line, is_last_line in flag_last_object(iw_devs.splitlines()):
-            # first phy
-            line = line.strip().lower()
-            if first_phy:
-                # if iw dev resp is empty return
-                if is_last_line:
-                    return []
-                # phy#0
-                if line.startswith("phy#"):
-                    first_phy = False
-                    phy_id = line.split("#")[1]
-                    continue
-            # Interface mon0
-            if line.startswith("interface "):
-                if "unnamed" in line or "non-netdev" in line:
-                    log.debug("skipping %s in phy%s detection", line, phy_id)
-                    continue
-                if iface_name:
-                    ifaces.append(iface(iface_name, ifindex, addr, _type))
-                iface_name = line.split(" ")[1]
-                continue
-            # ifindex 4
-            if line.startswith("ifindex "):
-                ifindex = line.split(" ")[1]
-                continue
-            # addr d8:f8:83:12:24:07
-            if line.startswith("addr "):
-                addr = line.split(" ")[1]
-                continue
-            # type managed
-            if line.startswith("type "):
-                _type = line.split(" ")[1]
-                continue
-            if line.startswith("phy#"):
-                ifaces.append(iface(iface_name, ifindex, addr, _type))
-                phys.append(phy(phy_id, ifaces))
-                # reset vars
-                phy_id = ""
-                iface_name = ""
-                ifaces = []
-                ifindex = ""
-                addr = ""
-                _type = ""
-                # new phy
-                phy_id = line.split("#")[1].strip()
+        # Build mapping from phy_id to interfaces using /sys
+        phy_to_interfaces = {}
 
-            # last phy
-            if is_last_line:
-                ifaces.append(iface(iface_name, ifindex, addr, _type))
-                phys.append(phy(phy_id, ifaces))
+        # Iterate over all network interfaces in /sys/class/net
+        try:
+            for iface_name in os.listdir("/sys/class/net"):
+                iface_path = os.path.join("/sys/class/net", iface_name)
+                if not os.path.isdir(iface_path):
+                    continue
+
+                # Check if this is a wireless interface (has phy80211)
+                phy80211_path = os.path.join(iface_path, "phy80211")
+                if not os.path.exists(phy80211_path):
+                    continue
+
+                # Get phy index from /sys/class/net/<iface>/phy80211/index
+                phy_index_path = os.path.join(phy80211_path, "index")
+                try:
+                    with open(phy_index_path, "r") as f:
+                        phy_id = f.read().strip()
+                except (IOError, OSError):
+                    continue
+
+                # Get ifindex
+                ifindex_path = os.path.join(iface_path, "ifindex")
+                try:
+                    with open(ifindex_path, "r") as f:
+                        ifindex = f.read().strip()
+                except (IOError, OSError):
+                    ifindex = ""
+
+                # Get MAC address
+                addr_path = os.path.join(iface_path, "address")
+                try:
+                    with open(addr_path, "r") as f:
+                        addr = f.read().strip()
+                except (IOError, OSError):
+                    addr = ""
+
+                # Get interface type/mode from /sys/class/net/<iface>/type
+                type_path = os.path.join(iface_path, "type")
+                iface_type = "unknown"
+                try:
+                    with open(type_path, "r") as f:
+                        type_val = f.read().strip()
+                        type_int = int(type_val)
+                        if type_int == 1:
+                            iface_type = "managed"
+                        elif type_int in (801, 802, 803):
+                            iface_type = "monitor"
+                except (IOError, OSError, ValueError):
+                    pass
+
+                # Create iface tuple and add to mapping
+                interface = iface(iface_name, ifindex, addr, iface_type)
+                if phy_id not in phy_to_interfaces:
+                    phy_to_interfaces[phy_id] = []
+                phy_to_interfaces[phy_id].append(interface)
+        except OSError:
+            pass
+
+        # Convert mapping to list of phy namedtuples
+        for phy_id, interfaces in phy_to_interfaces.items():
+            phys.append(phy(phy_id, interfaces))
+
         return phys
 
     def get_phy_id(self) -> str:
         """Check and determines the phy# for the interface name of this object"""
-        self.phys = self.build_iw_phy_list(run_command(["iw", "dev"]))
-        # self.log.debug("phys: %s", self.phys)
-        phy_id = ""
-        for phy in self.phys:
-            for iface in phy.interfaces:
-                if self.name in iface.name:
-                    self.log.debug("phy%s maps to provided %s", phy.phy_id, iface.name)
-                    phy_id = phy.phy_id
-        return phy_id
+        # Read phy index directly from /sys
+        phy_index_path = f"/sys/class/net/{self.name}/phy80211/index"
+        try:
+            with open(phy_index_path, "r") as f:
+                phy_id = f.read().strip()
+            self.log.debug("phy%s maps to provided %s", phy_id, self.name)
+            return phy_id
+        except (IOError, OSError) as e:
+            self.log.debug("Could not read phy index from %s: %s", phy_index_path, e)
+            return ""
 
     def get_mode(self, iface="") -> str:
         """Get the current mode of the interface {unknown/managed/monitor}"""
         if not iface:
             iface = self.name
-        _interface_type: "str" = run_command(["cat", f"/sys/class/net/{iface}/type"])
+        _interface_type: str = run_command(["cat", f"/sys/class/net/{iface}/type"])
         mode = "unknown"
         try:
             _type = int(_interface_type)
@@ -712,9 +949,7 @@ class Interface:
             return mode
         if _type == 1:
             mode = "managed"
-        elif _type == 801:
-            mode = "monitor"
-        elif _type == 802:
+        elif _type == 801 or _type == 802:
             mode = "monitor"
         elif (
             _type == 803

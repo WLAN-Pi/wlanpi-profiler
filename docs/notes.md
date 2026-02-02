@@ -1,5 +1,4 @@
-
-# notes (mostly appendix/misc)
+# Notes (mostly appendix/misc)
 
 ## scapy canvas_dump fun
 

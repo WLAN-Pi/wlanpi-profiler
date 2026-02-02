@@ -1,2 +1,5 @@
 scapy
 manuf2
+jinja2
+pytest==8.4.2 # Required for on-device hardware tests (profiler test)
+iniconfig==2.1.0  # Pin to 2.1.0 for Python 3.9 compatibility

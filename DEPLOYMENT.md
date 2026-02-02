@@ -1,6 +1,6 @@
 # Releases
 
-wlanpi-profiler releases are handled through Github workflows and leverage `https://apt.fury.io/dfinimundi/Packages` until we find a new home.
+wlanpi-profiler releases are handled through Github workflows and are now uploaded to Packagecloud.
 
 There are two workflows defined.
 
@@ -8,7 +8,7 @@ There are two workflows defined.
 
 2. When a push to `<repo>/debian/changelog` is made, the workflow will build the debian package, create an artifact, upload artifact to Github, and finaly upload the package to the repository.
 
-## Workflow Process
+## Workflow process
 
 ### debian packaging
 
@@ -79,7 +79,6 @@ Set per session:
 
 Set to take effect at shell login via `~/.profile`
 
-
 ```bash
 # vim ~/.profile
 # append the following:
@@ -92,7 +91,6 @@ export DEBEMAIL="Josh Schmelzle <josh@joshschmelzle.com>"
 For more information on debchange review the manpages by running `man debchange` from your terminal.
 
 Additionally review the [Debian maintainers guide Chapter 8](https://www.debian.org/doc/manuals/maint-guide/update.en.html).
-
 
 ## APPENDIX
 

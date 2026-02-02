@@ -1,0 +1,67 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -530,6 +530,64 @@ static u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
+ 		wpabuf_put_u8(buf, hostapd_get_mld_id(hapd));
+ 	}
+ 
++	/* WLAN Pi Profiler: Add synthetic Per-STA Profile when configured with Link ID override */
++	/* This creates a fake "affiliated link" (Link 0) when we advertise as Link 1 */
++	if (hapd->iconf->mld_link_id_set && 
++	    hapd->iconf->mld_link_id_override != 0 &&
++	    (!mld_info || hapd->mld->num_links == 1)) {
++		u16 control;
++		u8 target_link_id = 0;  /* We're Link 1, create profile for Link 0 */
++		
++		wpa_printf(MSG_DEBUG,
++			   "PROFILER: Adding synthetic Per-STA Profile for Link ID %d",
++			   target_link_id);
++		
++		/* Per-STA Profile subelement */
++		wpabuf_put_u8(buf, 0x00);  /* Subelement ID: Per-STA Profile */
++		wpabuf_put_u8(buf, 23);     /* Subelement Length (matches BearCentral) */
++		
++		/* STA Control - matches BearCentral: 0x0160 */
++		/* Bits 0-3: Link ID = 0 */
++		/* Bit 4: Complete Profile = 0 */
++		/* Bit 5: MAC Address Present = 1 */
++		/* Bit 6: Beacon Interval Present = 1 */
++		/* Bit 7: TSF Offset Present = 0 */
++		/* Bit 8: DTIM Info Present = 1 */
++		/* Bit 9: NSTR Link Pair Present = 0 */
++		/* Bit 10-11: NSTR Bitmap Size = 0 */
++		/* Bit 12: BSS Parameters Change Count Present = 0 */
++		control = (target_link_id & 0xf) |  /* Link ID = 0 */
++			  (1 << 5) |                     /* MAC Address Present */
++			  (1 << 6) |                     /* Beacon Interval Present */
++			  (1 << 8);                      /* DTIM Info Present */
++		wpabuf_put_le16(buf, control);
++		
++		/* STA Info Length = 11 bytes (MAC + Beacon Interval + DTIM Info) */
++		wpabuf_put_u8(buf, 11);
++		
++		/* STA MAC Address - use MLD MAC address for affiliated link */
++		wpabuf_put_data(buf, hapd->mld->mld_addr, ETH_ALEN);
++		
++		/* Beacon Interval - use same as current BSS */
++		wpabuf_put_le16(buf, hapd->iconf->beacon_int);
++		
++		/* DTIM Info */
++		wpabuf_put_u8(buf, 0);  /* DTIM Count = 0 */
++		wpabuf_put_u8(buf, hapd->conf->dtim_period);  /* DTIM Period */
++		
++		/* Capabilities Information - matches BearCentral: 0x1111 */
++		/* Bit 0: ESS = 1 */
++		/* Bit 4: Privacy = 1 */
++		/* Bit 8: Spectrum Management = 1 */
++		wpabuf_put_le16(buf, 0x1111);
++		
++		wpa_printf(MSG_DEBUG,
++			   "PROFILER: Synthetic Per-STA Profile added: "
++			   "Link %d, MAC " MACSTR ", Beacon Int %d, DTIM %d",
++			   target_link_id, MAC2STR(hapd->mld->mld_addr),
++			   hapd->iconf->beacon_int, hapd->conf->dtim_period);
++	}
++
+ 	if (!mld_info)
+ 		goto out;
+ 

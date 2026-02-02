@@ -1,0 +1,19 @@
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -831,6 +831,16 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
+ 	int res, n_chans, n_chans1, start_chan_idx, start_chan_idx1;
+ 	int skip_radar = 0;
+ 
++	/*
++	 * WLAN Pi Profiler: Bypass all DFS handling
++	 * This allows testing on any channel without DFS radar detection delays.
++	 * Return 1 = "no DFS needed, continue with AP setup"
++	 * WARNING: For testing only. May violate regulations on DFS channels.
++	 */
++	wpa_printf(MSG_DEBUG, "PROFILER: DFS handling bypassed");
++	return 1;
++
++	/* Original DFS code follows (disabled) */
+ 	if (is_6ghz_freq(iface->freq))
+ 		return 1;
+ 

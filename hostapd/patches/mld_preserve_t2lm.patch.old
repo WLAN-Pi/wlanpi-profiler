@@ -1,0 +1,20 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -516,8 +516,14 @@ static u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
+ 	mld_cap |= active_links & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
+ 
+ 	/* TODO: Advertise T2LM based on driver support as well */
+-	mld_cap &= ~EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_NEG_SUPP_MSK;
+-
++	/* WLAN Pi Profiler: Don't clear T2LM if explicitly set in config */
++	if (!hapd->iconf->mld_mld_capa_set ||
++	    !(hapd->iconf->mld_mld_capa_override & EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_NEG_SUPP_MSK)) {
++		/* Only clear if not set by profiler config */
++		mld_cap &= ~EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_NEG_SUPP_MSK;
++	} else {
++		wpa_printf(MSG_DEBUG, "PROFILER: Preserving T2LM negotiation bits: 0x%x",
++			   mld_cap & EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_NEG_SUPP_MSK);
++	}
+ 	wpa_printf(MSG_DEBUG, "MLD: MLD Capabilities and Operations=0x%x",
+ 		   mld_cap);
+ 	wpabuf_put_le16(buf, mld_cap);

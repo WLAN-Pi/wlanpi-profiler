@@ -18,7 +18,13 @@ try:
 except FileNotFoundError:
     readme = about["__description__"]
 
-packages = ["profiler"]
+packages = [
+    "profiler",
+    "profiler.tests",
+    "profiler.tests.hardware",
+    "profiler.tests.hardware.ondevice",
+]
+
 
 def parse_requires(_list):
     requires = list()
@@ -30,16 +36,21 @@ def parse_requires(_list):
     requires = list(filter(None, requires))  # remove "" from list
     return requires
 
+
 with open("extras.txt") as f:
     testing = f.read().splitlines()
 
 testing = parse_requires(testing)
 
-extras = {"testing": testing}
+extras = {
+    "testing": testing,
+    "test": testing,  # Alias for debian packaging
+    "all": testing,  # Include all extras
+}
 
 with open("requirements.txt") as f:
     requires = f.read().splitlines()
-    
+
 requires = parse_requires(requires)
 
 setup(

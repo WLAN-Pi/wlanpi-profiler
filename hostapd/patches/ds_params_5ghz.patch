@@ -1,0 +1,14 @@
+--- a/src/ap/beacon.c
++++ b/src/ap/beacon.c
+@@ -329,10 +329,7 @@ static size_t hostapd_eid_ht_operation_len(struct hostapd_hw_modes *mode)
+ static u8 * hostapd_eid_ds_params(struct hostapd_data *hapd, u8 *eid)
+ {
+ 	enum hostapd_hw_mode hw_mode = hapd->iconf->hw_mode;
+-
+-	if (hw_mode != HOSTAPD_MODE_IEEE80211G &&
+-	    hw_mode != HOSTAPD_MODE_IEEE80211B)
+-		return eid;
++	/* WLAN Pi Profiler: Add DS Parameter Set for all bands including 5 GHz */
+ 
+ 	*eid++ = WLAN_EID_DS_PARAMS;
+ 	*eid++ = 1;

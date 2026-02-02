@@ -1,0 +1,58 @@
+--- a/src/ap/ieee802_11_ht.c
++++ b/src/ap/ieee802_11_ht.c
+@@ -40,8 +40,53 @@
+ 	os_memcpy(cap->supported_mcs_set, hapd->iface->current_mode->mcs_set,
+ 		  16);
+ 
+-	/* TODO: ht_extended_capabilities (now fully disabled) */
+-	/* TODO: tx_bf_capability_info (now fully disabled) */
++	/* WLAN Pi Profiler: Override HT MCS to advertise 4 spatial streams */
++	static int profiler_ht_4ss_logged = 0;
++	if (!profiler_ht_4ss_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Advertising HT 4 SS support");
++		profiler_ht_4ss_logged = 1;
++	}
++	cap->supported_mcs_set[0] = 0xff;  /* MCS 0-7 (SS1) */
++	cap->supported_mcs_set[1] = 0xff;  /* MCS 8-15 (SS2) */
++	cap->supported_mcs_set[2] = 0xff;  /* MCS 16-23 (SS3) */
++	cap->supported_mcs_set[3] = 0xff;  /* MCS 24-31 (SS4) */
++
++	/* WLAN Pi Profiler: Enable HT Extended Capabilities */
++	/* Bit 0: PCO, Bit 1: PCO Transition Time (01b = 400us), Bit 10: HT-Delayed BA */
++	cap->ht_extended_capabilities = host_to_le16(
++		(1 << 0) |  /* PCO */
++		(1 << 1) |  /* PCO Transition Time bit 0 (01b = 400us) */
++		(1 << 10)   /* HT-Delayed Block Ack */
++	);
++
++	/* WLAN Pi Profiler: Enable ALL HT Transmit Beamforming capabilities for profiling */
++	u32 txbf_cap = 0;
++	txbf_cap |= (1 << 0);   /* Implicit TxBF Receiving Capable */
++	txbf_cap |= (1 << 1);   /* Receive Staggered Sounding Capable */
++	txbf_cap |= (1 << 2);   /* Transmit Staggered Sounding Capable */
++	txbf_cap |= (1 << 3);   /* Receive NDP Capable */
++	txbf_cap |= (1 << 4);   /* Transmit NDP Capable */
++	txbf_cap |= (1 << 5);   /* Implicit TxBF Capable */
++	txbf_cap |= (3 << 6);   /* Calibration: 0b11 = Respond & Initiate */
++	txbf_cap |= (1 << 8);   /* Explicit CSI TxBF Capable */
++	txbf_cap |= (1 << 9);   /* Explicit Noncompressed Steering Capable */
++	txbf_cap |= (1 << 10);  /* Explicit Compressed Steering Capable */
++	txbf_cap |= (3 << 11);  /* Explicit CSI Feedback: 0b11 = Immediate & Unsolicited */
++	txbf_cap |= (3 << 13);  /* Explicit Uncompressed Steering Matrix Feedback */
++	txbf_cap |= (3 << 15);  /* Explicit Compressed Steering Matrix Feedback */
++	txbf_cap |= (3 << 17);  /* Minimal Grouping: 0b11 = No Grouping */
++	txbf_cap |= (3 << 19);  /* CSI Number of Beamformer Antennas: 0b11 = 4 antennas */
++	txbf_cap |= (3 << 21);  /* Uncompressed Steering Matrix Beamformer Antennas: 4 ant */
++	txbf_cap |= (3 << 23);  /* Compressed Steering Matrix Beamformer Antennas: 4 ant */
++	txbf_cap |= (3 << 25);  /* CSI Max Number of Rows Beamformer Supported: 4 rows */
++	txbf_cap |= (3 << 27);  /* Channel Estimation Capability: 0b11 = 4 space-time streams */
++	cap->tx_bf_capability_info = host_to_le32(txbf_cap);
++	static int profiler_ht_txbf_logged = 0;
++	if (!profiler_ht_txbf_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Enabled HT TxBF capabilities: 0x%08x", txbf_cap);
++		profiler_ht_txbf_logged = 1;
++	}
++
+ 	/* TODO: asel_capabilities (now fully disabled) */
+ 
+  	pos += sizeof(*cap);

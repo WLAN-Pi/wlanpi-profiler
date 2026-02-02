@@ -1,3 +1,10 @@
 include profiler/config.ini
 include extras.txt
 include requirements.txt
+include pytest.ini
+recursive-include profiler/templates *.j2
+include profiler/templates/README.md
+recursive-include profiler/tests/hardware/ondevice *.py
+include profiler/tests/conftest.py
+include profiler/tests/hardware/__init__.py
+include profiler/tests/__init__.py

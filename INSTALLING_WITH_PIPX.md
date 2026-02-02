@@ -1,5 +1,7 @@
 # Installing `wlanpi-profiler` using pipx
 
+NOTE: THIS IS AN MAINTAINED DOCUMENT PRESERVED FOR HISTORY
+
 It is possible to install `profiler` outside of the WLAN Pi ecosystem on distributions such as Debian or Ubuntu using the `pipx` package manager. There are some tradeoffs, but the core profiler features will still work.
 
 Assumptions:

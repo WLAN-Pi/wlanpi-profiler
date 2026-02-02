@@ -1,0 +1,147 @@
+# Hostapd Configuration for wlanpi-profiler
+# Band: 5 GHz
+# Generated: {{ generation_timestamp }}
+
+# Interface Configuration
+interface={{ interface }}
+driver=nl80211
+ctrl_interface=/var/run/wlanpi-profiler/hostapd
+ctrl_interface_group=0
+
+# Basic AP Parameters
+ssid={{ ssid }}
+hw_mode={{ hw_mode }}
+channel={{ channel }}
+country_code={{ country_code }}
+beacon_int=102
+beacon_rate=120
+
+# Security Configuration
+wpa=2
+wpa_key_mgmt={{ wpa_key_mgmt }}
+
+{% if wpa3_enabled %}
+sae_password={{ passphrase }}
+sae_pwe=2
+{% endif %}
+wpa_passphrase={{ passphrase }}
+{% if wpa3_enabled %}
+wpa_pairwise=CCMP GCMP-256
+rsn_pairwise=CCMP GCMP-256
+{% else %}
+wpa_pairwise=CCMP
+rsn_pairwise=CCMP
+{% endif %}
+
+# 802.11w (Management Frame Protection)
+ieee80211w=1
+
+# Interworking (802.11u) for comprehensive capability advertising
+interworking=1
+access_network_type=0
+internet=1
+
+{% if ft_enabled %}
+# 802.11r (Fast Transition)
+nas_identifier=wlanpi-profiler.local
+mobility_domain={{ mobility_domain }}
+ft_over_ds=0
+ft_psk_generate_local=1
+pmk_r1_push=0
+reassociation_deadline=1000
+
+{% endif %}
+# HT Capabilities (802.11n)
+{% if ieee80211n_enabled %}
+ieee80211n=1
+ht_capab=[LDPC][HT40+][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][MAX-AMSDU-7935]
+{% else %}
+ieee80211n=0
+{% endif %}
+
+# VHT Capabilities (802.11ac) - Maximum
+{% if ieee80211ac_enabled %}
+ieee80211ac=1
+vht_oper_chwidth={{ vht_oper_chwidth }}
+vht_oper_centr_freq_seg0_idx={{ vht_oper_centr_freq_seg0_idx }}
+vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1][SU-BEAMFORMER][SU-BEAMFORMEE][BF-ANTENNA-4][SOUNDING-DIMENSION-4][MU-BEAMFORMER][MU-BEAMFORMEE][MAX-A-MPDU-LEN-EXP7]
+{% else %}
+ieee80211ac=0
+{% endif %}
+
+# HE Capabilities (802.11ax / Wi-Fi 6)
+{% if ieee80211ax_enabled %}
+ieee80211ax=1
+he_su_beamformer=1
+he_mu_beamformer=1
+he_oper_chwidth={{ he_oper_chwidth }}
+he_oper_centr_freq_seg0_idx={{ he_oper_centr_freq_seg0_idx }}
+
+# HE Spatial Reuse Parameter Set
+he_spr_sr_control=5
+he_spr_non_srg_obss_pd_max_offset=20
+{% else %}
+ieee80211ax=0
+{% endif %}
+
+# EHT Capabilities (802.11be / Wi-Fi 7)
+{% if ieee80211be_enabled %}
+ieee80211be=1
+eht_su_beamformer=1
+eht_su_beamformee=1
+eht_mu_beamformer=1
+eht_oper_chwidth={{ eht_oper_chwidth }}
+eht_oper_centr_freq_seg0_idx={{ eht_oper_centr_freq_seg0_idx }}
+
+# AP MLD (Multi-Link Device) - Enable to advertise MLE even on single-band AP
+# This allows profiling Wi-Fi 7 clients' full MLE capabilities
+mld_ap=1
+
+# Use physical MAC address as BSSID
+bssid={{ mac_address }}
+
+# EML Capabilities - Enhanced Multi-Link capabilities
+# Enable EMLSR (Enhanced Multi-Link Single Radio) support
+emlsr_support=1
+# Enable EMLMR (Enhanced Multi-Link Multi Radio) support  
+emlmr_support=1
+
+# MLD Capabilities
+# Maximum number of simultaneous links (match/exceed reference AP)
+mld_max_num_links=2
+
+# MLD Link ID Override (0-15) - Set to 1 to match reference APs
+mld_link_id=1
+
+# MLD Transition Timeout (0-7) - Value 4 encodes to timeout=8 in EML caps
+mld_transition_timeout=4
+
+# TID-To-Link Mapping Negotiation (0-3) - 3 = DL and UL T2LM support
+mld_tid_to_link_negotiation=3
+
+# EHT NSS Override
+# Override number of spatial streams advertised in EHT-MCS maps (1-8)
+eht_nss_override=4
+{% else %}
+ieee80211be=0
+{% endif %}
+
+# 802.11k/v
+rrm_neighbor_report=1
+rrm_beacon_report=1
+bss_transition=1
+
+# WMM
+wmm_enabled=1
+
+# Vendor-Specific Information Element
+# OUI: 31:41:59 (π digits) - WLAN Pi Profiler version advertisement
+# Format: DD<len>314159<data> where data contains TLVs for profiler/system version
+# This allows clients to see the profiler version in beacon frames
+{% if vendor_elements %}
+vendor_elements={{ vendor_elements }}
+{% endif %}
+
+# Logging
+logger_stdout=-1
+logger_stdout_level=2

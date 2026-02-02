@@ -12,7 +12,6 @@ import logging.config
 import os
 import platform
 import struct
-import sys
 import zlib
 import textwrap
 
@@ -22,7 +21,7 @@ __version__ = "1"
 
 
 def setup_logger(args) -> logging.Logger:
-    """ Configure and set logging levels """
+    """Configure and set logging levels"""
     if args.logging:
         if args.logging == "debug":
             logging_level = logging.DEBUG
@@ -51,7 +50,7 @@ def setup_logger(args) -> logging.Logger:
 
 
 def setup_parser() -> argparse:
-    """ Set default values and handle arg parser """
+    """Set default values and handle arg parser"""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
@@ -113,7 +112,6 @@ def anonymize_file(input_file: str, output_file: str) -> None:
     logger = logging.getLogger(inspect.stack()[0][3])
     logger.info(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     with PcapReader(input_file) as reader:
-
         writer = PcapWriter(output_file, sync=True)
 
         ssid_number = 0

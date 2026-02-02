@@ -1,0 +1,64 @@
+--- a/src/ap/ieee802_11_he.c
++++ b/src/ap/ieee802_11_he.c
+@@ -139,6 +139,17 @@
+ 		os_memcpy(&cap->optional[mcs_nss_size],
+ 			  mode->he_capab[opmode].ppet,  ppet_size);
+ 
++	/* WLAN Pi Profiler: Enable advanced HE MAC capabilities for profiling */
++	cap->he_mac_capab_info[0] |= (1 << 1);  /* Bit 1: TWT Requester */
++	cap->he_mac_capab_info[0] |= (1 << 2);  /* Bit 2: TWT Responder */
++	cap->he_mac_capab_info[5] |= (1 << 1);  /* Bit 41: Dynamic SM Power Save */
++	cap->he_mac_capab_info[5] |= (1 << 2);  /* Bit 42: Punctured Sounding Support */
++	static int profiler_he_mac_logged = 0;
++	if (!profiler_he_mac_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Enabled HE MAC caps: TWT Requester/Responder, Dynamic SM Power Save, Punctured Sounding");
++		profiler_he_mac_logged = 1;
++	}
++
+ 	if (hapd->iface->conf->he_phy_capab.he_su_beamformer)
+ 		cap->he_phy_capab_info[HE_PHYCAP_SU_BEAMFORMER_CAPAB_IDX] |=
+ 			HE_PHYCAP_SU_BEAMFORMER_CAPAB;
+@@ -160,8 +171,30 @@
+ 		cap->he_phy_capab_info[HE_PHYCAP_MU_BEAMFORMER_CAPAB_IDX] &=
+ 			~HE_PHYCAP_MU_BEAMFORMER_CAPAB;
+ 
+-	cap->he_phy_capab_info[HE_PHYCAP_CHANNEL_WIDTH_SET_IDX] &=
+-		he_oper_chwidth;
++	/* WLAN Pi Profiler: Enable advanced HE PHY capabilities for profiling */
++	cap->he_phy_capab_info[3] |= (1 << 3);  /* Bit 27: Triggered SU Beamforming Feedback */
++	cap->he_phy_capab_info[3] |= (1 << 4);  /* Bit 28: Triggered MU Beamforming Partial BW Feedback */
++	cap->he_phy_capab_info[4] |= (1 << 3);  /* Bit 35: Triggered MU Beamforming Partial BW Feedback */
++	cap->he_phy_capab_info[4] |= (1 << 4);  /* Bit 36: Triggered CQI Feedback */
++	cap->he_phy_capab_info[6] |= (1 << 7);  /* Bit 55: Partial Bandwidth Extended Range */
++	static int profiler_he_phy_logged = 0;
++	if (!profiler_he_phy_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Enabled HE PHY caps: Triggered SU/MU Beamforming Feedback, Triggered CQI, Partial BW ER");
++		profiler_he_phy_logged = 1;
++	}
++
++	/* WLAN Pi Profiler: Advertise 160 MHz and 80+80 MHz HE capability */
++	static int profiler_he_160mhz_logged = 0;
++	if (!profiler_he_160mhz_logged) {
++		wpa_printf(MSG_DEBUG,
++			   "PROFILER: Advertising HE 160/80+80 MHz capability (oper_chwidth=%d)",
++			   he_oper_chwidth);
++		profiler_he_160mhz_logged = 1;
++	}
++	cap->he_phy_capab_info[HE_PHYCAP_CHANNEL_WIDTH_SET_IDX] |= 0x1E;
++
++	/* Override HE MCS for 80 MHz to advertise 4 spatial streams */
++	/* NOTE: Only modify 80 MHz MCS (first 4 bytes) to avoid corrupting PPET data */
++	/* We operate at 80 MHz (he_oper_chwidth=1) so mcs_nss_size=4, PPET starts at optional[4] */
++	static int profiler_he_4ss_logged = 0;
++	if (!profiler_he_4ss_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Advertising HE 4 SS support for 80 MHz");
++		profiler_he_4ss_logged = 1;
++	}
++	cap->optional[0] = 0xaa;  /* Rx HE-MCS <= 80MHz: SS 1-4, MCS 0-11 (2 bits per SS) */
++	cap->optional[1] = 0xff;  /* Rx HE-MCS <= 80MHz: SS 5-8 not supported */
++	cap->optional[2] = 0xaa;  /* Tx HE-MCS <= 80MHz: SS 1-4, MCS 0-11 */
++	cap->optional[3] = 0xff;  /* Tx HE-MCS <= 80MHz: SS 5-8 not supported */
++	/* Do NOT write optional[4-7] - those would corrupt PPET data since we operate at 80 MHz */
+ 
+ 	pos += ie_size;
+ 

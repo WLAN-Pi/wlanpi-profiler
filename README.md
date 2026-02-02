@@ -4,251 +4,217 @@
 
 Profiler is a Wi-Fi client capability analyzer tool built for the [WLAN Pi](https://github.com/WLAN-Pi/).
 
-The primary purpose is to automate the collection and analysis of association request frames.
+## What is it?
 
-It performs two primary functions:
+The primary purpose is to automate the collection and analysis of association request frames to understand client Wi-Fi capabilities.
 
-1. advertises a "fake" Access Point
-2. "profiles" any attempted client association requests (which contain the claimed capabilities of the client) 
+Understanding client capabilities helps in:
 
-## Why?
+- **WLAN design** - Factor in client capabilities (spatial streams, Tx power, frequency bands)
+- **Troubleshooting** - Verify client support for 802.11k/r/v, PHY types, and channels
+- **Validation** - Confirm clients can support planned network features
 
-Understanding the various client capabilities found in a particular environment helps in the Wireless LAN definition, design, and troubleshooting/validation process.
+## Two operating modes
 
-The WLAN designer may desire to factor in the capabilities of expected clients in their design output. How many spatial streams? What is the client Tx power? What frequency bands does it support? 
+**1. Live capture mode (WLAN Pi / Linux)**
 
-The WLAN troubleshooter may understand better the issues they are uncovering when knowing the capabilities of the client. Does the client support .11k/r/v? Which PHYs does the client support? What channels does the client support?
+- Advertises a fake access point using hostapd or FakeAP
+- Captures client association requests in real-time
+- Requires Linux with supported Wi-Fi adapter
 
-The profiler helps to more quickly answer these questions for you.
+**2. Pcap analysis mode (cross-platform)**
 
-## Client capabilities will vary
+- Analyzes pre-captured `.pcap` files offline
+- No special hardware required - uses built-in Scapy parsing
+- Works on Windows, macOS, and Linux
 
-Capabilities across each client type will vary; depending on factors like client chipset, the number of antennas, power mode (e.g. iOS Low Power Mode), age of the client, driver, supplicant, etc.
+## What capabilities are detected?
 
-Each client includes its capability details in the 802.11 association frame sent from the client to an access point. By capturing this frame, it is possible to decode and report on the client's claimed capabilities.
+Profiler detects **40+ client capabilities** across multiple Wi-Fi generations:
 
-However, please note that the client will match the capabilities advertised by an access point. For instance, a 3 spatial stream client will tell a 2 spatial stream AP it only supports 2 spatial streams.
+**Wi-Fi standards:**
 
-The profiler attempts to address this problem by advertising the highest-level feature sets.   
+- 802.11n (Wi-Fi 4) - HT capabilities, spatial streams
+- 802.11ac (Wi-Fi 5) - VHT capabilities, MCS, 160 MHz, beamforming
+- 802.11ax (Wi-Fi 6/6E) - HE capabilities, TWT, OFDMA, BSS Color
+- 802.11be (Wi-Fi 7) - EHT capabilities, MLO, 320 MHz
 
-## Getting started with profiler on a WLAN Pi
+**Management and security:**
 
-The first step is to start the profiler, which will broadcast a fake AP. The client will send an association frame when attempting to connect to the fake AP. The capabilities of a client are then determined based on profiler analyzing the association frame. 
+- 802.11k - Radio resource management
+- 802.11r - Fast roaming (FT)
+- 802.11v - BSS transition management
+- 802.11w - Protected management frames
+- WPA3/SAE - Modern security with SAE Hash-to-Element
 
-If running directly from a terminal, once profiled, a text report prints in real-time to the screen, and results write to a local directory on the WLAN Pi host. If running from FPMS, you should see a banner display for a few moments. 
+[See complete capability list](CAPABILITY_LOGIC.md)
 
-Once we've profiled a client, profiler saves the results which consist of a text report and the association frame in PCAP format. Profiler also appends the result to a daily rotating `.csv` report.
+## Quick start
 
-1. Start the profiler:
+### Start profiling
 
-    - Ensure a supported WLAN NIC is plugged into the WLAN Pi
-
-    1. Starting the profiler service using the Front Panel Menu System (FPMS):
-        - Navigate to `Menu` > `Apps` > `Profiler` > `Start`
-
-    2. Starting the service manually:
-        - `sudo service wlanpi-profiler start|stop|status`
-        - Want to view more of the journal scrollback from `service wlanpi-profiler status` output?
-
-            ```
-            journalctl -u wlanpi-profiler.service
-            ```
-
-    3. Starting from the terminal:
-        - `sudo profiler`
-
-
-    - How to view CLI usage and man page from the shell:
-
-        ```
-        profiler -h
-        man wlanpi-profiler
-        ```
-
-2. Profile the client:
-
-    - once the profiler is started, the configured SSID will broadcast (default: "WLAN Pi")
-
-    - connect a client and enter any random 8 characters for the PSK
-
-    - note the client will expectedly fail authentication but we should receive the association request
-
-3. Viewing the results:
-
-    - You can look on the WebUI (http://<IPv4_of_WLANPi>/profiler) or on the filesystem at `/var/www/html/profiler`.
-
-## Installation
-
-profiler is included in the [WLAN Pi](https://github.com/WLAN-Pi/) image as a Debian package, but if you want to install it manually, here is what you need:
-
-General requirements:
-
-- adapter (and driver) which supports both monitor mode and packet injection
-  - mt76x2u, mt7921u (a8000), mt7921e (rz608/mt7921k, rz616/mt7922m), and iwlwifi (ax200, ax210, be200) are tested regularly (everything else is experimental and not officially supported).
-  - removed from the recommended list are rtl88XXau adapters (certain comfast adapters for example), but they should still work. with that said, don't open a bug report here for a rtl88XXau card.
-- elevated permissions
-
-Package requirements:
-
-- Python version 3.9 or higher
-- `iw`, `iproute2`, `pciutils`, `usbutils`, `kmod`, `wpa_cli`, and `wpasupplicant` tools installed on the host. most distributions already come with these.
-
-### Upgrading WLAN Pi OS v3 (C4, M4, Pro) installs.
-
-Got your hands on a WLAN Pi C4, M4, or Pro? We build and deploy a Debian package for `wlanpi-profiler` to our package archive. Get the latest version by running `sudo apt update` and `sudo apt install wlanpi-profiler`.
-
-### Upgrading existing WLAN Pi OS v2 (NEO2) installs via pipx:
-
-Are you reading this and have a NEO2 WLAN Pi? You can upgrade your existing profiler install, but there are some manual things you need to do first. Check out the [upgrading with pipx](UPGRADING_WITH_PIPX.md) instructions.
-
-### Don't have a WLAN Pi? Installing via pipx:
-
-Don't have a WLAN Pi? Have a Linux host handy? Try the [installing wlanpi-profiler using pipx](INSTALLING_WITH_PIPX.md) instructions.
-
-# Usage from the CLI
-
-You can start profiler directly from the command line like this:
-
-```
+```bash
 sudo profiler
 ```
 
-Stop with `CTRL + C`.
+### Connect a client
 
-Usage:
+1. Look for SSID "Profiler xxx" (where xxx is last 3 chars of eth0 MAC)
+2. Connect using passphrase: `profiler`
+3. Profiler captures the association request and displays results
 
-```
-usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug] [--noprep]
-                   [--noAP] [--no11r] [--no11ax] [--no11be] [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--read PCAP]
-                   [--no_bpf_filters] [--list_interfaces] [--version]
+### View results
 
-wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler
+- **Web interface:** `http://<WLAN_Pi_IP>/profiler`
+- **File system:** `/var/www/html/profiler/`
+- **Terminal:** Real-time text output
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -c CHANNEL            set the channel to broadcast on
-  -f FREQUENCY          set the frequency to broadcast on
-  -i INTERFACE          set network interface for profiler
-  -s SSID               set profiler SSID name
-  --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
-  --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
-  --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
-  --debug               enable debug logging output
-  --noprep              disable interface preperation (default: False)
-  --noAP                enable Rx only mode (default: False)
-  --no11r               turn off 802.11r Fast Transition (FT) reporting
-  --no11ax              turn off 802.11ax High Efficiency (HE) reporting
-  --no11be              turn off 802.11be Extremely High Throughput (EHT) reporting
-  --noprofilertlv       disable generation of Profiler specific vendor IE
-  --wpa3_personal_transition
-                        enable WPA3 Personal Transition in the RSNE for 2.4 / 5 GHz
-  --wpa3_personal       enable WPA3 Personal only in the RSNE for 2.4 / 5 GHz
-  --oui_update          initiates update of OUI database (requires Internet connection)
-  --read PCAP           read and analyze association request frames from pcap
-  --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance
-  --list_interfaces     print out a list of interfaces with an 80211 stack
-  --version, -V         show program's version number and exit
+[Full quick start guide →](docs/user/QUICKSTART.md)
+
+## Installation
+
+Profiler is included in the WLAN Pi image as a Debian package.
+
+### Upgrade on WLAN Pi OS v3 (R4, M4, M4+, Pro)
+
+```bash
+sudo apt update
+sudo apt install wlanpi-profiler
 ```
 
-## Usage Examples
+### Install on other systems
 
-We require elevated permissions to put the interface in monitor mode and to open raw native sockets for frame injection. Starting and stopping profiler from the WLAN Pi's Front Panel Menu System (FPMS) will handle this for you automatically. 
+See [installing with pipx](INSTALLING_WITH_PIPX.md).
 
-Don't want to use the default channel? You can change it with the `-c` option:
+### Requirements
 
-```
-# capture frames on channel 48 using the default SSID
+- Adapter with monitor mode and packet injection support
+- Tested: mt76x2u, mt7921u (a8000), mt7921e, iwlwifi (ax200, ax210, be200)
+- Elevated permissions (sudo)
+
+## Documentation
+
+- [Quick start guide](docs/user/QUICKSTART.md) - Get up and running
+- [Configuration guide](docs/user/CONFIGURATION.md) - Customize settings
+- [Command line usage](docs/user/CLI_USAGE.md) - CLI reference
+- [Full documentation index](docs/README.md)
+
+## Key features
+
+### AP mode (default in v2.0.0)
+
+Uses hostapd for faster client discovery (1-2 seconds vs 10+ seconds in legacy mode).
+
+- Hostapd handles probe responses at driver level
+- Monitor mode VIF captures association requests
+- Requires adapter supporting simultaneous AP + monitor mode
+
+[Learn more about AP mode →](docs/user/CONFIGURATION.md#ap-mode)
+
+### Security modes
+
+| Mode | WPA2 | WPA3 | 802.11r | 802.11be |
+|------|------|------|---------|----------|
+| ft-wpa3-mixed (default) | Yes | Yes | Yes | Yes |
+| wpa3-mixed | Yes | Yes | No | Yes |
+| ft-wpa2 | Yes | No | Yes | Auto-disabled |
+| wpa2 | Yes | No | No | Auto-disabled |
+
+[See all security options →](docs/user/CONFIGURATION.md#security-settings)
+
+### External monitoring
+
+Profiler writes JSON files for integration with other tools:
+
+- **Status file:** `/run/wlanpi-profiler.status.json` - Real-time lifecycle state
+- **Info file:** `/run/wlanpi-profiler.info.json` - Operational metrics
+- **State file:** `/var/lib/wlanpi-profiler/state.json` - Persistent session data
+
+[Learn about monitoring →](docs/MONITORING.md)
+
+## Usage examples
+
+### Basic usage
+
+```bash
+# Start with defaults
+sudo profiler
+
+# Use specific channel
 sudo profiler -c 48
+
+# Custom SSID
+sudo profiler -s "My Profiler"
 ```
 
-Want to use a custom SSID? You can use the `-s` option to specify your own SSID:
+### Pcap analysis
 
-```
-# capture frames on channel 36 using an SSID called 'JOIN ME'
-sudo profiler -c 36 -s "JOIN ME"
-```
-
-Having problems profiling a client? We can disable .11r IE in fake AP beacon like this:
-
-```
-# capture frames on channel 100 with 802.11r disabled for clients that don't like 802.11r
-sudo profiler -c 100 --no11r
+```bash
+# Analyze existing capture
+profiler --pcap capture.pcap
 ```
 
-Having problems profiling a client? We can disable .11ax IE in fake AP beacon like this:
+### Common configurations
 
-```
-# capture frames on the default channel with 802.11ax disabled for clients that don't like 802.11ax
-sudo profiler --no11ax
-```
+```bash
+# WPA2-only clients
+sudo profiler --security-mode wpa2
 
-Do you want to capture passively? We can do that! If we use `--noAP`, we will listen for any association request on a given channel.
+# Passive listening mode
+sudo profiler --listen-only -c 100
 
-```
-# capture frames on channel 100 without the fake AP running (Rx only, no Tx)
-sudo profiler --noAP -c 100
-```
-
-Already have some association requests in a pcap? We can analyze them. Use `--read <file.pcap>` to feed them into profiler:
-
-```
-# analyze an association request in a previously captured PCAP file
-sudo profiler --read assoc_frame.pcap
-```
-
-Something not working? Use `--debug` to get more logs printed to the shell.
-
-```
-# increase output to screen for debugging
+# Debug logging
 sudo profiler --debug
 ```
 
-## Feature: overriding defaults with configuration file support
+[More CLI examples →](docs/user/CLI_USAGE.md)
 
-To change the default operation of the script (without passing in CLI args), on the WLAN Pi, a configuration file can be found at `/etc/wlanpi-profiler/config.ini`. 
+## Hardware test suite
 
-This can be used as a way to modify settings loaded at runtime such as channel, SSID, and interface. 
+Validate your installation with the built-in test suite:
 
-## Feature: client capabilities diff
-
-When a client is profiled, a hash of the capabilities is calculated and stored in memory. 
-
-If subsequent association requests are seen from the same client, the previously calculated hash is compared to what is already in memory.
-
-If the hash is the same, the additional association request is ignored. 
-
-If the hash is different, capabilities are profiled and a text diff of the client report is saved.
-
-## Feature: MAC OUI database update
-
-A lookup feature is included to show the manufacturer of the client based on the 6-byte MAC OUI. this is a wrapper around a Python module called `manuf` which uses a local flat file for OUI lookup. 
-
-If you find that some clients are not identified in the results, the flat file may need to be updated.
-
-When the WLAN Pi has connectivity to the internet, this can be done from the CLI of the WLAN Pi:
-
-```
-sudo profiler --oui_update
+```bash
+sudo profiler test
 ```
 
-## Notes and Warnings
+Tests include:
 
-- A client will generally only report the capabilities it has that match the network it associates to.
-    - If you want the client to report all of its capabilities, it must associate with a network that supports those capabilities (e.g, a 3 spatial stream client will not report it supports 3 streams if the AP it associates with supports only 1 or 2 streams).
-    - The fake AP created by the profiler attempts to simulate a fully-featured AP, but there may be cases where it does not behave as expected.
-- Treat reporting of 802.11k capabilities with caution. To be sure verify through other means like:
-    - Check neighbor report requests from a WLC/AP debug.
-    - Gather and analyze a packet capture for action frames containing the neighbor report.
-- While we try our best to make this as accurate as possible, we do not guarantee the accuracy of reporting. **Trust, but verify.**
+- Hostapd binary and permissions
+- Configuration and directories
+- Interface discovery and capabilities
+- Interface staging for monitor mode
 
-# Thanks 
+[Testing documentation →](docs/developer/TESTING.md)
 
-- Jerry Olla, Nigel Bowden, and the WLAN Pi Community for all their input and effort on the first versions of the profiler. Without them, this project would not exist.
+## Building from source
 
-# Contributing
+Developers can build Debian packages locally:
 
-Want to contribute? Thanks! Please take a few moments to [read this](CONTRIBUTING.md).
+```bash
+# Native architecture build
+./scripts/build-package-native.sh
 
-# Discussions and Issues
+# Cross-architecture build
+./scripts/build-package-cross.sh
+```
 
-Please use GitHub discussions for dialogue around features and ideas that do not exist. Create issues for problems found running profiler.
+[Development guide →](DEVELOPMENT.md)
+
+## Contributing
+
+Contributions are welcome! Please read the [contributing guide](CONTRIBUTING.md) for details.
+
+## Support
+
+- **Documentation:** [Full docs index](docs/README.md)
+- **Issues:** Create a GitHub issue for bugs
+- **Discussions:** Use GitHub discussions for questions and ideas
+- **Known issues:** [See known issues](KNOWN_ISSUES.md)
+
+## Acknowledgments
+
+Thanks to Jerry Olla, Nigel Bowden, and the WLAN Pi community for their input and effort on the first versions of profiler. Without them, this project would not exist.
+
+## License
+
+BSD-3-Clause

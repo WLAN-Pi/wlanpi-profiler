@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-""""
+""" "
 nic prep:
 
 sudo ip link set wlan0 down

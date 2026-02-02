@@ -1,0 +1,29 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -557,19 +557,13 @@ static u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
+ 	wpabuf_put_le16(buf, hapd->iface->mld_eml_capa);
+ 
+ 	mld_cap = hapd->iface->mld_mld_capa;
+-	max_simul_links = mld_cap & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
+-	active_links = hapd->mld->num_links - 1;
+-
+-	if (active_links > max_simul_links) {
+-		wpa_printf(MSG_ERROR,
+-			   "MLD: Error in max simultaneous links, advertised: 0x%x current: 0x%x",
+-			   max_simul_links, active_links);
+-		active_links = max_simul_links;
+-	}
+-
+-	mld_cap &= ~EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
+-	mld_cap |= active_links & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
+-
++	
++	/* Preserve the configured max_simul_links value instead of overwriting
++	 * it with active_links. This allows advertising higher capabilities
++	 * than the number of currently active links, which is important for
++	 * client profiling scenarios where we want to advertise maximum
++	 * capabilities regardless of actual link count.
++	 */
+ 	/* TODO: Advertise T2LM based on driver support as well */
+ 	mld_cap &= ~EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_NEG_SUPP_MSK;
+ 

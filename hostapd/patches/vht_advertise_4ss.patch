@@ -1,0 +1,40 @@
+--- a/src/ap/ieee802_11_vht.c
++++ b/src/ap/ieee802_11_vht.c
+@@ -66,6 +66,37 @@
+ 	/* Supported MCS set comes from hw */
+ 	os_memcpy(&cap->vht_supported_mcs_set, mode->vht_mcs_set, 8);
+ 
++	/* WLAN Pi Profiler: Override VHT capabilities for profiling */
++	static int profiler_vht_4ss_logged = 0;
++	if (!profiler_vht_4ss_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: VHT caps override: 160 MHz, Short GI 160, 4 SS, max beamforming");
++		profiler_vht_4ss_logged = 1;
++	}
++	/* VHT MCS Map: 0xaa = MCS 0-9 for each SS (2 bits per SS, 0b10 = MCS 0-9) */
++	cap->vht_supported_mcs_set.rx_map = host_to_le16(0xffaa);  /* SS 1-4: MCS 0-9, SS 5-8: not supported */
++	cap->vht_supported_mcs_set.tx_map = host_to_le16(0xffaa);  /* SS 1-4: MCS 0-9, SS 5-8: not supported */
++	
++	/* Override VHT capabilities info */
++	u32 vht_cap = le_to_host32(cap->vht_capabilities_info);
++	
++	/* Set 160 MHz support - Bit 2: VHT_CAP_SUPP_CHAN_WIDTH_160MHZ */
++	vht_cap |= VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
++	
++	/* Set Short GI for 160 MHz - Bit 6 */
++	vht_cap |= VHT_CAP_SHORT_GI_160;
++	
++	/* Set beamformee STS capability to maximum (7 = 8 STS)
++	 * Bits 13-15 of VHT capabilities info */
++	vht_cap &= ~VHT_CAP_BEAMFORMEE_STS_MAX;  /* Clear bits 13-15 */
++	vht_cap |= (7 << VHT_CAP_BEAMFORMEE_STS_OFFSET);  /* Set to 7 (max) */
++	
++	/* Set sounding dimensions to maximum (7 = 8 dimensions)
++	 * Bits 16-18 of VHT capabilities info */
++	vht_cap &= ~VHT_CAP_SOUNDING_DIMENSION_MAX;  /* Clear bits 16-18 */
++	vht_cap |= (7 << VHT_CAP_SOUNDING_DIMENSION_OFFSET);  /* Set to 7 (max) */
++	
++	cap->vht_capabilities_info = host_to_le32(vht_cap);
++
+ 	pos += sizeof(*cap);
+ 
+ 	return pos;

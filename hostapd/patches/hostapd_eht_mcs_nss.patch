@@ -1,0 +1,23 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -182,6 +182,20 @@
+ 						 eht_cap->phy_cap);
+ 	if (mcs_nss_len) {
+ 		os_memcpy(pos, eht_cap->mcs, mcs_nss_len);
++
++		/* WLAN Pi Profiler: Force 160 MHz EHT-MCS map (6 bytes total) */
++		if (mcs_nss_len < 6) {
++			wpa_printf(MSG_DEBUG, "PROFILER: Forcing EHT MCS length from %d to 6 bytes for 160 MHz support", mcs_nss_len);
++			mcs_nss_len = 6;
++		}
++		/* Override EHT MCS to advertise 4 spatial streams for both <=80 and 160 MHz */
++		pos[0] = 0x44;  /* BW <= 80MHz: Rx NSS=4 (MCS 0-9), Tx NSS=4 (MCS 0-9) */
++		pos[1] = 0x44;  /* BW <= 80MHz: Rx NSS=4 (MCS 10-11), Tx NSS=4 (MCS 10-11) */
++		pos[2] = 0x44;  /* BW <= 80MHz: Rx NSS=4 (MCS 12-13), Tx NSS=4 (MCS 12-13) */
++		pos[3] = 0x44;  /* BW = 160MHz: Rx NSS=4 (MCS 0-9), Tx NSS=4 (MCS 0-9) */
++		pos[4] = 0x44;  /* BW = 160MHz: Rx NSS=4 (MCS 10-11), Tx NSS=4 (MCS 10-11) */
++		pos[5] = 0x44;  /* BW = 160MHz: Rx NSS=4 (MCS 12-13), Tx NSS=4 (MCS 12-13) */
++
+ 		pos += mcs_nss_len;
+ 	}
+ 
