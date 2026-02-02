@@ -1,0 +1,21 @@
+--- a/src/ap/ap_config.h
++++ b/src/ap/ap_config.h
+@@ -1218,6 +1218,18 @@ struct hostapd_config {
+ 	struct eht_phy_capabilities_info eht_phy_capab;
+ 	u16 punct_bitmap; /* a bitmap of disabled 20 MHz channels */
+ 	u8 punct_acs_threshold;
++	
++	/* MLD Link ID override for profiling */
++	u8 mld_link_id_override;
++	bool mld_link_id_set;
++	
++	/* MLD/EML capability overrides for profiling */
++	u16 mld_eml_capa_override;
++	u16 mld_mld_capa_override;
++	u8 eht_nss_override;
++	bool mld_eml_capa_set;
++	bool mld_mld_capa_set;
++	bool eht_nss_override_set;
+ 	u8 eht_default_pe_duration;
+ 	u8 eht_bw320_offset;
+ #endif /* CONFIG_IEEE80211BE */

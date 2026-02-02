@@ -1,0 +1,33 @@
+--- a/src/ap/ieee802_11_he.c
++++ b/src/ap/ieee802_11_he.c
+@@ -93,7 +93,7 @@
+ 	struct hostapd_hw_modes *mode = hapd->iface->current_mode;
+ 	u8 he_oper_chwidth = ~HE_PHYCAP_CHANNEL_WIDTH_MASK;
+ 	u8 *pos = eid;
+-	u8 ie_size = 0, mcs_nss_size = 4, ppet_size = 0;
++	u8 ie_size = 0, mcs_nss_size = 4, ppet_size = 0, profiler_override = 0;
+ 
+ 	if (!mode)
+ 		return eid;
+@@ -121,6 +121,21 @@
+ 		break;
+ 	}
+ 
++	/* WLAN Pi Profiler: Force 160 MHz support with proper MCS maps */
++	if (hapd->iface->conf->he_oper_chwidth == CONF_OPER_CHWIDTH_160MHZ) {
++		static int profiler_he_logged = 0;
++		if (!profiler_he_logged) {
++			wpa_printf(MSG_DEBUG, "PROFILER: HE 5GHz 160MHz: forcing mcs_nss_size=8, ppet_size=0");
++			profiler_he_logged = 1;
++		}
++		mcs_nss_size = 8;  /* 4 bytes for <=80 MHz + 4 bytes for 160 MHz */
++		ppet_size = 0;      /* Disable PPE thresholds */
++		he_oper_chwidth = HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_IN_2G |
++				  HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G |
++				  HE_PHYCAP_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
++		profiler_override = 1;
++	}
++
+ 	ie_size += mcs_nss_size + ppet_size;
+ 
+ 	*pos++ = WLAN_EID_EXTENSION;

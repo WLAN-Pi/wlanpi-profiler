@@ -1,0 +1,127 @@
+diff --git a/src/ap/hw_features.c b/src/ap/hw_features.c
+--- a/src/ap/hw_features.c
++++ b/src/ap/hw_features.c
+@@ -727,6 +727,13 @@ int hostapd_check_ht_capab(struct hostapd_iface *iface)
+ int hostapd_check_ht_capab(struct hostapd_iface *iface)
+ {
+ 	int ret;
++	
++	/* WLAN Pi Profiler: Skip all hardware capability validation */
++	/* This allows advertising maximum capabilities for client profiling */
++	wpa_printf(MSG_INFO, "PROFILER: Bypassing HT/VHT/HE capability validation - using config values");
++	if (iface->conf->ieee80211n)
++		return 0;
++	/* End PROFILER patch */
+ 
+ 	if (is_6ghz_freq(iface->freq))
+ 		return 0;
+diff --git a/hostapd/config_file.c b/hostapd/config_file.c
+--- a/hostapd/config_file.c
++++ b/hostapd/config_file.c
+@@ -5090,6 +5090,58 @@ static int hostapd_config_fill(struct hostapd_config *conf,
+ 				   line);
+ 			return 1;
+ 		}
++	} else if (os_strcmp(buf, "mld_eml_capa_override") == 0) {
++		conf->mld_eml_capa_override = strtol(pos, NULL, 0);
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EML capability override = 0x%04x",
++			   conf->mld_eml_capa_override);
++	} else if (os_strcmp(buf, "mld_mld_capa_override") == 0) {
++		conf->mld_mld_capa_override = strtol(pos, NULL, 0);
++		conf->mld_mld_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: MLD capability override = 0x%04x",
++			   conf->mld_mld_capa_override);
++	} else if (os_strcmp(buf, "emlsr_support") == 0) {
++		int val = atoi(pos);
++		if (val) {
++			conf->mld_eml_capa_override |= 0x0001; /* EHT_ML_EML_CAPA_EMLSR_SUPP */
++		} else {
++			conf->mld_eml_capa_override &= ~0x0001;
++		}
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EMLSR support = %d", val);
++	} else if (os_strcmp(buf, "emlmr_support") == 0) {
++		int val = atoi(pos);
++		if (val) {
++			conf->mld_eml_capa_override |= 0x0080; /* EHT_ML_EML_CAPA_EMLMR_SUPP */
++		} else {
++			conf->mld_eml_capa_override &= ~0x0080;
++		}
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EMLMR support = %d", val);
++	} else if (os_strcmp(buf, "mld_max_num_links") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 15) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid mld_max_num_links value %d (must be 0-15)",
++				   line, val);
++			return 1;
++		}
++		/* Clear the max links bits and set new value */
++		conf->mld_mld_capa_override &= ~0x000f; /* ~EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK */
++		conf->mld_mld_capa_override |= (val & 0x000f);
++		conf->mld_mld_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: Max simultaneous links = %d", val);
++	} else if (os_strcmp(buf, "mld_eml_transition_timeout") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 15) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid transition timeout value %d (must be 0-15)",
++				   line, val);
++			return 1;
++		}
++		/* Clear transition timeout bits (bits 11-14) and set new value */
++		conf->mld_eml_capa_override &= ~0x7800; /* ~EHT_ML_EML_CAPA_TRANSITION_TIMEOUT_MASK */
++		conf->mld_eml_capa_override |= ((val & 0x0f) << 11);
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EML transition timeout = %d", val);
+ 	} else if (os_strcmp(buf, "eht_bw320_offset") == 0) {
+ 		conf->eht_bw320_offset = atoi(pos);
+ #ifdef CONFIG_TESTING_OPTIONS
+diff --git a/src/ap/ap_config.h b/src/ap/ap_config.h
+--- a/src/ap/ap_config.h
++++ b/src/ap/ap_config.h
+@@ -1207,6 +1207,13 @@ struct hostapd_config {
+ 	u8 punct_acs_threshold;
+ 	u8 eht_default_pe_duration;
+ 	u8 eht_bw320_offset;
++
++	/* WLAN Pi Profiler: MLD/EML capability overrides */
++	u16 mld_eml_capa_override;
++	u16 mld_mld_capa_override;
++	bool mld_eml_capa_set;
++	bool mld_mld_capa_set;
++	/* End PROFILER patch */
+ #endif /* CONFIG_IEEE80211BE */
+ 
+ 	/* EHT enable/disable config from CHAN_SWITCH */
+diff --git a/src/ap/ap_drv_ops.c b/src/ap/ap_drv_ops.c
+--- a/src/ap/ap_drv_ops.c
++++ b/src/ap/ap_drv_ops.c
+@@ -1103,6 +1103,7 @@ int hostapd_drv_send_mlme(struct hostapd_data *hapd,
+ void hostapd_get_mld_capa(struct hostapd_iface *iface)
+ {
+ 	struct hostapd_data *hapd = iface->bss[0];
++	struct hostapd_config *conf = iface->conf;
+ 
+ 	if (!hapd->driver || !hapd->driver->get_mld_capab)
+ 		return;
+@@ -1110,6 +1111,17 @@ void hostapd_get_mld_capa(struct hostapd_iface *iface)
+ 	hapd->driver->get_mld_capab(hapd->drv_priv, WPA_IF_AP_BSS,
+ 				    &iface->mld_eml_capa,
+ 				    &iface->mld_mld_capa);
++
++	/* WLAN Pi Profiler: Override with configured values if set */
++	if (conf->mld_eml_capa_set) {
++		iface->mld_eml_capa = conf->mld_eml_capa_override;
++		wpa_printf(MSG_INFO, "MLD: Overriding EML capabilities to 0x%04x", iface->mld_eml_capa);
++	}
++	if (conf->mld_mld_capa_set) {
++		iface->mld_mld_capa = conf->mld_mld_capa_override;
++		wpa_printf(MSG_INFO, "MLD: Overriding MLD capabilities to 0x%04x", iface->mld_mld_capa);
++	}
++	/* End PROFILER patch */
+ }
+ 
+ #ifdef CONFIG_IEEE80211BE

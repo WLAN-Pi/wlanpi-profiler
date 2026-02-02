@@ -1,3 +1,84 @@
+wlanpi-profiler (2.0.0-1) unstable; urgency=medium
+
+  * MAJOR RELEASE v2.0.0 - Breaking Changes
+  * BREAKING: AP mode is now the DEFAULT (use --fakeap for legacy mode)
+  * BREAKING: GCMP-256 refactored to group_cipher/pairwise_cipher capabilities
+  * feat: AP mode with hostapd - 5-10x faster discovery (1-2 seconds)
+  * feat: Dynamic country code detection (replaces hardcoded US)
+  * feat: Status/info JSON files for external monitoring (Web UI, FPMS)
+  * feat: Complete WiFi 6E/7 support - 18 EHT capabilities
+  * feat: Multi-Link Element (MLE) parsing - 9 MLO capabilities
+  * feat: Probe response optimization - 99% latency reduction
+  * feat: Test coverage 52% → 56% (254 tests, all passing)
+  * docs: Consolidated 20+ investigation docs into INVESTIGATIONS.md
+  * docs: Enhanced README with AP mode, country code, status files
+  * docs: Updated CAPABILITY_LOGIC with all 40+ capabilities
+  * chore: Status changed from beta to production
+  * BREAKING: Remove gcmp256 capability (replaced by Group/Pairwise Cipher)
+  * feat: Add Group Cipher capability reporting from RSN IE
+  * feat: Report ALL pairwise ciphers (comma-separated) instead of first only
+  * feat: Report ALL AKM suites (comma-separated) instead of first only
+  * feat: Complete cipher suite dictionary (0-15) with all reserved entries
+  * feat: Complete AKM suite dictionary (0-25) including FILS, PASN, SAE-GDH
+  * fix: Use integer db_value for Group Cipher, Pairwise Cipher, and AKM
+  * feat: rename 802.11w to 802.11w/MFP in reports for clarity
+  * feat: add Pairwise Cipher and AKM suite reporting from RSN IE
+  * fix: improve MLE Common Info offset calculation
+  * feat: upgrade to GCMP-256 cipher (was GCMP-128)
+  * feat: add EHT NSS and MCS parsing to client reports
+  * fix: remove 802.11ax/SU Beamformer from client reports (AP-only capability)
+  * feat: add WiFi 7 MLD/EML configuration parameters to hostapd
+  * Enable EMLSR and EMLMR support
+  * Configure max simultaneous links and transition timeout
+  * feat: add /proc/cpuinfo parsing for ARM processor name detection
+  * change: monitor interface renamed from wlan0mon to wlan0profiler
+  * fix: properly terminate child processes on SIGINT/SIGTERM
+  * chore: remove verbose hostapd configuration from debug output
+  * fix: text report now shows expanded format (one capability per line)
+  * fix: reorganize debug logs to group related info together
+  * fix: suppress frame template debug message in hostapd AP mode
+  * chore: remove obsolete [X]/[ ] key from text reports
+  * feat: port tshark-dc features to dev branch
+  * feat: enhanced startup debug logging (platform, architecture, Python details)
+  * feat: multi-path file saving support (dual locations)
+  * feat: expanded text report format (40-char width, line-by-line)
+  * feat: JSON schema v2 with capture_ssid, capture_bssid, capture_manuf fields
+  * fix: clarify sniffer Rx-only mode log message for hostapd AP mode
+  * cleanup: remove non-functional PACKET_QDISC_BYPASS socket optimization code
+  * fix: scapy 2.7.0 Linux-only import - only import get_if_raw_hwaddr on Linux platform
+  * fix: scapy 2.7.0 cross-platform compatibility - import get_if_raw_hwaddr from scapy.arch
+  * fix: scapy 2.7.0 compatibility - get_if_raw_hwaddr moved to scapy.arch.unix
+  * deps: bump manuf2 from 2.0.1 to 2.0.2 (updated OUI database)
+  * perf: lazy import scapy in manager.py to speed up -h/--help response (~4s faster)
+  * fix: change default password from wlanpi!! to wlanpi123
+  * fix: --fakeap mode conflict error (default=True on --ap-mode)
+  * fix: defer tool checks until after -h/--help for faster help response
+  * deps: bump scapy from 2.5.0 to 2.7.0
+  * feat: add hostapd ctrl_interface for proper BSSID querying
+  * fix: report correct BSSID when MLD mode creates virtual BSSID
+  * fix: use /var/run/wlanpi-profiler/hostapd to avoid conflicts with system hostapd
+  * fix: show actual BSSID in startup banner (was showing interface MAC)
+  * fix: detect and warn about already-running profiler instances
+  * fix: improve hostapd crash error messages with recovery suggestions
+  * fix: banner showing "listen only mode" instead of "hostapd AP" mode
+  * feat: maximize hostapd beacon advertising for comprehensive profiling
+  * feat: enable HT TxBF capabilities (all beamforming, calibration, CSI)
+  * feat: enhance HE capabilities (TWT, Dynamic SM Power Save, BF feedback)
+  * feat: maximize EHT PHY (SU/MU BF, MCS 15, MCS 14, PSR, Power Boost, 20MHz)
+  * feat: add vendor-specific IE with profiler version (OUI 31:41:59)
+  * feat: enable Interworking (802.11u), FILS, and TAXONOMY in hostapd
+  * fix: enable CONFIG_INTERWORKING to prevent hostapd startup failure
+  * feat: add hostapd AP mode integration with --ap-mode flag
+  * feat: add config generator with Jinja2 templates for 2.4/5 GHz
+  * feat: implement dual interface staging for AP mode
+  * feat: add listen-only mode to prevent TX conflicts with hostapd
+  * fix: re-enable BPF filters for improved performance
+  * fix: repair broken unit tests (test_version, test_platform)
+  * chore: fix ruff lint errors (unused variables, import shadowing)
+  * chore: update tox.ini for Python 3.14 compatibility
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Thu, 23 Jan 2025 00:00:00 -0800
+
 wlanpi-profiler (1.0.20-1) unstable; urgency=medium
 
   * refactor: inline interface staging commands and streamline scan logic

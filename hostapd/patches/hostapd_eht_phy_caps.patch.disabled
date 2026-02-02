@@ -1,0 +1,26 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -190,6 +190,23 @@
+ 		cap->phy_cap[EHT_PHYCAP_MU_BEAMFORMER_IDX] &=
+ 			~EHT_PHYCAP_MU_BEAMFORMER_MASK;
+ 
++	/* WLAN Pi Profiler: Enable advanced EHT PHY capabilities */
++	cap->phy_cap[0] |= (1 << 3);
++	cap->phy_cap[0] |= (1 << 4);
++	cap->phy_cap[0] |= (1 << 5);
++	cap->phy_cap[1] |= (1 << 1);
++	cap->phy_cap[1] |= (1 << 2);
++	cap->phy_cap[2] |= (1 << 3);
++	cap->phy_cap[3] |= (1 << 7);
++	cap->phy_cap[4] |= (1 << 0);
++	cap->phy_cap[5] = 0xFF;
++	cap->phy_cap[6] = 0xFF;
++	cap->phy_cap[7] |= (1 << 0);
++	cap->phy_cap[7] |= (1 << 4);
++	cap->phy_cap[7] |= (1 << 5);
++	cap->phy_cap[7] |= (1 << 6);
++	cap->phy_cap[8] |= (1 << 2);
++	cap->phy_cap[8] |= (1 << 4);
+ 	pos = cap->optional;
+ 
+ 	mcs_nss_len = ieee80211_eht_mcs_set_size(mode->mode,

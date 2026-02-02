@@ -1,4 +1,6 @@
-# Interface Staging Note for Various Cards
+# Interface staging note for various cards
+
+This is for Fake AP mode and does not cover AP mode.
 
 ## iwlwifi 
 

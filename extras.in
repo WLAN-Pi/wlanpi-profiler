@@ -1,10 +1,7 @@
-black
-isort
-autoflake
+ruff
 mypy
-flake8
-pytest
 pytest-cov
 pytest-mock
 tox
 coverage-badge
+iniconfig==2.1.0  # Pin to 2.1.0 for Python 3.9 compatibility

@@ -1,0 +1,28 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -155,7 +155,24 @@
+ 
+ 	cap = (struct ieee80211_eht_capabilities *) pos;
+ 	os_memset(cap, 0, sizeof(*cap));
+-	cap->mac_cap = host_to_le16(eht_cap->mac_cap);
++
++	/* WLAN Pi Profiler: Override EHT MAC capabilities for comprehensive profiling */
++	u16 override_mac_cap = 0;
++	override_mac_cap |= (1 << 0);  /* Bit 0: NSEP Priority Access Supported */
++	override_mac_cap |= (1 << 1);  /* Bit 1: EHT OM Control Support */
++	override_mac_cap |= (1 << 2);  /* Bit 2: Triggered TXOP Sharing Mode 1 Support */
++	override_mac_cap |= (1 << 4);  /* Bit 4: Restricted TWT Supported */
++	override_mac_cap |= (1 << 5);  /* Bit 5: SCS Traffic Description Support */
++	override_mac_cap |= (1 << 7);  /* Bit 7: EPCS Priority Access Support */
++	override_mac_cap |= EHT_MACCAP_MAX_MPDU_LEN_11454; /* Max MPDU 11454 */
++
++	cap->mac_cap = host_to_le16(override_mac_cap);
++	static int profiler_eht_mac_logged = 0;
++	if (!profiler_eht_mac_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Override EHT MAC caps to 0x%04x (EPCS, OM, R-TWT, SCS)", override_mac_cap);
++		profiler_eht_mac_logged = 1;
++	}
++
+ 	os_memcpy(cap->phy_cap, eht_cap->phy_cap, EHT_PHY_CAPAB_LEN);
+ 
+ 	if (!is_6ghz_op_class(hapd->iconf->op_class))

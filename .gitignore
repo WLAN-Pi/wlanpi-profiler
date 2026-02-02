@@ -1,3 +1,5 @@
+.build-manifest.txt
+
 # vim swp
 *.swp
 
@@ -38,6 +40,12 @@ debian/wlanpi-profiler.postinst.debhelper
 debian/wlanpi-profiler.prerm.debhelper
 debian/wlanpi-profiler.substvars
 debian/wlanpi-profiler/
+
+# Debian packages
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -124,3 +132,8 @@ venv.bak/
 .idea/modules.xml
 .idea/vcs.xml
 .idea/workspace.xml
+
+# Hostapd build artifacts (extracted source, modified by patches)
+hostapd/hostapd-2.11/
+hostapd/hostapd-2.11-backup/
+hostapd/*.tar.gz

@@ -1,0 +1,19 @@
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -1064,6 +1064,16 @@ static int dfs_set_valid_channel(struct hostapd_iface *iface, int skip_radar)
+ 	u8 cf1 = 0, cf2 = 0;
+ 	int sec = 0;
+ 
++	/*
++	 * WLAN Pi Profiler: Disable DFS channel validation
++	 * This allows 160 MHz on channel 36 for testing beacon capabilities.
++	 * WARNING: This build is for testing ONLY and may violate regulatory
++	 * requirements in your region. Do NOT use in production.
++	 */
++	wpa_printf(MSG_INFO, "PROFILER: DFS validation disabled - using configured channel");
++	return 0;
++
++	/* Original DFS validation code follows (disabled) */
+ 	channel = dfs_get_valid_channel(iface, &sec, &cf1, &cf2,
+ 					skip_radar ? DFS_AVAILABLE :
+ 					DFS_ANY_CHANNEL);

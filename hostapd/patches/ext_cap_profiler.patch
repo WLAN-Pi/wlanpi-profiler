@@ -1,0 +1,36 @@
+--- ieee802_11_shared.c.orig	2026-01-24 23:37:49.998521471 -0500
++++ hostapd-2.11/src/ap/ieee802_11_shared.c	2026-01-24 23:38:06.281643082 -0500
+@@ -424,6 +424,13 @@
+ 			*pos |= 0x01; /* Bit 48 - UTF-8 SSID */
+ 		break;
+ 	case 7: /* Bits 56-63 */
++		/* WLAN Pi Profiler: Advertise SCS support for comprehensive profiling */
++		*pos |= 0x40; /* Bit 62 - SCS (Stream Classification Service) */
++		static int profiler_ext_scs_logged = 0;
++		if ((*pos & 0x40) && !profiler_ext_scs_logged) {
++			wpa_printf(MSG_DEBUG, "PROFILER: Enabled Extended Capability - SCS (Stream Classification Service)");
++			profiler_ext_scs_logged = 1;
++		}
+ 		break;
+ 	case 8: /* Bits 64-71 */
+ 		if (hapd->conf->ftm_responder)
+@@ -443,6 +450,19 @@
+ #endif /* CONFIG_IEEE80211AX */
+ 		if (hostapd_get_ht_vht_twt_responder(hapd))
+ 			*pos |= 0x40; /* Bit 78 - TWT responder */
++		/* WLAN Pi Profiler: Always advertise TWT Responder and FILS for profiling */
++		*pos |= 0x40; /* Bit 78 - TWT responder */
++		*pos |= 0x01; /* Bit 72 - FILS */
++		static int profiler_ext_twt_logged = 0;
++		static int profiler_ext_fils_logged = 0;
++		if ((*pos & 0x40) && !profiler_ext_twt_logged) {
++			wpa_printf(MSG_DEBUG, "PROFILER: Enabled Extended Capability - TWT Responder");
++			profiler_ext_twt_logged = 1;
++		}
++		if ((*pos & 0x01) && !profiler_ext_fils_logged) {
++			wpa_printf(MSG_DEBUG, "PROFILER: Enabled Extended Capability - FILS");
++			profiler_ext_fils_logged = 1;
++		}
+ 		break;
+ 	case 10: /* Bits 80-87 */
+ #ifdef CONFIG_SAE

@@ -1,0 +1,21 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -492,7 +492,17 @@
+ 	wpabuf_put_data(buf, hapd->mld->mld_addr, ETH_ALEN);
+ 
+ 	/* Own Link ID */
+-	wpabuf_put_u8(buf, hapd->mld_link_id);
++	/* Own Link ID */
++	if (hapd->iconf->mld_link_id_set) {
++		/* WLAN Pi Profiler: Override Link ID for profiling */
++		wpa_printf(MSG_DEBUG,
++			   "PROFILER: MLD Link ID override: %d -> %d",
++			   hapd->mld_link_id,
++			   hapd->iconf->mld_link_id_override);
++		wpabuf_put_u8(buf, hapd->iconf->mld_link_id_override);
++	} else {
++		wpabuf_put_u8(buf, hapd->mld_link_id);
++	}
+ 
+ 	/* Currently hard code the BSS Parameters Change Count to 0x1 */
+ 	wpabuf_put_u8(buf, 0x1);

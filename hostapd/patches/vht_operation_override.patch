@@ -1,0 +1,26 @@
+--- a/src/ap/ieee802_11_vht.c
++++ b/src/ap/ieee802_11_vht.c
+@@ -161,6 +161,22 @@ u8 * hostapd_eid_vht_operation(struct hostapd_data *hapd, u8 *eid)
+ 		 */
+ 		oper->vht_op_info_chwidth = CHANWIDTH_80MHZ;
+ 	}
++	/* WLAN Pi Profiler: Override VHT Operation to advertise 160 MHz capability */
++	/* Even though we operate at 20 MHz, advertise 160 MHz for client profiling */
++	static int profiler_vht_oper_logged = 0;
++	if (!profiler_vht_oper_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: VHT Operation override: 160 MHz, CCFS0=42, CCFS1=50");
++		profiler_vht_oper_logged = 1;
++	}
++	/* For 160 MHz using "new style" encoding (802.11ac-2013 amendment):
++	 * Channel 36 @ 160 MHz covers channels 36-64
++	 * - Channel Width = 1 (indicates 80 MHz encoding, used for both 160 and 80+80)
++	 * - CCFS0 = 42 (center of lower 80 MHz segment, channels 36-48)
++	 * - CCFS1 = 50 (center of full 160 MHz band) */
++	oper->vht_op_info_chwidth = 1;  /* CHANWIDTH_80MHZ encoding */
++	oper->vht_op_info_chan_center_freq_seg0_idx = 42;  /* Lower 80 MHz segment */
++	oper->vht_op_info_chan_center_freq_seg1_idx = 50;  /* Full 160 MHz center */
++
+ 
+ 	/* VHT Basic MCS set comes from hw */
+ 	/* Hard code 1 stream, MCS0-7 is a min Basic VHT MCS rates */
+ 	oper->vht_basic_mcs_set = host_to_le16(0xfffc);

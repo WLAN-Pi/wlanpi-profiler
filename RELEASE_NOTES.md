@@ -1,3 +1,63 @@
+Release 2.0.0
+
+**Breaking changes**
+
+**Runtime file path migration:**
+
+- Runtime files moved from `/var/run/` to `/run/` (modern canonical path)
+- Both paths work identically due to symlink (`/var/run/` -> `/run/`)
+- No action required for existing integrations
+
+**JSON file naming:**
+
+- Monitoring files now include explicit `.json` extension:
+  - `/run/wlanpi-profiler.status.json` - Lifecycle state
+  - `/run/wlanpi-profiler.info.json` - Operational metrics
+
+- Legacy files unchanged:
+  - `/run/wlanpi-profiler.ssid` - Current SSID (plain text)
+  - `/run/wlanpi-profiler.last_profile` - Last MAC (plain text)
+
+**New features**
+
+**Persistent state file:**
+
+- New file: `/var/lib/wlanpi-profiler/state.json`
+- Contains last-run session information (survives reboot)
+- Useful for post-mortem analysis and monitoring
+- World-readable for Web UI integration (runs as `wlanpi` user)
+- See [STATE_FILE_SCHEMA.md](STATE_FILE_SCHEMA.md) for details
+
+**AP mode default:**
+
+- AP mode with hostapd is now the default (was FakeAP/monitor-only mode)
+- Use `--fakeap` flag for legacy behavior
+- Much improved client discovery: 1-2 seconds (5-10x improvement)
+
+**Status & info files:**
+
+- Real-time monitoring via JSON files in `/run/`
+- Schema-versioned with comprehensive field documentation
+- See [INFO_FILE_SCHEMA.md](INFO_FILE_SCHEMA.md) for details
+
+**Schema versioning:**
+
+- All JSON files include `schema_version` and `profiler_version` fields
+- Enables graceful handling of format changes
+- Breaking changes increment major version (1.0 -> 2.0)
+- Backward-compatible additions increment minor version (1.0 -> 1.1)
+
+**Other changes**
+
+- GCMP-256 cipher detection refactored: replaced single `gcmp256` boolean with separate `group_cipher` and `pairwise_cipher` capabilities (database schema change)
+- Dynamic country code detection from `iw reg get` 
+- Improved Wi-Fi 6E/7 capability detection (Dozen+ new capabilities: SCS, MSCS, EHT MAC/PHY, MLE with 9 sub-capabilities, SAE H2E)
+- Probe response optimization 
+- Consolidate performance investigations into INVESTIGATIONS.md
+- Update CAPABILITY_LOGIC.md 
+- Fix DTIM count in fakeAP beacon frames (5 -> 0)
+- Fix config structure tests to include ap_mode/fakeap fields
+
 Release 1.0.17
 
 - Allow user to disable addition of Profiler vendor information elements

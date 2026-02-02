@@ -1,7 +1,7 @@
-Style Guide
+Style guide
 ===========
 
-Adding Capabilities
+Adding capabilities
 -------------------
 
 `CAPABILITY_LOGIC.md` should be updated whenever additional capabilities are added. 

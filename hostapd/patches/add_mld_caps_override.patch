@@ -1,0 +1,29 @@
+--- ap_drv_ops.c.orig	2026-01-24 23:49:58.073112842 -0500
++++ hostapd-2.11/src/ap/ap_drv_ops.c	2026-01-25 00:02:24.863519808 -0500
+@@ -1103,6 +1103,7 @@
+ void hostapd_get_mld_capa(struct hostapd_iface *iface)
+ {
+ 	struct hostapd_data *hapd = iface->bss[0];
++	struct hostapd_config *conf = iface->conf;
+ 
+ 	if (!hapd->driver || !hapd->driver->get_mld_capab)
+ 		return;
+@@ -1110,6 +1111,18 @@
+ 	hapd->driver->get_mld_capab(hapd->drv_priv, WPA_IF_AP_BSS,
+ 				    &iface->mld_eml_capa,
+ 				    &iface->mld_mld_capa);
++
++	/* Override with config values if set */
++	if (conf->mld_eml_capa_set) {
++		iface->mld_eml_capa = conf->mld_eml_capa_override;
++		wpa_printf(MSG_DEBUG, "PROFILER: MLD EML capabilities override to 0x%04x",
++			   iface->mld_eml_capa);
++	}
++	if (conf->mld_mld_capa_set) {
++		iface->mld_mld_capa = conf->mld_mld_capa_override;
++		wpa_printf(MSG_DEBUG, "PROFILER: MLD capabilities override to 0x%04x",
++			   iface->mld_mld_capa);
++	}
+ }
+ 
+ 

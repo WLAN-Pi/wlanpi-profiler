@@ -1,10 +1,8 @@
 from scapy.all import (
     RadioTap,
     Dot11,
-    Dot11FCS,
     Dot11Beacon,
     Dot11Elt,
-    sendp,
     hexdump,
     conf,
 )

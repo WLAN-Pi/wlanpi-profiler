@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-#
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2024 Josh Schmelzle
+# Copyright : (c) 2024-2026 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -12,9 +10,35 @@ profiler.constants
 define constant values for app
 """
 
-LAST_PROFILE_TMP_FILE = "/var/run/wlanpi-profiler.last_profile"
-SSID_TMP_FILE = "/var/run/wlanpi-profiler.ssid"
+import os
+import sys
+
+# Runtime files
+LAST_PROFILE_TMP_FILE = "/run/wlanpi-profiler.last_profile"
+SSID_TMP_FILE = "/run/wlanpi-profiler.ssid"
+STATUS_FILE = "/run/wlanpi-profiler.status.json"
+INFO_FILE = "/run/wlanpi-profiler.info.json"
+
+# Persistent session record
+LAST_SESSION_FILE = "/var/lib/wlanpi-profiler/last-session.json"
+
+# Configuration
 CONFIG_FILE = "/etc/wlanpi-profiler/config.ini"
+
+# Default passphrase for AP modes (8 characters minimum)
+DEFAULT_PASSPHRASE = "profiler"
+
+# Hostapd paths - Use paths relative to Python executable for dev/prod compatibility
+# This ensures we always use the hostapd binary from our virtual environment,
+# never a system-wide installation
+_BIN_DIR = os.path.dirname(sys.executable)
+HOSTAPD_BINARY = os.path.join(_BIN_DIR, "hostapd")
+HOSTAPD_CLI_BINARY = os.path.join(_BIN_DIR, "hostapd_cli")
+HOSTAPD_CONFIG_DIR = "/tmp"
+
+# Profiler's hostapd control interface (NOT system hostapd at /var/run/hostapd)
+# The profiler bundles its own hostapd and should never interact with system hostapd
+PROFILER_CTRL_INTERFACE = "/run/wlanpi-profiler/hostapd"
 
 DOT11_TYPE_MANAGEMENT = 0
 DOT11_SUBTYPE_BEACON = 0x08
@@ -44,6 +68,30 @@ HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 802.11ax 6 GHz capabilities IE
 MLE_EXT_TAG = 107  # 802.11be Multi-Link Element
 EHT_CAPABILITIES_IE_EXT_TAG = 108  # 802.11be EHT Capabilities IE
 EHT_OPERATION_IE_EXT_TAG = 109  # 802.11be EHT Operation IE
+RSNX_TAG = 244  # RSNX - RSN Extension IE
+
+# RSN AKM Suite Types (IEEE 802.11-2024)
+# Used for client capability detection in association request frames
+RSN_AKM_WPA_PSK = 2  # WPA2-Personal
+RSN_AKM_FT_PSK = 4  # Fast Transition PSK
+RSN_AKM_SAE = 8  # WPA3-SAE
+RSN_AKM_FT_SAE = 9  # Fast Transition SAE
+RSN_AKM_SAE_GDH = 24  # SAE with Extended Key (Group Dependent Hashing)
+RSN_AKM_FT_SAE_GDH = 25  # FT-SAE with Extended Key (Group Dependent Hashing)
+
+# Note: SAE-GDH (AKM 24/25) requires hostapd master (not in our currently bundled 2.11)
+# Profiler can detect these AKMs but cannot advertise them with current hostapd
+
+# Security mode mappings for hostapd wpa_key_mgmt configuration
+# Maps security_mode config value → hostapd wpa_key_mgmt string
+SECURITY_MODES = {
+    "wpa2": "WPA-PSK",  # WPA2-Personal only
+    "ft-wpa2": "WPA-PSK FT-PSK",  # WPA2 + Fast Transition
+    "wpa3-mixed": "WPA-PSK SAE",  # WPA2/WPA3 transition mode
+    "ft-wpa3-mixed": "WPA-PSK FT-PSK SAE FT-SAE",  # Full featured (default)
+}
+
+DEFAULT_SECURITY_MODE = "ft-wpa3-mixed"
 
 CHANNELS = {
     "2G": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
@@ -198,4 +246,33 @@ _20MHZ_FREQUENCY_CHANNEL_MAP = {
     7075: 225,
     7095: 229,
     7115: 233,
+}
+
+# Security mode constraints
+# Used for validation, documentation, and auto-disable logic
+SECURITY_MODE_CONSTRAINTS = {
+    "wpa2": {
+        "ft_supported": False,
+        "wpa3_supported": False,
+        "be_recommended": False,  # Wi-Fi 7 requires WPA3 per spec
+        "description": "WPA2-Personal only (no FT, no WPA3)",
+    },
+    "ft-wpa2": {
+        "ft_supported": True,
+        "wpa3_supported": False,
+        "be_recommended": False,  # Wi-Fi 7 requires WPA3 per spec
+        "description": "WPA2-Personal with Fast Transition",
+    },
+    "wpa3-mixed": {
+        "ft_supported": False,
+        "wpa3_supported": True,
+        "be_recommended": True,
+        "description": "WPA2/WPA3-Personal transition mode (no FT)",
+    },
+    "ft-wpa3-mixed": {
+        "ft_supported": True,
+        "wpa3_supported": True,
+        "be_recommended": True,
+        "description": "WPA2/WPA3-Personal transition mode with Fast Transition (default)",
+    },
 }

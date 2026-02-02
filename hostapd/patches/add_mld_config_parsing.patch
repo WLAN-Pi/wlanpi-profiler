@@ -1,0 +1,97 @@
+--- a/hostapd/config_file.c
++++ b/hostapd/config_file.c
+@@ -5091,6 +5091,94 @@
+ 		}
+ 	} else if (os_strcmp(buf, "eht_bw320_offset") == 0) {
+ 		conf->eht_bw320_offset = atoi(pos);
++	} else if (os_strcmp(buf, "mld_link_id") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 15) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid mld_link_id value %d (must be 0-15)",
++				   line, val);
++			return 1;
++		}
++		conf->mld_link_id_override = val;
++		conf->mld_link_id_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: Link ID override = %d", val);
++	} else if (os_strcmp(buf, "mld_transition_timeout") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 7) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid mld_transition_timeout value %d (must be 0-7)",
++				   line, val);
++			return 1;
++		}
++		/* Transition Timeout is bits 9-11 of EML capabilities */
++		/* Value encoding: 0=128us, 1=256us, ..., 7=16384us */
++		/* BearCentral uses 8 which means 4 in the 3-bit encoding (4 = 0b100) */
++		/* But the value 8 here means index 8 in transition table, not raw bits */
++		/* For now, we'll use the raw value in bits 9-11 */
++		conf->mld_eml_capa_override &= ~0x3800;  /* Clear bits 9-11 */
++		conf->mld_eml_capa_override |= ((val & 0x7) << 9);
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: Transition Timeout = %d (bits 9-11 = 0x%x)", 
++			   val, (val & 0x7) << 9);
++	} else if (os_strcmp(buf, "mld_tid_to_link_negotiation") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 3) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid mld_tid_to_link_negotiation value %d (must be 0-3)",
++				   line, val);
++			return 1;
++		}
++		/* TID-To-Link Mapping Negotiation Support is bits 5-6 of MLD capabilities */
++		/* 0 = Not supported */
++		/* 1 = Support for both directions */
++		/* 2 = Reserved */
++		/* 3 = Support for DL and UL T2LM negotiation */
++		conf->mld_mld_capa_override &= ~0x0060;  /* Clear bits 5-6 */
++		conf->mld_mld_capa_override |= ((val & 0x3) << 5);
++		conf->mld_mld_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: TID-To-Link Mapping Negotiation = %d (bits 5-6 = 0x%x)",
++			   val, (val & 0x3) << 5);
++	} else if (os_strcmp(buf, "emlsr_support") == 0) {
++		int val = atoi(pos);
++		if (val) {
++			conf->mld_eml_capa_override |= 0x0001;
++		} else {
++			conf->mld_eml_capa_override &= ~0x0001;
++		}
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EMLSR support = %d", val);
++	} else if (os_strcmp(buf, "emlmr_support") == 0) {
++		int val = atoi(pos);
++		if (val) {
++			conf->mld_eml_capa_override |= 0x0080;
++		} else {
++			conf->mld_eml_capa_override &= ~0x0080;
++		}
++		conf->mld_eml_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: EMLMR support = %d", val);
++	} else if (os_strcmp(buf, "mld_max_num_links") == 0) {
++		int val = atoi(pos);
++		if (val < 0 || val > 15) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid mld_max_num_links value %d (must be 0-15)",
++				   line, val);
++			return 1;
++		}
++		conf->mld_mld_capa_override &= ~0x000f;
++		conf->mld_mld_capa_override |= (val & 0x000f);
++		conf->mld_mld_capa_set = 1;
++		wpa_printf(MSG_DEBUG, "MLD: Max simultaneous links = %d", val);
++	} else if (os_strcmp(buf, "eht_nss_override") == 0) {
++		int val = atoi(pos);
++		if (val < 1 || val > 8) {
++			wpa_printf(MSG_ERROR,
++				   "Line %d: Invalid eht_nss_override value %d (must be 1-8)",
++				   line, val);
++			return 1;
++		}
++		conf->eht_nss_override = val;
++		conf->eht_nss_override_set = 1;
++		wpa_printf(MSG_DEBUG, "EHT: NSS override = %d", val);
+ #ifdef CONFIG_TESTING_OPTIONS
+ 	} else if (os_strcmp(buf, "eht_oper_puncturing_override") == 0) {
+ 		if (get_u16(pos, line, &bss->eht_oper_puncturing_override))

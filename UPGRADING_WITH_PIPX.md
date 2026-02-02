@@ -1,5 +1,7 @@
 # Updating profiler2 via pipx on NEO{1,2} running WLAN Pi OS v2
 
+NOTE: THIS IS AN MAINTAINED DOCUMENT PRESERVED FOR HISTORY
+
 If you would like to upgrade the shipped version of `profiler2` with WLAN Pi OS v2, please follow these instructions. Please note that these instructions do not work unless `profiler2` was installed via `pipx` either during the WLAN Pi image creation or you manually installed it that way.
 
 ## Prerequisites

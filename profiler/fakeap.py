@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-#
 # profiler : a Wi-Fi client capability analyzer tool
-# Copyright : (c) 2024 Josh Schmelzle
+# Copyright : (c) 2024-2026 Josh Schmelzle
 # License : BSD-3-Clause
 # Maintainer : josh@joshschmelzle.com
 
@@ -12,48 +10,52 @@ profiler.fakeap
 fake ap code handling beaconing and sniffing for the profiler
 """
 
-# standard library imports
+import contextlib
 import datetime
 import inspect
 import logging
 import multiprocessing
 import os
-import signal
+import socket
+import struct
 import sys
 from time import sleep, time
-from typing import Dict
+from typing import Any
 
 # suppress scapy warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
-# third party imports
 try:
-    from scapy.all import Dot11Beacon  # type: ignore
-    from scapy.all import Dot11Elt  # type: ignore
-    from scapy.all import Dot11ProbeResp  # type: ignore
-    from scapy.all import (  # type: ignore
+    import platform
+
+    from scapy.all import (  # type: ignore  # type: ignore
         Dot11,
         Dot11Auth,
+        Dot11Beacon,  # type: ignore
+        Dot11Elt,  # type: ignore
+        Dot11ProbeResp,  # type: ignore
         RadioTap,
         Scapy_Exception,
-    )
-    from scapy.all import conf as scapyconf  # type: ignore
-    from scapy.all import (  # type: ignore
         get_if_hwaddr,
-        get_if_raw_hwaddr,
         hexdump,
         sniff,
     )
+    from scapy.all import conf as scapyconf  # type: ignore
+
+    if platform.system() == "Linux":
+        try:
+            from scapy.all import get_if_raw_hwaddr  # type: ignore
+        except ImportError:
+            from scapy.arch.unix import get_if_raw_hwaddr  # type: ignore
 except ModuleNotFoundError as error:
     if error.name == "scapy":
-        print("required module scapy not found.")
+        print("ERROR: scapy module is required for live capture mode.")
+        print("Install with: pip install scapy")
     else:
-        print(f"{error}")
-    sys.exit(signal.SIGABRT)
+        print(f"ERROR: {error}")
+    sys.exit(-1)
 
 from .__version__ import __version__
-
-# app imports
 from .constants import (
     DOT11_SUBTYPE_ASSOC_REQ,
     DOT11_SUBTYPE_AUTH_REQ,
@@ -63,13 +65,14 @@ from .constants import (
     DOT11_SUBTYPE_REASSOC_REQ,
     DOT11_TYPE_MANAGEMENT,
 )
-from .helpers import get_wlanpi_version
+from .helpers import get_wlanpi_version, has_bad_fcs, is_valid_mac
 
 
 class _Utils:
     """Fake AP helper functions"""
 
-    def build_wlanpi_vendor_ie_type_0(testing):
+    @staticmethod
+    def build_wlanpi_vendor_ie_type_0(testing: bool) -> Any:
         """
         OUI type 0 will follow a type-length-value (TLV) encoding like so <221><total-length><oui><oui_type>[[<type><length><value>] ...]
 
@@ -99,7 +102,7 @@ class _Utils:
         profiler_version = __version__
         if testing:
             profiler_version = "6.6.6"
-        profiler_version_type = int(0).to_bytes(1, "big")
+        profiler_version_type = (0).to_bytes(1, "big")
         profiler_version_data = bytes(f"{profiler_version}".encode("ascii"))
         profiler_version_length = len(profiler_version_data).to_bytes(1, "big")
         profiler_version_tlv = (
@@ -109,7 +112,7 @@ class _Utils:
         system_version = get_wlanpi_version()
         if testing:
             system_version = "9.9.9"
-        system_version_type = int(1).to_bytes(1, "big")
+        system_version_type = (1).to_bytes(1, "big")
         system_version_data = bytes(f"{system_version}".encode("ascii"))
         system_version_length = len(system_version_data).to_bytes(1, "big")
         system_version_tlv = (
@@ -127,13 +130,12 @@ class _Utils:
         ft_disabled,
         he_disabled,
         be_disabled,
-        wpa3_personal_transition,
-        wpa3_personal,
+        security_mode,
         profiler_tlv_disabled,
         testing,
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
-        ssid_bytes: "bytes" = bytes(ssid, "utf-8")
+        ssid_bytes: bytes = bytes(ssid, "utf-8")
         essid = Dot11Elt(ID="SSID", info=ssid_bytes)
 
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
@@ -142,28 +144,42 @@ class _Utils:
         channel = bytes([channel])  # type: ignore
         dsset = Dot11Elt(ID="DSset", info=channel)
 
-        dtim_data = b"\x05\x04\x00\x03\x00\x00"
+        dtim_data = b"\x00\x04\x00\x03\x00\x00"  # Fixed: DTIM count=0, period=4 (was 5, 4 - invalid!)
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
         ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
-        if ft_disabled:
-            akm = b"\x01\x00\x00\x0f\xac\x02\x80\x00"
-            if wpa3_personal_transition:
-                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x08\x80\x00"
-            if wpa3_personal:
-                akm = b"\x01\x00\x00\x0f\xac\x08\x90\x00"
-            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
+        # Map security_mode to AKM suites and optionally mobility domain
+        # security_mode can be: wpa2, ft-wpa2, wpa3-mixed, ft-wpa3-mixed
+        mobility_domain = None  # Only created for FT modes
+
+        if ft_disabled or security_mode in ["wpa2", "wpa3-mixed"]:
+            # No FT modes
+            if security_mode == "wpa3-mixed":
+                # WPA2/WPA3 transition - add GCMP-256 for WPA3
+                # RSN format: version(2) + group_cipher(4) + pairwise_count(2) + pairwise_ciphers(4*n) + akm_count(2) + akms(4*m) + rsn_caps(2)
+                # Pairwise ciphers: CCMP (for WPA2) + GCMP-256 (for WPA3)
+                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"  # Count=2, CCMP, GCMP-256
+                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x08\x80\x00"  # PSK + SAE
+                rsn_data = b"\x01\x00\x00\x0f\xac\x04" + pairwise_ciphers + akm
+            else:
+                # WPA2 only
+                akm = b"\x01\x00\x00\x0f\xac\x02\x80\x00"
+                rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
         else:
+            # FT modes (ft-wpa2 or ft-wpa3-mixed)
             mobility_domain_data = b"\x45\xc2\x00"
             mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
-            akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
-            if wpa3_personal_transition:
+            if security_mode == "ft-wpa3-mixed":
+                # FT-WPA2 + FT-WPA3 transition - add GCMP-256 for WPA3
+                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"  # Count=2, CCMP, GCMP-256
                 akm = b"\x04\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x00\x0f\xac\x08\x00\x0f\xac\x09\x8c\x00"
-            if wpa3_personal:
-                akm = b"\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\x9c\x00"
-            rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
+                rsn_data = b"\x01\x00\x00\x0f\xac\x04" + pairwise_ciphers + akm
+            else:
+                # FT-WPA2 only
+                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
+                rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
 
         rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
@@ -217,16 +233,18 @@ class _Utils:
 
         eht_operation = Dot11Elt(ID=0xFF, info=eht_op_data5)
 
-        mac = mac.replace(":", "")
+        # Multi-Link Element (MLE) - currently not included in frame
+        # mac = mac.replace(":", "")
         # mle_data = b"\x6b\xb0\x01\x0d" + b"\x40\xed\x00\xad\xaa\x1b" + b"\x02\x00\x01\x00\x41\x00"
-        mle_data = (
-            b"\x6b\xb0\x01\x0d" + bytes.fromhex(mac) + b"\x02\x00\x01\x00\x41\x00"
-        )
-        mle = Dot11Elt(ID=0xFF, info=mle_data)
+        # mle_data = (
+        #     b"\x6b\xb0\x01\x0d" + bytes.fromhex(mac) + b"\x02\x00\x01\x00\x41\x00"
+        # )
+        # mle = Dot11Elt(ID=0xFF, info=mle_data)
 
         frame = essid / rates / dsset / dtim / ht_capabilities / rsn
 
-        if not ft_disabled:
+        # Add mobility domain if FT is enabled
+        if mobility_domain is not None:
             frame = frame / mobility_domain
 
         frame = (
@@ -260,16 +278,17 @@ class _Utils:
         """Build base frame for beacon and probe resp"""
         log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         log.debug("building 6 GHz frame")
-        ssid_bytes: "bytes" = bytes(ssid, "utf-8")
+        ssid_bytes: bytes = bytes(ssid, "utf-8")
         essid = Dot11Elt(ID="SSID", info=ssid_bytes)
 
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
 
-        channel = bytes([channel])  # type: ignore
-        dsset = Dot11Elt(ID="DSset", info=channel)
+        # Note: DSset (channel) element not used in 6 GHz frames
+        # channel = bytes([channel])  # type: ignore
+        # dsset = Dot11Elt(ID="DSset", info=channel)
 
-        dtim_data = b"\x05\x04\x00\x03\x00\x00"
+        dtim_data = b"\x00\x04\x00\x03\x00\x00"  # Fixed: DTIM count=0, period=4 (was 5, 4 - invalid!)
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
         rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\xe8\x00"
@@ -363,20 +382,15 @@ class _Utils:
     def build_fake_frame_ies(config, mac, testing=False) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        ssid: "str" = config.get("GENERAL").get("ssid")
+        ssid: str = config.get("GENERAL").get("ssid")
         mac = mac
         channel: int = int(config.get("GENERAL").get("channel"))
         frequency: int = int(config.get("GENERAL").get("frequency"))
-        ft_disabled: "bool" = config.get("GENERAL").get("ft_disabled")
-        he_disabled: "bool" = config.get("GENERAL").get("he_disabled")
-        be_disabled: "bool" = config.get("GENERAL").get("be_disabled")
-        profiler_tlv_disabled: "bool" = config.get("GENERAL").get(
-            "profiler_tlv_disabled"
-        )
-        wpa3_personal_transition: "bool" = config.get("GENERAL").get(
-            "wpa3_personal_transition"
-        )
-        wpa3_personal: "bool" = config.get("GENERAL").get("wpa3_personal")
+        ft_disabled: bool = config.get("GENERAL").get("ft_disabled")
+        he_disabled: bool = config.get("GENERAL").get("he_disabled")
+        be_disabled: bool = config.get("GENERAL").get("be_disabled")
+        profiler_tlv_disabled: bool = config.get("GENERAL").get("profiler_tlv_disabled")
+        security_mode: str = config.get("GENERAL").get("security_mode", "ft-wpa3-mixed")
 
         if frequency > 5950:
             frame = _Utils.build_fake_frame_ies_6ghz(
@@ -390,8 +404,7 @@ class _Utils:
                 ft_disabled,
                 he_disabled,
                 be_disabled,
-                wpa3_personal_transition,
-                wpa3_personal,
+                security_mode,
                 profiler_tlv_disabled,
                 testing,
             )
@@ -427,36 +440,49 @@ class TxBeacons(multiprocessing.Process):
         lock,
         sequence_number,
     ):
-        super(TxBeacons, self).__init__()
+        super().__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid: "str" = config.get("GENERAL").get("ssid")
-        self.interface: "str" = config.get("GENERAL").get("interface")
-        channel: "str" = config.get("GENERAL").get("channel")
+        self.ssid: str = config.get("GENERAL").get("ssid")
+        self.interface: str = config.get("GENERAL").get("interface")
+        channel: str = config.get("GENERAL").get("channel")
         if not channel:
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
         scapyconf.iface = self.interface
         self.l2socket = None
         try:
-            self.l2socket = scapyconf.L2socket(iface=self.interface)
+            self.l2socket = socket.socket(
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
+            )
+            self.l2socket.bind((self.interface, 0))
         except OSError as error:
-            if "No such device" in error.strerror:
+            if error.strerror and "No such device" in error.strerror:
                 self.log.warning(
                     "TxBeacons: no such device (%s) ... exiting ...", self.interface
                 )
-                sys.exit(signal.SIGALRM)
+                sys.exit(1)
         if not self.l2socket:
             self.log.error(
-                "TxBeacons(): unable to create L2socket with %s ... exiting ...",
+                "TxBeacons(): unable to create raw socket with %s ... exiting ...",
                 self.interface,
             )
-            sys.exit(signal.SIGALRM)
-        self.log.debug(self.l2socket.outs)
+            sys.exit(1)
+        self.log.debug("Raw AF_PACKET socket created for beacons on %s", self.interface)
+
+        # Set socket priority for beacons
+        try:
+            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
+            self.log.info("Socket priority set to 7 (highest) for beacons")
+        except OSError as e:
+            self.log.warning("Could not set socket priority for beacons: %s", e)
         self.beacon_interval = 0.102_400
+
+        # Beacon process uses its own local sequence counter (no lock contention!)
+        self.beacon_seq = 0
 
         with lock:
             self.mac = _Utils.get_mac(self.interface)
@@ -471,52 +497,84 @@ class TxBeacons(multiprocessing.Process):
             beacon_frame_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
-        self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
-        self.log.info("starting beacon transmissions")
-        self.every(self.beacon_interval, self.beacon)
+            # Pre-serialize beacon frame for fast transmission
+            beacon_bytes = bytes(self.beacon_frame)
 
-    def every(self, interval: float, task) -> None:
-        """Attempt to address beacon drift"""
-        start_time = time()
-        while True:
-            task()
-            sleep(interval - ((time() - start_time) % interval))
+            # Calculate offsets for sequence number
+            radiotap_len = struct.unpack("<H", beacon_bytes[2:4])[0]
+            self.seq_offset = radiotap_len + 22
+
+            # Store as bytearray for efficient updates
+            self.beacon_template = bytearray(beacon_bytes)
+
+            self.log.debug(
+                "Beacon template created: %d bytes, seq_offset=%d",
+                len(self.beacon_template),
+                self.seq_offset,
+            )
+
+        self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
+
+    def cleanup(self):
+        """Clean up resources"""
+        if hasattr(self, "l2socket") and self.l2socket:
+            with contextlib.suppress(Exception):
+                self.l2socket.close()
+            self.l2socket = None
+
+    def __del__(self):
+        """Destructor to ensure socket cleanup"""
+        self.cleanup()
+
+    def run(self):
+        """Main beacon transmission loop - called by multiprocessing.Process.start()"""
+        self.log.debug("TxBeacons process started, beginning beacon transmission")
+        try:
+            while True:
+                self.beacon()
+                sleep(self.beacon_interval)
+        except KeyboardInterrupt:
+            self.log.info("TxBeacons received shutdown signal")
+        except Exception as e:
+            self.log.error("TxBeacons encountered error: %s", e, exc_info=True)
+            from profiler.status import ProfilerState, StatusReason, write_status
+
+            write_status(
+                state=ProfilerState.FAILED,
+                reason=StatusReason.FAKEAP_CRASHED,
+                error=str(e),
+            )
+        finally:
+            self.log.debug("TxBeacons shutting down")
+            self.cleanup()
 
     def beacon(self) -> None:
         """Update and Tx Beacon Frame"""
-        frame = self.beacon_frame
-        with self.sequence_number.get_lock():
-            frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
+        # Use local sequence counter (no lock, no contention!)
+        self.beacon_seq = (self.beacon_seq + 1) % 4096
+        seq_num = self.beacon_seq
 
-        # print(f"frame.sequence_number: {frame.sequence_number}")
-        # frame.sequence_number value is updating here, but not updating in pcap for some adapters
-        # this appears to impact MediaTek adapters vs RealTek
+        # Fast byte-level patching of pre-serialized template
+        frame_bytes = bytearray(self.beacon_template)
 
-        # ts = int((datetime.now().timestamp() - self.boot_time) * 1000000)
-        # frame[Dot11Beacon].timestamp = ts
+        # Patch sequence number (bits 4-15 of sequence control field)
+        frame_bytes[self.seq_offset : self.seq_offset + 2] = struct.pack(
+            "<H", seq_num << 4
+        )
 
-        # INFO: SCAPY TIMESTAMP FIELD INFORMATION
-        # class LELongField(LongField):
-        #     def __init__(self, name, default):
-        #         Field.__init__(self, name, default, "<Q")
-        #
-        # < is little-endian
-        # unsigned long long
-        # size is 8
-
-        # self.log.debug("frame timestamp: %s", convert_timestamp_to_uptime(ts))
-        # scapy is doing something werid with our timestamps.
-        # pcap shows wrong timestamp values
+        # Send via raw socket
+        if not self.l2socket:
+            return
         try:
-            self.l2socket.send(frame)  # type: ignore
+            self.l2socket.send(frame_bytes)
         except OSError as error:
             for event in ("Network is down", "No such device"):
-                if event in error.strerror:
+                if error.strerror and event in error.strerror:
                     self.log.warning(
                         "beacon(): network is down or no such device (%s) ... exiting ...",
                         self.interface,
                     )
-                    sys.exit(signal.SIGALRM)
+                    sys.exit(1)
 
 
 class Sniffer(multiprocessing.Process):
@@ -531,7 +589,7 @@ class Sniffer(multiprocessing.Process):
         queue,
         args,
     ):
-        super(Sniffer, self).__init__()
+        super().__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
 
@@ -539,43 +597,93 @@ class Sniffer(multiprocessing.Process):
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid: "str" = config.get("GENERAL").get("ssid")
-        self.interface: "str" = config.get("GENERAL").get("interface")
-        channel: "str" = config.get("GENERAL").get("channel")
+        self.ssid: str = config.get("GENERAL").get("ssid")
+        self.interface: str = config.get("GENERAL").get("interface")
+        channel: str = config.get("GENERAL").get("channel")
         if not channel:
             raise ValueError("cannot determine channel to sniff")
         self.channel = int(channel)
-        self.listen_only: "bool" = config.get("GENERAL").get("listen_only")
-        self.assoc_reqs: "Dict" = {}
+        self.listen_only: bool = config.get("GENERAL").get("listen_only")
+        self.assoc_reqs: dict = {}
 
-        self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
-        if args.no_bpf_filters:
+        # Monitoring metrics (track client interactions)
+        self.seen_macs: set = set()  # All unique MACs observed
+        self.authed_macs: set = set()  # MACs that sent auth request
+        self.assoc_macs: set = set()  # MACs that sent assoc request
+        self.total_probe_requests = 0  # Total probe requests (can be >1 per MAC)
+        self.total_auth_requests = 0  # Total auth requests (can be >1 per MAC)
+        self.total_assoc_requests = 0  # Total assoc requests (can be >1 per MAC)
+        self.invalid_frame_count = 0  # Corrupted/invalid frames filtered
+        self.bad_fcs_count = 0  # Frames with bad FCS (checksum mismatch)
+        self.last_stats_log_time: float = 0  # For periodic logging
+        self.last_metrics_update_time: float = (
+            0  # For debouncing monitoring metrics writes
+        )
+        self.metrics_update_interval = 10.0  # Write to disk every 10 seconds
+        self.metrics_dirty = False  # Track if metrics changed since last write
+
+        # BPF filters for improved kernel-level packet filtering
+        # Default to enabled for better performance
+        if hasattr(args, "no_bpf_filters") and args.no_bpf_filters:
+            # Explicit --no-bpf-filters flag
             self.bpf_filter = ""
+            self.log.info("BPF filters disabled (filtering in Python instead)")
+        else:
+            # Enable BPF filters by default for performance
+            self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
+            self.log.info(
+                "BPF filters enabled (kernel-level filtering for better performance)"
+            )
         # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
         # self.log.debug(scapyconf.ifaces)
         self.l2socket = None
         try:
-            self.l2socket = scapyconf.L2socket(iface=self.interface)
+            self.l2socket = socket.socket(
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
+            )
+            self.l2socket.bind((self.interface, 0))
         except OSError as error:
-            if "No such device" in error.strerror:
+            if error.strerror and "No such device" in error.strerror:
                 self.log.warning(
                     "Sniffer: No such device (%s) ... exiting ...", self.interface
                 )
-                sys.exit(signal.SIGALRM)
+                sys.exit(1)
         if not self.l2socket:
             self.log.error(
-                "Sniffer(): unable to create L2socket with %s ... exiting ...",
+                "Sniffer(): unable to create raw socket with %s ... exiting ...",
                 self.interface,
             )
-            sys.exit(signal.SIGALRM)
-        self.log.debug(self.l2socket.outs)
+            sys.exit(1)
+        self.log.debug("Raw AF_PACKET socket created for %s", self.interface)
+
+        # Set socket priority for probe responses
+        try:
+            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
+            self.log.info("Socket priority set to 7 (highest) for probe responses")
+        except OSError as e:
+            self.log.warning("Could not set socket priority for responses: %s", e)
 
         self.received_frame_cb = self.received_frame
-        self.dot11_probe_request_cb = self.probe_response
+        # Determine if we're in Rx-only mode (listen-only or hostapd mode)
+        if self.listen_only:
+            # Check if this is hostapd mode (ap_mode=True) or true listen-only
+            ap_mode = config.get("GENERAL", {}).get("ap_mode", False)
+            if ap_mode:
+                self.log.info(
+                    "Sniffer in Rx-only mode (hostapd AP handles probe/auth responses)"
+                )
+            else:
+                self.log.info(
+                    "Sniffer in Rx-only mode (passive monitoring, no AP responses)"
+                )
+            self.dot11_probe_request_cb = lambda *args, **kwargs: None  # No-op
+            self.dot11_auth_cb = lambda *args, **kwargs: None  # No-op
+        else:
+            self.dot11_probe_request_cb = self.probe_response
+            self.dot11_auth_cb = self.auth
         self.dot11_assoc_request_cb = self.assoc_req
-        self.dot11_auth_cb = self.auth
         with lock:
             self.mac = _Utils.get_mac(self.interface)
             probe_resp_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
@@ -592,54 +700,183 @@ class Sniffer(multiprocessing.Process):
                 / Dot11(subtype=DOT11_SUBTYPE_AUTH_REQ, addr2=self.mac, addr3=self.mac)
                 / Dot11Auth(seqnum=0x02)
             )
+
+            # Pre-serialize frames to bytearrays for fast patching
+            probe_resp_bytes = bytes(self.probe_response_frame)
+            auth_bytes = bytes(self.auth_frame)
+
+            # Calculate RadioTap header length (bytes 2-3, little-endian)
+            radiotap_len = struct.unpack("<H", probe_resp_bytes[2:4])[0]
+
+            # 802.11 MAC header offsets (after RadioTap header)
+            # Frame Control (2) + Duration (2) + addr1 (6) + addr2 (6) + addr3 (6) + Seq (2)
+            self.addr1_offset = radiotap_len + 4
+            self.seq_offset = radiotap_len + 22
+
+            # Store templates as bytearrays for efficient in-place updates
+            self.probe_response_template = bytearray(probe_resp_bytes)
+            self.auth_template = bytearray(auth_bytes)
+
+            # Pre-allocate buffers for zero-allocation response path
+            self.probe_response_buffer = bytearray(len(probe_resp_bytes))
+            self.auth_buffer = bytearray(len(auth_bytes))
+
+            # MAC address cache for repeated clients (LRU with 128 entries)
+            from functools import lru_cache
+
+            @lru_cache(maxsize=128)
+            def parse_mac_cached(mac_str):
+                return bytes.fromhex(mac_str.replace(":", ""))
+
+            self._parse_mac = parse_mac_cached
+
+            # Sniffer process uses its own local sequence counter (no lock contention!)
+            self.sniffer_seq = 0
+
+            # Only log frame template details in fake AP mode (not needed in hostapd mode)
+            if not self.listen_only:
+                self.log.debug(
+                    "Frame templates created: probe=%d bytes, auth=%d bytes, addr1_offset=%d, seq_offset=%d (using local seq counter)",
+                    len(self.probe_response_template),
+                    len(self.auth_template),
+                    self.addr1_offset,
+                    self.seq_offset,
+                )
+
+    def cleanup(self):
+        """Clean up resources"""
+        if hasattr(self, "l2socket") and self.l2socket:
+            with contextlib.suppress(Exception):
+                self.l2socket.close()
+            self.l2socket = None
+
+    def __del__(self):
+        """Destructor to ensure socket cleanup"""
+        self.cleanup()
+
+    def run(self):
+        """Main process loop - called by multiprocessing.Process.start()"""
         try:
             sniff(
                 iface=self.interface,
                 prn=self.received_frame_cb,
                 store=0,
                 filter=self.bpf_filter,
+                promisc=False,
             )
+        except KeyboardInterrupt:
+            self.log.info("Sniffer received shutdown signal")
+            self.log_session_stats()  # Log final stats on shutdown
         except Scapy_Exception as error:
             if "ailed to compile filter" in str(error):
-                self.log.exception(
-                    "we had a problem creating BPF filters on L2socket/%s",
+                self.log.warning(
+                    "BPF filter compilation failed on %s, retrying without filters",
                     self.interface,
-                    exc_info=True,
                 )
-                self.log.info("try running with --no_bpf_filters")
+                self.log.info(
+                    "Running without BPF filters (filtering in Python instead)"
+                )
+                # Retry without BPF filters
+                try:
+                    sniff(
+                        iface=self.interface,
+                        prn=self.received_frame_cb,
+                        store=0,
+                        filter="",
+                        promisc=False,
+                    )
+                except Exception:
+                    self.log.exception(
+                        "scapy.sniff() failed even without BPF filters: %s",
+                        exc_info=True,
+                    )
+                    from profiler.status import (
+                        ProfilerState,
+                        StatusReason,
+                        write_status,
+                    )
+
+                    write_status(
+                        state=ProfilerState.FAILED,
+                        reason=StatusReason.FAKEAP_CRASHED,
+                        error="scapy.sniff() failed without BPF filters",
+                    )
+                    sys.exit(1)
             else:
                 self.log.exception(
                     "scappy.sniff() problem in fakeap.py sniffer(): %s",
                     exc_info=True,
                 )
-            signal.SIGALRM
+                from profiler.status import ProfilerState, StatusReason, write_status
+
+                write_status(
+                    state=ProfilerState.FAILED,
+                    reason=StatusReason.FAKEAP_CRASHED,
+                    error=f"scapy.sniff() error: {error}",
+                )
+                sys.exit(1)
+        finally:
+            # Always log final stats and write final metrics on exit
+            self.log.info("Sniffer shutting down")
+            if self.invalid_frame_count > 0:
+                self.log.info(
+                    f"Filtered {self.invalid_frame_count} invalid/corrupted frames during session"
+                )
+            if self.bad_fcs_count > 0:
+                self.log.info(
+                    f"Filtered {self.bad_fcs_count} frames with bad FCS during session"
+                )
+            self.log_session_stats()
+            # Force write final monitoring metrics (bypass debounce)
+            self._update_monitoring_metrics(force=True)
 
     def received_frame(self, packet) -> None:
         """Handle incoming packets for profiling"""
+        # Check if this is a Dot11 packet (802.11 management frame)
+        if not packet.haslayer(Dot11):
+            return  # Ignore non-802.11 packets
+
+        # Periodic stats logging (every 60 seconds)
+        current_time = time()
+        if current_time - self.last_stats_log_time >= 60:
+            self.log_session_stats()
+            self.last_stats_log_time = current_time
+
+        # Track all unique MACs seen (any frame type)
+        mac = packet.addr2
+        if mac and mac not in self.seen_macs:
+            self.seen_macs.add(mac)
+            self._update_monitoring_metrics()
+
         if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
             if packet.addr1 == self.mac:  # if we are the receiver
                 self.log.debug("rx auth sent from MAC %s", packet.addr2)
+                # Track auth metrics
+                self.total_auth_requests += 1
+                if mac not in self.authed_macs:
+                    self.authed_macs.add(mac)
+                    self._update_monitoring_metrics()
                 self.dot11_auth_cb(packet.addr2)
         elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:  # probe request
-            if Dot11Elt in packet:
-                if packet[Dot11Elt].ID == 0:
-                    ssid = packet[Dot11Elt].info
-                    try:
-                        decoded = ssid.decode("latin-1")
-                    except UnicodeDecodeError:
-                        decoded = ""
-                    self.log.debug(
-                        "rx probe req for %s (%s) by MAC %s",
-                        ssid,
-                        decoded,
-                        packet.addr2,
-                    )
-                    if ssid == self.ssid.encode() or packet[Dot11Elt].len == 0:
-                        self.dot11_probe_request_cb(packet)
+            self.total_probe_requests += 1
+            if Dot11Elt in packet and packet[Dot11Elt].ID == 0:
+                ssid = packet[Dot11Elt].info
+                try:
+                    decoded = ssid.decode("latin-1")
+                except UnicodeDecodeError:
+                    decoded = ""
+                if ssid == self.ssid.encode() or packet[Dot11Elt].len == 0:
+                    self.dot11_probe_request_cb(packet, ssid, decoded)
         elif (
             packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
             or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
         ):
+            # Track assoc metrics
+            self.total_assoc_requests += 1
+            if mac not in self.assoc_macs:
+                self.assoc_macs.add(mac)
+                self._update_monitoring_metrics()
+
             if packet.addr1 == self.mac:  # if we are the receiver
                 self.dot11_assoc_request_cb(packet)
             if self.listen_only:
@@ -657,46 +894,192 @@ class Sniffer(multiprocessing.Process):
             else:
                 self.log.debug("SSID missing in assoc req by MAC %s", packet.addr2)
 
-    def probe_response(self, probe_request) -> None:
+    def probe_response(
+        self, probe_request: Any, ssid: bytes = b"", decoded: str = ""
+    ) -> None:
         """Send probe resp to assist with profiler discovery"""
-        frame = self.probe_response_frame
-        with self.sequence_number.get_lock():
-            frame.sequence_number = _Utils.next_sequence_number(self.sequence_number)
-        frame[Dot11].addr1 = probe_request.addr2
+        t_start = time()
+
+        # Use local sequence counter (no lock, no contention!)
+        self.sniffer_seq = (self.sniffer_seq + 1) % 4096
+        seq_num = self.sniffer_seq
+        lock_wait_ms = 0.0  # No lock anymore!
+        lock_ms = 0.0
+
+        # Fast byte-level patching using pre-allocated buffer
+        t_manip_start = time()
+
+        # Reuse buffer (in-place copy for zero allocation)
+        self.probe_response_buffer[:] = self.probe_response_template
+
+        # Parse destination MAC from string to bytes (with caching)
+        client_mac_bytes = self._parse_mac(probe_request.addr2)
+
+        # Patch addr1 (destination MAC)
+        self.probe_response_buffer[self.addr1_offset : self.addr1_offset + 6] = (
+            client_mac_bytes
+        )
+
+        # Patch sequence number (bits 4-15 of sequence control field)
+        self.probe_response_buffer[self.seq_offset : self.seq_offset + 2] = struct.pack(
+            "<H", seq_num << 4
+        )
+
+        t_manip_end = time()
+        manip_ms = (t_manip_end - t_manip_start) * 1000
+
+        # Send via raw socket
+        if not self.l2socket:
+            return
+        t_send_start = time()
         try:
-            self.l2socket.send(frame)  # type: ignore
+            self.l2socket.send(self.probe_response_buffer)
         except OSError as error:
             for event in ("Network is down", "No such device"):
-                if event in error.strerror:
+                if error.strerror and event in error.strerror:
                     self.log.exception(
                         "probe_response(): network is down or no such device ... exiting ..."
                     )
-                    sys.exit(signal.SIGALRM)
-        self.log.debug("tx probe resp to %s", probe_request.addr2)
+                    sys.exit(1)
+        t_send_end = time()
+        send_ms = (t_send_end - t_send_start) * 1000
 
-    def assoc_req(self, frame) -> None:
+        t_end = time()
+        total_ms = (t_end - t_start) * 1000
+
+        self.log.debug(
+            "rx probe req for %s (%s) by MAC %s | seq=%d wait=%.3fms lock=%.3fms manip=%.3fms send=%.3fms total=%.3fms",
+            ssid,
+            decoded,
+            probe_request.addr2,
+            seq_num,
+            lock_wait_ms,
+            lock_ms,
+            manip_ms,
+            send_ms,
+            total_ms,
+        )
+
+    def assoc_req(self, frame: Any) -> None:
         """Put association request on queue for the Profiler"""
+        if not is_valid_mac(frame.addr2) or not is_valid_mac(frame.addr1):
+            self.invalid_frame_count += 1
+            return
+
+        if has_bad_fcs(frame):
+            self.bad_fcs_count += 1
+            self.log.debug("dropping frame with bad FCS from %s", frame.addr2)
+            return
+
         self.assoc_reqs[frame.addr2] = frame
         self.log.debug("adding assoc req from %s to queue", frame.addr2)
         self.queue.put(frame)
 
-    def auth(self, receiver) -> None:
+    def auth(self, receiver: str) -> None:
         """Send authentication frame to get the station to prompt an assoc request"""
-        frame = self.auth_frame
-        frame[Dot11].addr1 = receiver
-        with self.sequence_number.get_lock():
-            frame.sequence_number = (
-                _Utils.next_sequence_number(self.sequence_number) - 1
-            )
+        t_start = time()
 
-        self.log.debug("tx authentication (0x0B) to %s", receiver)
+        # Use local sequence counter (no lock, no contention!)
+        self.sniffer_seq = (self.sniffer_seq + 1) % 4096
+        seq_num = self.sniffer_seq
+        lock_ms = 0.0  # No lock anymore!
 
+        # Fast byte-level patching using pre-allocated buffer
+        t_manip_start = time()
+
+        # Reuse buffer (in-place copy for zero allocation)
+        self.auth_buffer[:] = self.auth_template
+
+        # Parse destination MAC from string to bytes (with caching)
+        client_mac_bytes = self._parse_mac(receiver)
+
+        # Patch addr1 (destination MAC)
+        self.auth_buffer[self.addr1_offset : self.addr1_offset + 6] = client_mac_bytes
+
+        # Patch sequence number (bits 4-15 of sequence control field)
+        self.auth_buffer[self.seq_offset : self.seq_offset + 2] = struct.pack(
+            "<H", seq_num << 4
+        )
+
+        t_manip_end = time()
+        manip_ms = (t_manip_end - t_manip_start) * 1000
+
+        # Send via raw socket
+        if not self.l2socket:
+            return
+        t_send_start = time()
         try:
-            self.l2socket.send(frame)  # type: ignore
+            self.l2socket.send(self.auth_buffer)
         except OSError as error:
             for event in ("Network is down", "No such device"):
-                if event in error.strerror:
+                if error.strerror and event in error.strerror:
                     self.log.warning(
                         "auth(): network is down or no such device ... exiting ..."
                     )
-                    sys.exit(signal.SIGALRM)
+                    sys.exit(1)
+        t_send_end = time()
+        send_ms = (t_send_end - t_send_start) * 1000
+
+        t_end = time()
+        total_ms = (t_end - t_start) * 1000
+
+        self.log.debug(
+            "tx authentication (0x0B) to %s | seq=%d lock=%.3fms manip=%.3fms send=%.3fms total=%.3fms",
+            receiver,
+            seq_num,
+            lock_ms,
+            manip_ms,
+            send_ms,
+            total_ms,
+        )
+
+    def _update_monitoring_metrics(self, force: bool = False) -> None:
+        """Update monitoring metrics in info file (debounced to reduce disk I/O)
+
+        Args:
+            force: If True, bypass debounce and write immediately (e.g., on shutdown)
+        """
+        from .status import update_monitoring_metrics_in_info
+
+        # Mark that metrics have changed
+        self.metrics_dirty = True
+
+        # Check if enough time has passed since last update (debounce)
+        current_time = time()
+        time_since_last_update = current_time - self.last_metrics_update_time
+
+        if not force and time_since_last_update < self.metrics_update_interval:
+            # Too soon - skip this update to reduce disk I/O
+            return
+
+        # Only write if metrics actually changed
+        if not self.metrics_dirty and not force:
+            return
+
+        # Calculate failed profile count: MACs that authed but never sent assoc
+        failed_count = len(self.authed_macs - self.assoc_macs)
+
+        update_monitoring_metrics_in_info(
+            total_clients_seen=len(self.seen_macs),
+            failed_profile_count=failed_count,
+            invalid_frame_count=self.invalid_frame_count,
+            bad_fcs_count=self.bad_fcs_count,
+        )
+
+        # Reset debounce timer and dirty flag
+        self.last_metrics_update_time = current_time
+        self.metrics_dirty = False
+
+    def log_session_stats(self) -> None:
+        """Log current session statistics"""
+        failed_count = len(self.authed_macs - self.assoc_macs)
+
+        self.log.debug(
+            f"Session stats: probes={self.total_probe_requests}, "
+            f"auths={self.total_auth_requests}, "
+            f"assocs={self.total_assoc_requests}, "
+            f"unique_clients={len(self.seen_macs)}, "
+            f"failed={failed_count}, "
+            f"invalid_frames={self.invalid_frame_count}, "
+            f"bad_fcs={self.bad_fcs_count}"
+        )
