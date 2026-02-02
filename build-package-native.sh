@@ -41,13 +41,6 @@ echo "Installing package build dependencies..."
 mk-build-deps --install --remove --tool "apt-get -y --no-install-recommends" debian/control || true
 
 echo ""
-echo "========================================="
-echo "Building hostapd first..."
-echo "========================================="
-cd hostapd && bash build.sh
-cd /work
-
-echo ""
 echo "Building package..."
 dpkg-buildpackage -us -uc -b
 

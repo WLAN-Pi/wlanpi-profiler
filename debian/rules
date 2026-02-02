@@ -15,21 +15,21 @@ DH_VENV_ARGS=--builtin-venv --python ${SNAKE} $(EXTRA_REQUIREMENTS) \
 %:
 	dh $@ --with python3,python-virtualenv --buildsystem=pybuild
 
-.PHONY: override_dh_lintian override_dh_virtualenv override_dh_installexamples override_dh_auto_build override_dh_auto_install
+.PHONY: override_dh_lintian override_dh_virtualenv override_dh_installexamples override_dh_auto_configure override_dh_auto_install
 
-override_dh_auto_build:
-	@echo "Checking hostapd binary..."
-	@if [ ! -f hostapd/hostapd-2.11/hostapd/hostapd ]; then \
-		echo "ERROR: hostapd binary not found."; \
-		echo "It should have been built by build-package-native.sh before dpkg-buildpackage."; \
-		exit 1; \
-	fi
-	@echo "✓ Found hostapd binary: $$(ls -lh hostapd/hostapd-2.11/hostapd/hostapd | awk '{print $$5}')"
-	dh_auto_build
+override_dh_auto_configure:
+	@echo "~~~~~~~~~~~~~~~~~~~~"
+	@echo "Building hostapd..."
+	@echo "~~~~~~~~~~~~~~~~~~~~"
+	cd hostapd && bash build.sh
+	@echo ""
+	@echo "Hostapd build complete"
+	@echo "~~~~~~~~~~~~~~~~~~~~"
+	dh_auto_configure
 
 override_dh_auto_install:
 	dh_auto_install
-	@echo "========================================="
+	@echo "~~~~~~~~~~~~~~~~~~~~"
 	@echo "Installing hostapd and hostapd_cli binaries..."
 	@echo "PACKAGE=$(PACKAGE)"
 	@echo "Source hostapd: hostapd/hostapd-2.11/hostapd/hostapd"
@@ -42,8 +42,8 @@ override_dh_auto_install:
 	install -m 755 hostapd/hostapd-2.11/hostapd/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
 	@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd || echo "ERROR: hostapd install failed!"
 	@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli || echo "ERROR: hostapd_cli install failed!"
-	@echo "✓ Hostapd binaries installed"
-	@echo "========================================="
+	@echo "Hostapd binaries installed"
+	@echo "~~~~~~~~~~~~~~~~~~~~"
 
 override_dh_installexamples:
 	@echo "Excluding __pycache__ from installexamples"
@@ -97,9 +97,9 @@ override_dh_virtualenv:
 		du -sh $(DH_VENV_DIR) || echo "Cannot determine total venv size"
 
 		@echo ""
-		@echo "========================================="
+		@echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 		@echo "Installing hostapd and hostapd_cli binaries"
-		@echo "========================================="
+		@echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 		@echo "Source hostapd: hostapd/hostapd-2.11/hostapd/hostapd"
 		@echo "Source hostapd_cli: hostapd/hostapd-2.11/hostapd/hostapd_cli"
 		@echo "Target dir: debian/$(PACKAGE)/opt/wlanpi-profiler/bin/"
@@ -110,5 +110,5 @@ override_dh_virtualenv:
 		install -m 755 hostapd/hostapd-2.11/hostapd/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
 		@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
 		@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
-		@echo "✓ Hostapd binaries installed successfully"
-		@echo "========================================="
+		@echo "Hostapd binaries installed successfully"
+		@echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
