@@ -696,9 +696,7 @@ class Interface:
                         f"Available in {band_name} band: {', '.join(map(str, sample))}"
                     )
                     if flag:
-                        error_lines.append(
-                            f"Try with --channel {sample[0]} {flag}"
-                        )
+                        error_lines.append(f"Try with --channel {sample[0]} {flag}")
                     else:
                         error_lines.append(f"Try with --channel {sample[0]}")
                     error_lines.append("")
