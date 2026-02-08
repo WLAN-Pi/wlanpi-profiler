@@ -1,3 +1,9 @@
+wlanpi-profiler (2.0.1-1) unstable; urgency=medium
+
+  * Fix hostapd crash from No IR/DFS flags by adding channel checks after LAR scan 
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Sun, 08 Feb 2026 15:27:12 -0500
+
 wlanpi-profiler (2.0.0-1) unstable; urgency=medium
 
   * MAJOR RELEASE v2.0.0 - Breaking Changes
