@@ -714,6 +714,23 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             )
             sys.exit(-1)
 
+        # Validate channel for AP modes (hostapd and fakeAP) after LAR scan
+        # This ensures No IR/Disabled/Radar flags have been cleared, or we exit and attempt to display a helpful message
+        if not listen_only:
+            try:
+                __IFACE.validate_channel_for_ap(country_code)
+            except InterfaceError as e:
+                log.error(str(e))
+                write_status(
+                    state=ProfilerState.FAILED,
+                    reason=StatusReason.INTERFACE_VALIDATION,
+                    error=str(e),
+                )
+                # Clean up VIF if it was created
+                if __IFACE.requires_vif and hasattr(__IFACE, "mon"):
+                    removeVif()
+                sys.exit(-1)
+
         # ap_mode already determined earlier (before interface staging)
         if listen_only:
             # In true listen-only mode, we're not running an AP

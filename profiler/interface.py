@@ -249,14 +249,16 @@ class Interface:
     def check_for_disabled_or_noir_channels(
         self, freq: int, iw_phy_channels, verbose=False
     ) -> bool:
-        """Check iw phy channels for disabled or No IR and return True if found"""
+        """Check iw phy channels for disabled, No IR, or Radar detection and return True if found"""
         channels_status = self.get_channels_status(iw_phy_channels)
         # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
         if channels_status:
             for _band, channels in channels_status.items():
                 # loop through channels and check if we need to do a scan before staging
                 for ch in channels:
-                    if int(freq) == int(ch.freq) and (ch.disabled or ch.no_ir):
+                    if int(freq) == int(ch.freq) and (
+                        ch.disabled or ch.no_ir or ch.radar_detect
+                    ):
                         if verbose:
                             if ch.disabled:
                                 self.log.warning(
@@ -267,6 +269,12 @@ class Interface:
                             if ch.no_ir:
                                 self.log.warning(
                                     "No IR found in iw channel information for %s (%s) which _may_ cause packet injection to fail! Problem with discovery? Try a different channel / frequency. Confirm we're beaconing via OTA capture from a different interface or device.",
+                                    ch.ch,
+                                    ch.freq,
+                                )
+                            if ch.radar_detect:
+                                self.log.warning(
+                                    "Radar detection required for %s (%s) - DFS (Dynamic Frequency Selection) channel",
                                     ch.ch,
                                     ch.freq,
                                 )
@@ -550,6 +558,192 @@ class Interface:
 
         self.log.debug("finish stage_interface_listen_only")
 
+    def validate_channel_for_ap(self, country_code: str = "") -> None:
+        """
+        Validate that the selected channel is usable for AP operation.
+
+        After interface staging and LAR scan, verify the channel doesn't have
+        No IR, Disabled, or Radar flags. If it does, try to find alternative channels
+        and exit with a helpful error message.
+
+        Args:
+            country_code: Current regulatory country code (e.g., "US")
+
+        Raises:
+            InterfaceError: If channel has regulatory restrictions, with
+                suggestions for alternative channels
+        """
+        self.log.debug("start validate_channel_for_ap")
+
+        iw_phy_channels = run_command(["iw", "phy", f"{self.phy}", "channels"])
+        channels_status = self.get_channels_status(iw_phy_channels)
+
+        if not channels_status:
+            self.log.warning(
+                "Unable to validate channel - could not parse iw phy channels"
+            )
+            return
+
+        requested_band = None
+        requested_channel_info = None
+        restriction_type = []
+
+        for band, channels in channels_status.items():
+            for ch in channels:
+                if int(ch.freq) == int(self.frequency):
+                    requested_band = band
+                    requested_channel_info = ch
+                    if ch.disabled:
+                        restriction_type.append("Disabled")
+                    if ch.no_ir:
+                        restriction_type.append("No IR (No initiation of radiation)")
+                    if ch.radar_detect:
+                        restriction_type.append("Radar detection")
+                    break
+            if requested_channel_info:
+                break
+
+        if not restriction_type:
+            self.log.debug(
+                "Channel %s (%s MHz) - no regulatory restrictions detected",
+                self.channel,
+                self.frequency,
+            )
+            return
+
+        self.log.error(
+            "Channel %s (%s MHz) has regulatory restrictions: %s",
+            self.channel,
+            self.frequency,
+            ", ".join(restriction_type),
+        )
+
+        # Find available channels (no disabled, no_ir, radar flags) in all bands
+        available_by_band = {}
+        for band, channels in channels_status.items():
+            available = []
+            for ch in channels:
+                # Only include standard 20MHz channels we support
+                if (
+                    not ch.disabled
+                    and not ch.no_ir
+                    and not ch.radar_detect
+                    and int(ch.freq) in _20MHZ_FREQUENCY_CHANNEL_MAP
+                ):
+                    available.append(int(ch.ch))
+            if available:
+                available_by_band[band] = available
+
+        error_lines = [
+            "",
+            f"ERROR: Channel {self.channel} ({self.frequency} MHz) cannot be used for AP operation:",
+        ]
+
+        for restriction in restriction_type:
+            if restriction == "Disabled":
+                error_lines.append(
+                    " - Disabled: Channel is disabled by regulatory domain"
+                )
+            elif "No IR" in restriction:
+                error_lines.append(
+                    " - No IR: Cannot initiate radiation on this channel (regulatory restriction)"
+                )
+            elif "Radar" in restriction:
+                error_lines.append(
+                    " - Radar detection: Channel requires DFS (Dynamic Frequency Selection)"
+                )
+
+        error_lines.append("")
+        error_lines.append("The LAR scan did not unlock this channel. Common causes:")
+        if country_code:
+            error_lines.append(f" - Country code: {country_code}")
+        error_lines.append(" - Channel restricted in your regulatory domain")
+        error_lines.append(" - Recent scan did not complete successfully")
+        error_lines.append(" - DFS channel")
+        error_lines.append("")
+
+        if requested_band and requested_band in available_by_band:
+            alternatives = available_by_band[requested_band]
+            band_name = self._get_band_display_name(requested_band)
+            error_lines.append(
+                f"Detected available unrestricted channels in the {band_name} band: {', '.join(map(str, alternatives))}"
+            )
+            # For 2.4 GHz, only suggest non-overlapping channels 1, 6, 11
+            if "1" in requested_band:
+                non_overlapping = [ch for ch in alternatives if ch in [1, 6, 11]]
+                if non_overlapping:
+                    error_lines.append(f"Try with --channel {non_overlapping[0]}")
+                else:
+                    error_lines.append(f"Try with --channel {alternatives[0]}")
+            else:
+                error_lines.append(f"Try with --channel {alternatives[0]}")
+        elif available_by_band:
+            error_lines.append(f"No available channels in {requested_band} band.")
+            error_lines.append("")
+
+            for band, channels in available_by_band.items():
+                if band != requested_band:
+                    band_name = self._get_band_display_name(band)
+                    flag = self._get_band_flag(band)
+
+                    # For 2.4 GHz, only show channels 1, 6, 11
+                    if "1" in band:
+                        sample = [ch for ch in channels if ch in [1, 6, 11]]
+                    else:
+                        sample = channels
+
+                    error_lines.append(
+                        f"Available in {band_name} band: {', '.join(map(str, sample))}"
+                    )
+                    if flag:
+                        error_lines.append(
+                            f"Try with --channel {sample[0]} {flag}"
+                        )
+                    else:
+                        error_lines.append(f"Try with --channel {sample[0]}")
+                    error_lines.append("")
+                    break  # Only suggest first alternative band
+        else:
+            error_lines.append("No channels available in any band!")
+            error_lines.append(
+                "Your regulatory domain may be restricting all non-client Wi-Fi transmission."
+            )
+
+        error_lines.append("")
+        error_lines.append("Additional troubleshooting:")
+        error_lines.append(" 1. Check current regulatory status: sudo iw reg get")
+        error_lines.append(" 2. Set a valid country code: sudo iw reg set US")
+        error_lines.append(
+            " 3. Check all available channels: sudo iw phy phy0 channels"
+        )
+
+        raise InterfaceError("\n".join(error_lines))
+
+    @staticmethod
+    def _get_band_display_name(band: str) -> str:
+        """Convert band identifier from iw phy to more human-readable reference."""
+        # band comes from iw phy as "1:", "2:", "3:", etc.
+        if "1" in band:
+            return "2.4 GHz"
+        elif "2" in band:
+            return "5 GHz"
+        elif "3" in band:
+            return "6 GHz"
+        else:
+            return band.replace("band ", "").replace(":", "")
+
+    @staticmethod
+    def _get_band_flag(band: str) -> str:
+        """Get the CLI flag for a given band identifier."""
+        if "1" in band:
+            return "--band 2.4"
+        elif "2" in band:
+            return "--band 5"
+        elif "3" in band:
+            return "--band 6"
+        else:
+            return ""
+
     @staticmethod
     def get_channels_status(iw_phy_channels) -> dict:
         """Run `iw phy phyX channels` and analyze channel information"""
@@ -560,13 +754,16 @@ class Interface:
         freq = ""
         ch = ""
         no_ir = False
+        radar_detect = False
         band = ""
         disabled = False
         first_band = True
         first_channel_in_band = True
         bands = {}
         channels = []
-        channel = namedtuple("channel", ["freq", "ch", "no_ir", "disabled"])
+        channel = namedtuple(
+            "channel", ["freq", "ch", "no_ir", "radar_detect", "disabled"]
+        )
 
         for line, last_line in flag_last_object(iw_phy_channels.splitlines()):
             line = line.strip().lower()
@@ -583,28 +780,32 @@ class Interface:
                     continue
             if line.startswith("no ir"):
                 no_ir = True
+            if line.startswith("radar detection"):
+                radar_detect = True
             if line.startswith("*"):
-                channels.append(channel(freq, ch, no_ir, disabled))
+                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
                 # reset vars
                 freq = ""
                 ch = ""
                 no_ir = False
+                radar_detect = False
                 disabled = False
                 if "disabled" in line:
                     disabled = True
                 freq = line.split()[1]
                 ch = line.split()[3].replace("[", "").replace("]", "")
             if line.startswith("band "):
-                channels.append(channel(freq, ch, no_ir, disabled))
+                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
                 bands[band] = channels
                 # reset channels list
                 channels = []
-                # reset channel flag
+                # reset channel flags
                 disabled = False
+                radar_detect = False
                 first_channel_in_band = True
                 band = line.split(" ")[1]
             if last_line:
-                channels.append(channel(freq, ch, no_ir, disabled))
+                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
                 bands[band] = channels
         return bands
 
