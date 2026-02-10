@@ -581,14 +581,14 @@ def setup_parser() -> argparse.ArgumentParser:
         dest="ap_mode",
         action="store_true",
         default=False,
-        help="use hostapd AP mode for fast discovery (default behavior, requires monitor VIF support)",
+        help="use hostapd AP mode for fast discovery (requires monitor VIF support)",
     )
     ap_mode_group.add_argument(
         "--fakeap",
         dest="fakeap",
         action="store_true",
         default=False,
-        help="use legacy FakeAP mode (Scapy/monitor-only, slower discovery but works with more adapters)",
+        help="use legacy FakeAP mode (Scapy/monitor-only, slower discovery but works with more adapters) (default behavior for bullseye branch)",
     )
     parser.add_argument(
         "--hostapd-config",
@@ -857,14 +857,14 @@ def setup_config(args) -> tuple[Optional[dict], Optional[str]]:
         config["GENERAL"]["passphrase"] = DEFAULT_PASSPHRASE
 
     # Handle hostapd mode options
-    # Default to ap_mode unless explicitly requesting fakeap
-    if args.fakeap:
-        config["GENERAL"]["fakeap"] = True
-        config["GENERAL"]["ap_mode"] = False
-    else:
-        # Default: use ap_mode
+    # Default to fakeap unless explicitly requesting ap_mode
+    if args.ap_mode:
         config["GENERAL"]["ap_mode"] = True
         config["GENERAL"]["fakeap"] = False
+    else:
+        # Default: use fakeap
+        config["GENERAL"]["fakeap"] = True
+        config["GENERAL"]["ap_mode"] = False
 
     if args.hostapd_config:
         config["GENERAL"]["hostapd_config"] = args.hostapd_config

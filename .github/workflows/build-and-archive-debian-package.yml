@@ -2,6 +2,15 @@ name: Build and Archive Debian Package
 on:
   # Allow manual runs of workflow from Actions tab
   workflow_dispatch:
+    inputs:
+      distros:
+        description: 'Distros to build as JSON array: ["bullseye"] or ["bullseye","bookworm","trixie"]'
+        required: false
+        default: '["bullseye"]'
+        type: string
+  push:
+    paths:
+      - 'debian/changelog'
   pull_request:
     paths:
       - 'debian/changelog'
@@ -11,12 +20,13 @@ jobs:
     uses: WLAN-Pi/gh-workflows/.github/workflows/get-formatted-version-string.yml@main
   sbuild:
     name: sbuild pkg
-    needs: 
+    needs:
       - format
     uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
     with:
       pkg: wlanpi-profiler
-      version: ${{ needs.format.outputs.version }} 
+      version: ${{ needs.format.outputs.version }}
+      distros: ${{ inputs.distros || '["bullseye"]' }}
   slack-workflow-status:
     if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack

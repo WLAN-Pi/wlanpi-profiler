@@ -1,3 +1,9 @@
+wlanpi-profiler (2.0.2-1) unstable; urgency=medium
+
+  * Make Fake AP the default mode for Bullseye 
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 10 Feb 2026 18:08:17 -0500
+
 wlanpi-profiler (2.0.1-1) unstable; urgency=medium
 
   * Fix hostapd crash from No IR/DFS flags by adding channel checks after LAR scan 
