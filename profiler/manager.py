@@ -779,6 +779,20 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             # update ssid record for sharing with other apps like FPMS for QR code generation
             helpers.update_ssid_record(config.get("GENERAL").get("ssid"))
 
+            # Auto-disable 11be/MLD if the interface/driver does not support it
+            if not config["GENERAL"].get("be_disabled", False):
+                try:
+                    phy_info = helpers.run_command(["sudo", "/sbin/iw", "phy", __IFACE.phy, "info"])
+                    if "EHT" not in phy_info and "Extremely High Throughput" not in phy_info:
+                        log.info("Interface %s does not support 802.11be (EHT). Auto-disabling EHT/MLD AP configuration.", __IFACE.name)
+                        config["GENERAL"]["be_disabled"] = True
+                except Exception as e:
+                    log.debug("Failed to query phy info via iw: %s", e)
+                    # Fallback check based on driver name
+                    if __IFACE.driver in ["mt7921e", "mt7921u", "mt7922"]:
+                        log.info("Driver %s does not support 802.11be (EHT). Auto-disabling EHT/MLD AP configuration.", __IFACE.driver)
+                        config["GENERAL"]["be_disabled"] = True
+
             try:
                 __HOSTAPD_MGR = HostapdManager(config["GENERAL"], country_code, log)
                 __HOSTAPD_MGR.start()
