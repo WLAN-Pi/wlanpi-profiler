@@ -14,7 +14,7 @@ source venv/bin/activate
 3. Update and install tools 
 
 ```bash
-pip install -u pip pip-tools setuptools wheel
+pip install -U pip pip-tools setuptools wheel
 ```
 
 4. Install depends
