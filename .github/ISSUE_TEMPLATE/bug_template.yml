@@ -1,37 +1,41 @@
 name: 🐛 Bug report
 description: Create a report to help us improve profiler
-title: "[BUG]: <concise title>"
-labels: ['bug, untriaged']
+title: "[BUG]: <title>"
+labels: ['bug', 'untriaged']
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to fill out this bug report!
+        Before filing, check if this issue already exists. For usage questions, use [discussions](https://github.com/WLAN-Pi/feedback/discussions) instead.
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
-      description: What did you expect?
-      placeholder: Tell us what happened and what you expected instead.
+      placeholder: Describe the bug and what you expected to happen instead.
     validations:
       required: true
   - type: textarea
-    id: logs
+    id: reproduce
     attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      value: |
-         - Run `$ sudo profiler --list_interfaces`, and paste in the full output.
-
-         - Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
-      render: shell
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Profiler version where this issue occurred (`profiler --version`).
     validations:
       required: true
   - type: dropdown
+    id: frequency
     attributes:
       label: How often does this bug happen?
-      description: |
-        Following the repro steps above, how easily are you able to reproduce this bug?
+      description: Following the repro steps above, how easily are you able to reproduce this bug?
       options:
         - Every time
         - Often
@@ -39,26 +43,15 @@ body:
         - Only once
     validations:
       required: true
-  - type: input
+  - type: textarea
+    id: logs
     attributes:
-      label: What version of the app are you using?
-      description: |
-        Please provide the app version where this issue occurred.
+      label: Relevant log output
+      description: This will be automatically formatted into code, so no need for backticks.
+      value: |
+        - Run `$ sudo profiler --list_interfaces`, and paste in the full output.
+
+        - Run `$ sudo profiler --debug`, reproduce the issue, and paste in the full output.
+      render: shell
     validations:
       required: true
-  - type: checkboxes
-    id: contribs
-    attributes:
-      label: Contributions
-      description: Please review our [developer documentation](https://github.com/WLAN-Pi/developers) before contributing.
-      options:
-        - label: I have read the contribution guidelines
-          required: true
-  - type: checkboxes
-    id: terms
-    attributes:
-      label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/WLAN-Pi/.github/blob/main/code_of_conduct.md). 
-      options:
-        - label: I agree to follow WLAN Pi's Code of Conduct
-          required: true
