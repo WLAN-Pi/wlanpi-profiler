@@ -4,4 +4,4 @@ pytest-cov
 pytest-mock
 tox
 coverage-badge
-iniconfig==2.1.0  # Pin to 2.1.0 for Python 3.9 compatibility
+iniconfig==2.3.0  # Pin to 2.1.0 for Python 3.9 compatibility
