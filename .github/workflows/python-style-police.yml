@@ -18,6 +18,10 @@ on:
       - .gitignore
       - LICENSE
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   python:
     runs-on: "${{ vars.RUNS_ON || 'ubuntu-22.04' }}"

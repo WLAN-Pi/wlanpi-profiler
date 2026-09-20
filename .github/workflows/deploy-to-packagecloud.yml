@@ -7,6 +7,10 @@ on:
       - main
     paths:
       - 'debian/changelog'
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   check_version:
     name: Check py & deb pkg versions match
