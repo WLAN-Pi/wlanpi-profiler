@@ -2,6 +2,10 @@
 
 ## Repository
 
+See [CONTRIBUTING.md](CONTRIBUTING.md#branching-model) for the branching model:
+`main` is the only long-lived branch; create short-lived feature branches from
+`main` and open pull requests against `main`.
+
 1. Clone repo to development host
 
 2. Create and activate virtualenv
