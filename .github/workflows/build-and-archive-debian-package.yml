@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - 'debian/changelog'
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   format:
     name: Get formatted version for filename
