@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Tests for profiler.status module
 
@@ -18,14 +16,15 @@ from profiler.status import (
     CountryCodeError,
     ProfilerState,
     StatusReason,
-    detect_country_code,
+    _get_frequency_from_channel,
+    _read_json,
+    _write_json_atomic,
     delete_info,
     delete_status,
+    detect_country_code,
     get_info,
-    get_info_file_path,
     get_last_session_file_path,
     get_status,
-    get_status_file_path,
     is_process_alive,
     read_last_session,
     update_last_profile_in_info,
@@ -33,9 +32,6 @@ from profiler.status import (
     write_info,
     write_last_session,
     write_status,
-    _get_frequency_from_channel,
-    _read_json,
-    _write_json_atomic,
 )
 
 

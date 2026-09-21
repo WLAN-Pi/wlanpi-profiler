@@ -28,6 +28,7 @@ import sys
 import tempfile
 import zlib
 from base64 import b64encode
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from time import ctime
@@ -41,9 +42,9 @@ except ImportError:
     pwd = None  # type: ignore[assignment]  # pwd module not available on Windows
 
 try:
-    import manuf2  # type: ignore[import-untyped]
+    import manuf2
 except ModuleNotFoundError:
-    manuf2 = None  # type: ignore[assignment]  # OUI lookups disabled but core works
+    manuf2 = None  # OUI lookups disabled but core works
 
 
 # Tools the profiler must have for live interface staging / capture.
@@ -86,7 +87,9 @@ BOOLEAN_CONFIG_KEYS = {
 }
 
 
-def check_required_tools(required=None, optional=None):
+def check_required_tools(
+    required: list[str] | None = None, optional: list[str] | None = None
+) -> None:
     """Check the external tools needed for the current mode.
 
     Missing ``required`` tools abort startup. Missing ``optional`` tools only
@@ -210,7 +213,9 @@ def set_directory_permissions(
     return set_file_permissions(path, mode, set_group)
 
 
-def setup_logger(args, config=None) -> None:
+def setup_logger(
+    args: argparse.Namespace, config: dict[str, Any] | None = None
+) -> None:
     """Configure and set logging levels
 
     Priority order (highest to lowest):
@@ -363,7 +368,7 @@ def is_valid_ssid(ssid_str: str) -> bool:
     return printable_count >= len(ssid_str) * 0.5
 
 
-def has_bad_fcs(frame) -> bool:
+def has_bad_fcs(frame: Any) -> bool:
     """Check if a frame has a bad FCS (Frame Check Sequence).
 
     The FCS is a 4-byte CRC32 checksum at the end of 802.11 frames.
@@ -394,7 +399,7 @@ def has_bad_fcs(frame) -> bool:
     return frame_fcs != expected_fcs
 
 
-def frequency(freq) -> int:
+def frequency(freq: Any) -> int:
     """Check if the provided frequency is valid"""
     try:
         # make sure freq is an int
@@ -681,7 +686,7 @@ class NetworkInterface:
     mac: str = ""
 
 
-def get_data_from_iproute2(intf) -> NetworkInterface:
+def get_data_from_iproute2(intf: str) -> NetworkInterface:
     """Get and parse output from iproute2 for a given interface"""
     # Get json output from `ip` command
     result = run_command(["ip", "-json", "address"])
@@ -699,7 +704,7 @@ def get_data_from_iproute2(intf) -> NetworkInterface:
     return iface
 
 
-def get_iface_mac(iface: str):
+def get_iface_mac(iface: str) -> str:
     """Check iproute2 output for <iface> and return a MAC with a format like 000000111111"""
     iface_data = get_data_from_iproute2(iface)
     iface_mac = None
@@ -710,7 +715,9 @@ def get_iface_mac(iface: str):
     return ""
 
 
-def setup_config(args) -> tuple[dict | None, str | None]:
+def setup_config(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any] | None, str | None]:
     """Create the configuration (SSID, channel, interface, etc) for the Profiler.
 
     Returns:
@@ -929,7 +936,7 @@ def setup_config(args) -> tuple[dict | None, str | None]:
         return None, error_msg
 
     # ensure channel is an integer and not a bool
-    ch = config.get("GENERAL").get("channel")
+    ch = (config.get("GENERAL") or {}).get("channel")
     if ch is None or ch == "":
         error_msg = "Invalid channel: no channel configured. Must be an integer."
         log.error(error_msg)
@@ -946,7 +953,7 @@ def setup_config(args) -> tuple[dict | None, str | None]:
     return config, None
 
 
-def strtobool(val):
+def strtobool(val: str) -> int:
     """Convert a string representation of truth to true (1) or false (0).
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -961,7 +968,9 @@ def strtobool(val):
         raise ValueError(f"invalid truth value {val}")
 
 
-def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
+def convert_configparser_to_dict(
+    config: configparser.ConfigParser,
+) -> dict[str, dict[str, Any]]:
     """
     Convert ConfigParser object to dictionary.
 
@@ -988,7 +997,7 @@ def load_config(config_file: str) -> configparser.ConfigParser:
     return config
 
 
-def validate(config) -> tuple[bool, str | None]:
+def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
     """Validate minimum config to run is OK.
 
     Returns:
@@ -1003,28 +1012,28 @@ def validate(config) -> tuple[bool, str | None]:
         return False, missing_error
 
     try:
-        _ssid = config.get("GENERAL").get("ssid")
+        _ssid = (config.get("GENERAL") or {}).get("ssid")
         if _ssid:
             ssid(_ssid)
 
         # Validate passphrase - warn in listen_only mode, fail in AP modes
-        _passphrase = config.get("GENERAL").get("passphrase")
+        _passphrase = (config.get("GENERAL") or {}).get("passphrase")
         if _passphrase:
             try:
                 passphrase(_passphrase)
             except ValueError as e:
-                if config.get("GENERAL").get("listen_only"):
+                if (config.get("GENERAL") or {}).get("listen_only"):
                     log.warning(
                         f"Passphrase validation: {e} (ignored in listen-only mode)"
                     )
                 else:
                     raise
 
-        ch = config.get("GENERAL").get("channel")
+        ch = (config.get("GENERAL") or {}).get("channel")
         if ch:
             channel(ch)
 
-        freq = config.get("GENERAL").get("frequency")
+        freq = (config.get("GENERAL") or {}).get("frequency")
         if freq:
             frequency(freq)
 
@@ -1040,7 +1049,7 @@ def validate(config) -> tuple[bool, str | None]:
                 )
 
         # Validate hostapd mode
-        if config.get("GENERAL").get("ap_mode"):
+        if (config.get("GENERAL") or {}).get("ap_mode"):
             from profiler.constants import HOSTAPD_BINARY
 
             # Check hostapd binary exists
@@ -1056,8 +1065,8 @@ def validate(config) -> tuple[bool, str | None]:
                 return False, error_msg
 
             # Check for 6 GHz channel attempts
-            ch = config.get("GENERAL").get("channel")
-            freq = config.get("GENERAL").get("frequency")
+            ch = (config.get("GENERAL") or {}).get("channel")
+            freq = (config.get("GENERAL") or {}).get("frequency")
 
             if freq and freq >= 5955:  # 6 GHz band
                 error_msg = (
@@ -1099,14 +1108,14 @@ def validate(config) -> tuple[bool, str | None]:
     return True, None
 
 
-def is_randomized(mac) -> bool:
+def is_randomized(mac: str) -> bool:
     """Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned"""
     if not mac or len(mac) < 2:
         return False
     return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
 
 
-def check_config_missing(config: dict) -> tuple[bool, str | None]:
+def check_config_missing(config: dict[str, Any]) -> tuple[bool, str | None]:
     """Check that the minimal config items exist.
 
     Returns:
@@ -1133,7 +1142,9 @@ def check_config_missing(config: dict) -> tuple[bool, str | None]:
     return True, None
 
 
-def run_command(cmd: list, suppress_output=False, check=False) -> str:
+def run_command(
+    cmd: list[str], suppress_output: bool = False, check: bool = False
+) -> str:
     """Run a single CLI command with subprocess and return stdout or stderr response.
 
     A non-zero exit code is always logged as a warning. When ``check`` is True
@@ -1227,7 +1238,7 @@ def update_manuf2() -> bool:
     return True
 
 
-def create_user_xdg_data_dir(app_name):
+def create_user_xdg_data_dir(app_name: str) -> Path | None:
     """Create XDG data directory with proper user ownership when running as root (Linux only)"""
     if pwd is None:
         # Not on Unix/Linux, skip this
@@ -1249,7 +1260,9 @@ def create_user_xdg_data_dir(app_name):
     return app_dir
 
 
-def get_app_data_paths(args=None, config=None) -> list[Path]:
+def get_app_data_paths(
+    args: argparse.Namespace | None = None, config: dict[str, Any] | None = None
+) -> list[Path]:
     """
     Returns writable application data directory paths based on the platform.
     Tests each candidate path for write permission before using it.
@@ -1360,7 +1373,7 @@ def get_app_data_paths(args=None, config=None) -> list[Path]:
     return writable_paths
 
 
-def verify_reporting_directories(config: dict) -> None:
+def verify_reporting_directories(config: dict[str, Any]) -> None:
     """Check reporting directories exist and create if not"""
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -1426,7 +1439,7 @@ class Base64Encoder(json.JSONEncoder):
     # example usage: json.dumps(bytes(frame), cls=Base64Encoder)
 
     # pylint: disable=method-hidden
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         """Perform default Base64 encode"""
         if isinstance(obj, bytes):
             return b64encode(obj).decode()
@@ -1515,7 +1528,7 @@ def get_processor_name() -> str:
     return ""
 
 
-def update_last_profile_record(mac: str):
+def update_last_profile_record(mac: str) -> None:
     """Update Last Profile record on local filesystem"""
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -1538,7 +1551,7 @@ def update_last_profile_record(mac: str):
         log.debug("skipping info file update (no permission)")
 
 
-def update_ssid_record(ssid: str):
+def update_ssid_record(ssid: str) -> None:
     """Update SSID record on local filesystem"""
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -1548,7 +1561,7 @@ def update_ssid_record(ssid: str):
     set_file_permissions(SSID_TMP_FILE)
 
 
-def flag_last_object(seq):
+def flag_last_object(seq: Iterable[Any]) -> Iterator[tuple[Any, bool]]:
     """Treat the last object in an iterable differently.
 
     Yields (item, is_last) tuples where is_last is True for the final item.
@@ -1565,7 +1578,7 @@ def flag_last_object(seq):
     yield _a, True
 
 
-def generate_run_message(config: dict) -> None:
+def generate_run_message(config: dict[str, Any]) -> None:
     """Create message to display to users screen"""
     interface = config["GENERAL"]["interface"]
     ap_mode = config["GENERAL"].get("ap_mode", False)
@@ -1687,12 +1700,12 @@ class Capability:
     db_value: int | str | list[str] = 0
 
 
-def get_bit(byteval, index) -> bool:
+def get_bit(byteval: int, index: int) -> bool:
     """Retrieve bit value from byte at provided index"""
     return (byteval & (1 << index)) != 0
 
 
-def log_security_configuration(config: dict, log: logging.Logger) -> None:
+def log_security_configuration(config: dict[str, Any], log: logging.Logger) -> None:
     """
     Log final security configuration summary.
 

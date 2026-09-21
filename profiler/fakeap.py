@@ -11,7 +11,6 @@ fake ap code handling beaconing and sniffing for the profiler
 """
 
 import contextlib
-import datetime
 import inspect
 import logging
 import multiprocessing
@@ -28,25 +27,25 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 try:
     import platform
 
-    from scapy.all import (  # type: ignore  # type: ignore
+    from scapy.all import (
         Dot11,
         Dot11Auth,
-        Dot11Beacon,  # type: ignore
-        Dot11Elt,  # type: ignore
-        Dot11ProbeResp,  # type: ignore
+        Dot11Beacon,
+        Dot11Elt,
+        Dot11ProbeResp,
         RadioTap,
         Scapy_Exception,
         get_if_hwaddr,
         hexdump,
         sniff,
     )
-    from scapy.all import conf as scapyconf  # type: ignore
+    from scapy.all import conf as scapyconf
 
     if platform.system() == "Linux":
         try:
-            from scapy.all import get_if_raw_hwaddr  # type: ignore
+            from scapy.all import get_if_raw_hwaddr
         except ImportError:
-            from scapy.arch.unix import get_if_raw_hwaddr  # type: ignore
+            from scapy.arch.unix import get_if_raw_hwaddr
 except ModuleNotFoundError as error:
     if error.name == "scapy":
         print("ERROR: scapy module is required for live capture mode.")
@@ -124,15 +123,15 @@ class _Utils:
 
     @staticmethod
     def build_fake_frame_ies_2ghz_5ghz(
-        ssid,
-        mac,
-        channel,
-        ft_disabled,
-        he_disabled,
-        be_disabled,
-        security_mode,
-        profiler_tlv_disabled,
-        testing,
+        ssid: str,
+        mac: str,
+        channel: int,
+        ft_disabled: bool,
+        he_disabled: bool,
+        be_disabled: bool,
+        security_mode: str,
+        profiler_tlv_disabled: bool,
+        testing: bool,
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         ssid_bytes: bytes = bytes(ssid, "utf-8")
@@ -141,8 +140,8 @@ class _Utils:
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
 
-        channel = bytes([channel])  # type: ignore
-        dsset = Dot11Elt(ID="DSset", info=channel)
+        channel_bytes = bytes([channel])
+        dsset = Dot11Elt(ID="DSset", info=channel_bytes)
 
         dtim_data = b"\x00\x04\x00\x03\x00\x00"  # Fixed: DTIM count=0, period=4 (was 5, 4 - invalid!)
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
@@ -184,7 +183,7 @@ class _Utils:
         rsn = Dot11Elt(ID=0x30, info=rsn_data)
 
         ht_info_data = (
-            bytes(channel)
+            channel_bytes
             + b"\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         )
         ht_information = Dot11Elt(ID=0x3D, info=ht_info_data)
@@ -273,7 +272,12 @@ class _Utils:
 
     @staticmethod
     def build_fake_frame_ies_6ghz(
-        ssid, channel, ft_disabled, be_disabled, profiler_tlv_disabled, testing
+        ssid: str,
+        channel: int,
+        ft_disabled: bool,
+        be_disabled: bool,
+        profiler_tlv_disabled: bool,
+        testing: bool,
     ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
@@ -379,18 +383,24 @@ class _Utils:
         return frame
 
     @staticmethod
-    def build_fake_frame_ies(config, mac, testing=False) -> Dot11Elt:
+    def build_fake_frame_ies(
+        config: dict[str, Any], mac: str, testing: bool = False
+    ) -> Dot11Elt:
         """Build base frame for beacon and probe resp"""
         logging.getLogger(inspect.stack()[0][1].split("/")[-1])
-        ssid: str = config.get("GENERAL").get("ssid")
+        ssid: str = (config.get("GENERAL") or {}).get("ssid") or ""
         mac = mac
-        channel: int = int(config.get("GENERAL").get("channel"))
-        frequency: int = int(config.get("GENERAL").get("frequency"))
-        ft_disabled: bool = config.get("GENERAL").get("ft_disabled")
-        he_disabled: bool = config.get("GENERAL").get("he_disabled")
-        be_disabled: bool = config.get("GENERAL").get("be_disabled")
-        profiler_tlv_disabled: bool = config.get("GENERAL").get("profiler_tlv_disabled")
-        security_mode: str = config.get("GENERAL").get("security_mode", "ft-wpa3-mixed")
+        channel: int = int((config.get("GENERAL") or {}).get("channel") or 0)
+        frequency: int = int((config.get("GENERAL") or {}).get("frequency") or 0)
+        ft_disabled: bool = bool((config.get("GENERAL") or {}).get("ft_disabled"))
+        he_disabled: bool = bool((config.get("GENERAL") or {}).get("he_disabled"))
+        be_disabled: bool = bool((config.get("GENERAL") or {}).get("be_disabled"))
+        profiler_tlv_disabled: bool = bool(
+            (config.get("GENERAL") or {}).get("profiler_tlv_disabled")
+        )
+        security_mode: str = (config.get("GENERAL") or {}).get(
+            "security_mode", "ft-wpa3-mixed"
+        )
 
         if frequency > 5950:
             frame = _Utils.build_fake_frame_ies_6ghz(
@@ -424,7 +434,7 @@ class _Utils:
         return mac
 
     @staticmethod
-    def next_sequence_number(sequence_number) -> int:
+    def next_sequence_number(sequence_number: Any) -> int:
         """Update a sequence number of type multiprocessing Value"""
         sequence_number.value = (sequence_number.value + 1) % 4096
         return sequence_number.value
@@ -435,27 +445,27 @@ class TxBeacons(multiprocessing.Process):
 
     def __init__(
         self,
-        config,
-        boot_time: datetime.datetime,
-        lock,
-        sequence_number,
-    ):
+        config: dict[str, Any],
+        boot_time: float,
+        lock: Any,
+        sequence_number: Any,
+    ) -> None:
         super().__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("beacon pid: %s; parent pid: %s", os.getpid(), os.getppid())
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid: str = config.get("GENERAL").get("ssid")
-        self.interface: str = config.get("GENERAL").get("interface")
-        channel: str = config.get("GENERAL").get("channel")
+        self.ssid: str = (config.get("GENERAL") or {}).get("ssid") or ""
+        self.interface: str = (config.get("GENERAL") or {}).get("interface") or ""
+        channel: str = (config.get("GENERAL") or {}).get("channel") or ""
         if not channel:
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
         scapyconf.iface = self.interface
         # Socket is opened in the child process (run()) so the parent does not
         # inherit a duplicate raw socket fd.
-        self.l2socket = None
+        self.l2socket: socket.socket | None = None
         self.beacon_interval = 0.102_400
 
         # Beacon process uses its own local sequence counter (no lock contention!)
@@ -492,14 +502,14 @@ class TxBeacons(multiprocessing.Process):
 
         self.log.debug(f"origin beacon hexdump {hexdump(self.beacon_frame)}")
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources"""
         if hasattr(self, "l2socket") and self.l2socket:
             with contextlib.suppress(Exception):
                 self.l2socket.close()
             self.l2socket = None
 
-    def _open_socket(self):
+    def _open_socket(self) -> None:
         """Create the raw AF_PACKET socket in the child process."""
         try:
             self.l2socket = socket.socket(
@@ -527,11 +537,11 @@ class TxBeacons(multiprocessing.Process):
         except OSError as e:
             self.log.warning("Could not set socket priority for beacons: %s", e)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure socket cleanup"""
         self.cleanup()
 
-    def run(self):
+    def run(self) -> None:
         """Main beacon transmission loop - called by multiprocessing.Process.start()"""
         self.log.debug("TxBeacons process started, beginning beacon transmission")
         self._open_socket()
@@ -591,13 +601,13 @@ class Sniffer(multiprocessing.Process):
 
     def __init__(
         self,
-        config,
-        boot_time: datetime.datetime,
-        lock,
-        sequence_number,
-        queue,
-        args,
-    ):
+        config: dict[str, Any],
+        boot_time: float,
+        lock: Any,
+        sequence_number: Any,
+        queue: Any,
+        args: Any,
+    ) -> None:
         super().__init__()
         self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
         self.log.debug("sniffer pid: %s; parent pid: %s", os.getpid(), os.getppid())
@@ -606,19 +616,19 @@ class Sniffer(multiprocessing.Process):
         self.boot_time = boot_time
         self.config = config
         self.sequence_number = sequence_number
-        self.ssid: str = config.get("GENERAL").get("ssid")
-        self.interface: str = config.get("GENERAL").get("interface")
-        channel: str = config.get("GENERAL").get("channel")
+        self.ssid: str = (config.get("GENERAL") or {}).get("ssid") or ""
+        self.interface: str = (config.get("GENERAL") or {}).get("interface") or ""
+        channel: str = (config.get("GENERAL") or {}).get("channel") or ""
         if not channel:
             raise ValueError("cannot determine channel to sniff")
         self.channel = int(channel)
-        self.listen_only: bool = config.get("GENERAL").get("listen_only")
-        self.assoc_reqs: dict = {}
+        self.listen_only: bool = bool((config.get("GENERAL") or {}).get("listen_only"))
+        self.assoc_reqs: dict[str, Any] = {}
 
         # Monitoring metrics (track client interactions)
-        self.seen_macs: set = set()  # All unique MACs observed
-        self.authed_macs: set = set()  # MACs that sent auth request
-        self.assoc_macs: set = set()  # MACs that sent assoc request
+        self.seen_macs: set[str] = set()  # All unique MACs observed
+        self.authed_macs: set[str] = set()  # MACs that sent auth request
+        self.assoc_macs: set[str] = set()  # MACs that sent assoc request
         self.total_probe_requests = 0  # Total probe requests (can be >1 per MAC)
         self.total_auth_requests = 0  # Total auth requests (can be >1 per MAC)
         self.total_assoc_requests = 0  # Total assoc requests (can be >1 per MAC)
@@ -649,7 +659,7 @@ class Sniffer(multiprocessing.Process):
         # self.log.debug(scapyconf.ifaces)
         # Socket is opened in the child process (run()) so the parent does not
         # inherit a duplicate raw socket fd.
-        self.l2socket = None
+        self.l2socket: socket.socket | None = None
 
         self.received_frame_cb = self.received_frame
         # Determine if we're in Rx-only mode (listen-only or hostapd mode)
@@ -711,7 +721,7 @@ class Sniffer(multiprocessing.Process):
             from functools import lru_cache
 
             @lru_cache(maxsize=128)
-            def parse_mac_cached(mac_str):
+            def parse_mac_cached(mac_str: str) -> bytes:
                 return bytes.fromhex(mac_str.replace(":", ""))
 
             self._parse_mac = parse_mac_cached
@@ -729,18 +739,18 @@ class Sniffer(multiprocessing.Process):
                     self.seq_offset,
                 )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources"""
         if hasattr(self, "l2socket") and self.l2socket:
             with contextlib.suppress(Exception):
                 self.l2socket.close()
             self.l2socket = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure socket cleanup"""
         self.cleanup()
 
-    def _open_socket(self):
+    def _open_socket(self) -> None:
         """Create the raw AF_PACKET socket in the child process."""
         try:
             self.l2socket = socket.socket(
@@ -768,7 +778,7 @@ class Sniffer(multiprocessing.Process):
         except OSError as e:
             self.log.warning("Could not set socket priority for responses: %s", e)
 
-    def run(self):
+    def run(self) -> None:
         """Main process loop - called by multiprocessing.Process.start()"""
         self._open_socket()
         try:
@@ -841,7 +851,7 @@ class Sniffer(multiprocessing.Process):
             # Force write final monitoring metrics (bypass debounce)
             self._update_monitoring_metrics(force=True)
 
-    def received_frame(self, packet) -> None:
+    def received_frame(self, packet: Any) -> None:
         """Handle incoming packets for profiling"""
         # Check if this is a Dot11 packet (802.11 management frame)
         if not packet.haslayer(Dot11):

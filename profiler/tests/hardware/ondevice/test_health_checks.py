@@ -20,7 +20,7 @@ pytestmark = pytest.mark.ondevice
 class TestInstallationIntegrity:
     """Verify profiler installation is complete and correct"""
 
-    def test_hostapd_binary_is_present_and_executable(self):
+    def test_hostapd_binary_is_present_and_executable(self) -> None:
         """Verify custom hostapd binary exists and is executable"""
         assert os.path.exists(HOSTAPD_BINARY), (
             f"hostapd binary not found at {HOSTAPD_BINARY}. "
@@ -30,7 +30,7 @@ class TestInstallationIntegrity:
             f"hostapd binary at {HOSTAPD_BINARY} is not executable"
         )
 
-    def test_hostapd_cli_binary_is_present_and_executable(self):
+    def test_hostapd_cli_binary_is_present_and_executable(self) -> None:
         """Verify custom hostapd_cli binary exists and is executable"""
         assert os.path.exists(HOSTAPD_CLI_BINARY), (
             f"hostapd_cli binary not found at {HOSTAPD_CLI_BINARY}. "
@@ -41,7 +41,7 @@ class TestInstallationIntegrity:
             f"hostapd_cli binary at {HOSTAPD_CLI_BINARY} is not executable"
         )
 
-    def test_profiler_cli_is_in_path(self):
+    def test_profiler_cli_is_in_path(self) -> None:
         """Verify profiler command is available"""
         result = subprocess.run(["which", "profiler"], capture_output=True, text=True)
         assert result.returncode == 0, "profiler command not found in PATH"
@@ -49,12 +49,12 @@ class TestInstallationIntegrity:
             f"Unexpected profiler path: {result.stdout}"
         )
 
-    def test_default_config_file_exists(self):
+    def test_default_config_file_exists(self) -> None:
         """Verify default config.ini exists"""
         config_path = "/etc/wlanpi-profiler/config.ini"
         assert os.path.exists(config_path), f"Default config not found at {config_path}"
 
-    def test_required_data_directories_exist(self):
+    def test_required_data_directories_exist(self) -> None:
         """Verify data output directories exist"""
         data_dirs = [
             "/var/www/html/profiler",
@@ -71,7 +71,7 @@ class TestInstallationIntegrity:
                 )
                 # Directory will be created at runtime if parent exists
 
-    def test_wpa_cli_is_available_optional(self):
+    def test_wpa_cli_is_available_optional(self) -> None:
         """Check if wpa_cli is available (optional)"""
         result = subprocess.run(["which", "wpa_cli"], capture_output=True, text=True)
         if result.returncode != 0:

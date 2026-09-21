@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Shared pytest fixtures for wlanpi-profiler tests
 """
 
-import pytest
 from unittest import mock
+
+import pytest
 
 
 def pytest_configure(config):

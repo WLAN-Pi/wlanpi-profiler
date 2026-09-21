@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for Wi-Fi 6E/7 capability detection migration from tshark-dc branch.
 
@@ -134,8 +133,10 @@ class TestExtendedCapabilities:
             (c for c in capabilities if c.db_key == "qos_r1_mscs_support"), None
         )
 
-        assert scs_cap is not None and scs_cap.value == "Supported"
-        assert mscs_cap is not None and mscs_cap.value == "Supported"
+        assert scs_cap is not None
+        assert scs_cap.value == "Supported"
+        assert mscs_cap is not None
+        assert mscs_cap.value == "Supported"
 
 
 class TestEHTMACCapabilities:
@@ -295,10 +296,14 @@ class TestEHTMACCapabilities:
             None,
         )
 
-        assert epcs_cap is not None and epcs_cap.value == "Supported"
-        assert om_cap is not None and om_cap.value == "Supported"
-        assert rtwt_cap is not None and rtwt_cap.value == "Supported"
-        assert scs_traffic_cap is not None and scs_traffic_cap.value == "Supported"
+        assert epcs_cap is not None
+        assert epcs_cap.value == "Supported"
+        assert om_cap is not None
+        assert om_cap.value == "Supported"
+        assert rtwt_cap is not None
+        assert rtwt_cap.value == "Supported"
+        assert scs_traffic_cap is not None
+        assert scs_traffic_cap.value == "Supported"
 
     def test_eht_mac_capabilities_all_not_supported(self):
         """Test EHT MAC capabilities all return 'Not supported' when bits are clear"""
@@ -336,10 +341,14 @@ class TestEHTMACCapabilities:
             None,
         )
 
-        assert epcs_cap is not None and epcs_cap.value == "Not supported"
-        assert om_cap is not None and om_cap.value == "Not supported"
-        assert rtwt_cap is not None and rtwt_cap.value == "Not supported"
-        assert scs_traffic_cap is not None and scs_traffic_cap.value == "Not supported"
+        assert epcs_cap is not None
+        assert epcs_cap.value == "Not supported"
+        assert om_cap is not None
+        assert om_cap.value == "Not supported"
+        assert rtwt_cap is not None
+        assert rtwt_cap.value == "Not supported"
+        assert scs_traffic_cap is not None
+        assert scs_traffic_cap.value == "Not supported"
 
 
 class TestEHTPHYCapabilities:
@@ -523,8 +532,10 @@ class TestEHTPHYCapabilities:
             (c for c in capabilities if c.db_key == "dot11be_mcs14_support"), None
         )
 
-        assert mcs15_cap is not None and mcs15_cap.value == "Supported"
-        assert mcs14_cap is not None and mcs14_cap.value == "Supported"
+        assert mcs15_cap is not None
+        assert mcs15_cap.value == "Supported"
+        assert mcs14_cap is not None
+        assert mcs14_cap.value == "Supported"
 
 
 class TestRSNXCapabilities:
@@ -952,14 +963,18 @@ class TestMLECapabilities:
             (c for c in capabilities if c.db_key == "dot11be_mle_emlmr_support"), None
         )
 
-        assert emlsr_cap is not None and emlsr_cap.db_value == 1, "EMLSR should be 1"
-        assert padding_cap is not None and padding_cap.db_value == 2, (
+        assert emlsr_cap is not None
+        assert emlsr_cap.db_value == 1, "EMLSR should be 1"
+        assert padding_cap is not None
+        assert padding_cap.db_value == 2, (
             f"Padding should be 2, got {padding_cap.db_value}"
         )
-        assert transition_cap is not None and transition_cap.db_value == 3, (
+        assert transition_cap is not None
+        assert transition_cap.db_value == 3, (
             f"Transition should be 3, got {transition_cap.db_value}"
         )
-        assert emlmr_cap is not None and emlmr_cap.db_value == 1, "EMLMR should be 1"
+        assert emlmr_cap is not None
+        assert emlmr_cap.db_value == 1, "EMLMR should be 1"
 
     def test_mle_not_present(self):
         """Test MLE returns 'Not reported' when MLE IE is missing"""
@@ -1045,17 +1060,23 @@ class TestMLECapabilities:
         )
 
         # MLE present
-        assert mle_cap is not None and mle_cap.db_value == 1
+        assert mle_cap is not None
+        assert mle_cap.db_value == 1
         # Type 0
-        assert type_cap is not None and type_cap.db_value == 0
+        assert type_cap is not None
+        assert type_cap.db_value == 0
         # Max Links = 1
-        assert max_links_cap is not None and max_links_cap.db_value == 1
+        assert max_links_cap is not None
+        assert max_links_cap.db_value == 1
         # T2LM = 1
-        assert t2lm_cap is not None and t2lm_cap.db_value == 1
+        assert t2lm_cap is not None
+        assert t2lm_cap.db_value == 1
         # Reconfig = 0
-        assert reconfig_cap is not None and reconfig_cap.db_value == 0
+        assert reconfig_cap is not None
+        assert reconfig_cap.db_value == 0
         # EMLSR not reported (EML Caps not present)
-        assert emlsr_cap is not None and emlsr_cap.db_value == -1
+        assert emlsr_cap is not None
+        assert emlsr_cap.db_value == -1
 
 
 class TestMalformedExtensionIEs:

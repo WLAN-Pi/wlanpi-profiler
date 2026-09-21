@@ -32,7 +32,7 @@ except ImportError:
 
 # Suppress BrokenPipeError when output is piped and pipe closes (e.g., | grep)
 # This is expected Unix behavior, not an error
-def handle_broken_pipe():
+def handle_broken_pipe() -> None:
     """Install handler to suppress BrokenPipeError traceback"""
     import signal
 
@@ -42,7 +42,7 @@ def handle_broken_pipe():
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
-def main():
+def main() -> None:
     """Set up args and start the profiler manager"""
     # Handle BrokenPipeError gracefully when output is piped
     handle_broken_pipe()
@@ -115,7 +115,7 @@ def main():
         sys.exit(0)
 
 
-def init():
+def init() -> None:
     """Handle main init"""
 
     # hard set no support for python < v3.13
@@ -125,7 +125,7 @@ def init():
         )
 
     if __name__ == "__main__":
-        sys.exit(main())
+        main()
 
 
 init()

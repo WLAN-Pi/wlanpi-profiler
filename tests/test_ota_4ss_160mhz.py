@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 OTA Beacon Verification Tests for 4 SS and 160 MHz Advertising
 
@@ -34,7 +32,6 @@ Environment Variables:
 import os
 import subprocess
 import time
-from typing import Dict, List, Optional
 
 import pytest
 from scapy.all import Dot11Beacon, Dot11Elt, sniff
@@ -59,9 +56,9 @@ class BeaconAnalyzer:
         """
         self.interface = interface
         self.timeout = timeout
-        self.beacons: List[Dot11Beacon] = []
+        self.beacons: list[Dot11Beacon] = []
 
-    def capture_beacon(self, ssid: str, count: int = 3) -> Optional[Dot11Beacon]:
+    def capture_beacon(self, ssid: str, count: int = 3) -> Dot11Beacon | None:
         """
         Capture beacon for specified SSID
 
@@ -104,7 +101,7 @@ class BeaconAnalyzer:
         return self.beacons[0] if self.beacons else None
 
     @staticmethod
-    def get_ie(beacon: Dot11Beacon, ie_id: int) -> Optional[bytes]:
+    def get_ie(beacon: Dot11Beacon, ie_id: int) -> bytes | None:
         """
         Extract Information Element from beacon by ID
 
@@ -123,7 +120,7 @@ class BeaconAnalyzer:
         return None
 
     @staticmethod
-    def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> Optional[bytes]:
+    def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> bytes | None:
         """
         Extract Extension IE from beacon by extension ID
 
@@ -143,7 +140,7 @@ class BeaconAnalyzer:
         return None
 
     @staticmethod
-    def verify_ht_4ss(beacon: Dot11Beacon) -> Dict[str, any]:
+    def verify_ht_4ss(beacon: Dot11Beacon) -> dict[str, any]:
         """
         Verify HT (802.11n) advertises 4 spatial streams
 
@@ -186,7 +183,7 @@ class BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_vht_4ss_and_160mhz(beacon: Dot11Beacon) -> Dict[str, any]:
+    def verify_vht_4ss_and_160mhz(beacon: Dot11Beacon) -> dict[str, any]:
         """
         Verify VHT (802.11ac) advertises 4 SS and 160 MHz capability
 
@@ -252,7 +249,7 @@ class BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_he_4ss_and_160mhz(beacon: Dot11Beacon) -> Dict[str, any]:
+    def verify_he_4ss_and_160mhz(beacon: Dot11Beacon) -> dict[str, any]:
         """
         Verify HE (802.11ax) advertises 4 SS and 160 MHz capability
 
@@ -349,7 +346,7 @@ class BeaconAnalyzer:
         return result
 
     @staticmethod
-    def verify_eht_4ss(beacon: Dot11Beacon) -> Dict[str, any]:
+    def verify_eht_4ss(beacon: Dot11Beacon) -> dict[str, any]:
         """
         Verify EHT (802.11be) advertises 4 spatial streams
 
@@ -421,7 +418,7 @@ class RemoteProfilerController:
 
     def __init__(self, remote_host: str = "wlanpi@198.18.42.1"):
         self.remote_host = remote_host
-        self.pid: Optional[int] = None
+        self.pid: int | None = None
 
     def start(
         self,

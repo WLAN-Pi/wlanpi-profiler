@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
-
 import pytest
-from profiler import profiler
 from scapy.all import rdpcap
+
+from profiler import profiler
 
 
 class TestProfiler:
@@ -259,7 +258,8 @@ class TestGCMP256CipherRegression:
             value = str(pairwise_cipher.value)
             # Should contain both cipher name and type for each
             # e.g., "CCMP-128 (4), GCMP-256 (9)"
-            assert "(" in value and ")" in value, (
+            assert "(" in value
+            assert ")" in value, (
                 f"Cipher format should include types in parentheses: {value}"
             )
 

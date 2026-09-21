@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
-
 import logging
 
 import pytest
+
 from profiler import helpers
 
 
@@ -44,8 +43,8 @@ class TestHelpers:
                 "files_path": "/var/www/html/profiler",
             }
         }
-        assert helpers.generate_run_message(conf1) == None
-        assert helpers.generate_run_message(conf2) == None
+        assert helpers.generate_run_message(conf1) is None
+        assert helpers.generate_run_message(conf2) is None
 
     @pytest.mark.parametrize(
         "mac,expected",
@@ -138,10 +137,8 @@ class TestHelpers:
     )
     def test_channel(self, channel, expected):
         if channel == "0":
-            with pytest.raises(ValueError) as exc_info:
-                channel = helpers.channel(channel)
-                print(exc_info)
-                assert "not a valid channel" in exc_info
+            with pytest.raises(ValueError, match="not a valid channel"):
+                helpers.channel(channel)
         else:
             channel = helpers.channel(channel)
             assert channel == expected
@@ -171,9 +168,8 @@ class TestHelpers:
             result = helpers.passphrase(passphrase)
             assert result == passphrase
         else:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValueError, match="8-63 characters"):
                 helpers.passphrase(passphrase)
-            assert "8-63 characters" in str(exc_info.value)
 
     def test_config(self):
         parser = helpers.setup_parser()
@@ -257,8 +253,8 @@ class TestHelpers:
 
     def test_get_app_data_paths_from_config(self):
         """Test that get_app_data_paths reads from config.ini"""
-        import tempfile
         import os
+        import tempfile
 
         parser = helpers.setup_parser()
 
@@ -421,7 +417,7 @@ class TestHelpers:
 
         # Should auto-disable 11be for WPA2
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_ft_wpa2_auto_disables_11be(self, tmp_path):
         """Test that ft-wpa2 mode auto-disables 802.11be"""
@@ -434,7 +430,7 @@ class TestHelpers:
 
         # Should auto-disable 11be for ft-wpa2
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_wpa3_mixed_keeps_11be_enabled(self, tmp_path):
         """Test that wpa3-mixed keeps 802.11be enabled"""
@@ -447,7 +443,7 @@ class TestHelpers:
 
         # Should NOT auto-disable 11be for wpa3-mixed
         assert error is None
-        assert config["GENERAL"].get("be_disabled", False) == False
+        assert not config["GENERAL"].get("be_disabled", False)
 
     def test_wpa2_with_11be_flag_override(self, tmp_path):
         """Test that --11be flag overrides auto-disable for WPA2"""
@@ -460,7 +456,7 @@ class TestHelpers:
 
         # User override should work
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == False
+        assert not config["GENERAL"]["be_disabled"]
 
     def test_wpa2_with_config_be_enabled(self, tmp_path):
         """config be_disabled:false no longer overrides auto-disable; use --11be"""
@@ -473,7 +469,7 @@ class TestHelpers:
 
         # be_disabled: false is treated as "not set", so 11be is auto-disabled
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_wpa2_shipped_default_auto_disables_11be(self, tmp_path):
         """The shipped default (be_disabled: false) must not suppress auto-disable"""
@@ -485,7 +481,7 @@ class TestHelpers:
         config, error = helpers.setup_config(args)
 
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_wpa2_be_disabled_true_overrides_auto_disable(self, tmp_path):
         """An explicit be_disabled:true is honored"""
@@ -497,7 +493,7 @@ class TestHelpers:
         config, error = helpers.setup_config(args)
 
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_ssid_and_passphrase_truthy_strings_not_coerced(self, tmp_path):
         """String values like '1'/'on'/'no' must stay strings, not become bools"""
@@ -564,7 +560,7 @@ class TestHelpers:
 
         # Should auto-disable 11be when 11ax is disabled
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_no11ax_flag_auto_disables_11be(self, tmp_path):
         """Test that --no11ax flag auto-disables 11be"""
@@ -577,7 +573,7 @@ class TestHelpers:
 
         # Should auto-disable 11be when 11ax is disabled via CLI
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == True
+        assert config["GENERAL"]["be_disabled"]
 
     def test_no11r_deprecation_warning(self, tmp_path, caplog):
         """Test that --no11r shows deprecation warning"""
@@ -590,7 +586,7 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file), "--no11r"])
 
         with caplog.at_level(logging.WARNING):
-            config, error = helpers.setup_config(args)
+            _, _ = helpers.setup_config(args)
 
         # Should see deprecation warning
         assert "DEPRECATED: --no11r" in caplog.text

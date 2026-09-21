@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 OTA Patch Regression Tests
 
@@ -9,7 +7,7 @@ efficiently.
 
 Patches tested:
 1. hostapd_ht_txbf.patch - HT TxBF capabilities + 4 SS (merged)
-2. vht_advertise_4ss.patch - VHT 4 spatial stream advertising  
+2. vht_advertise_4ss.patch - VHT 4 spatial stream advertising
 3. hostapd_he_caps.patch - HE capabilities (MAC, PHY, 160 MHz, 4 SS) (merged)
 4. hostapd_eht_caps.patch - EHT capabilities (MAC, PHY, 4 SS, 160 MHz) (merged)
 5. capability_validation_bypass.patch - Capability validation bypass
@@ -30,7 +28,6 @@ Usage:
 import os
 import subprocess
 import time
-from typing import Dict, Optional, Tuple
 
 import pytest
 from scapy.all import Dot11Beacon, Dot11Elt, sniff
@@ -42,7 +39,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def get_ie(beacon: Dot11Beacon, ie_id: int) -> Optional[bytes]:
+def get_ie(beacon: Dot11Beacon, ie_id: int) -> bytes | None:
     """Extract Information Element from beacon by ID"""
     elt = beacon.getlayer(Dot11Elt)
     while elt:
@@ -52,7 +49,7 @@ def get_ie(beacon: Dot11Beacon, ie_id: int) -> Optional[bytes]:
     return None
 
 
-def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> Optional[bytes]:
+def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> bytes | None:
     """Extract Extension IE from beacon by extension ID"""
     elt = beacon.getlayer(Dot11Elt)
     while elt:
@@ -63,7 +60,7 @@ def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> Optional[bytes]:
     return None
 
 
-def parse_ht_nss_and_caps(ht_cap: bytes) -> Dict:
+def parse_ht_nss_and_caps(ht_cap: bytes) -> dict:
     """Parse HT capabilities for NSS and TxBF"""
     if not ht_cap or len(ht_cap) < 26:
         return {"present": False}
@@ -89,7 +86,7 @@ def parse_ht_nss_and_caps(ht_cap: bytes) -> Dict:
     }
 
 
-def parse_vht_nss_and_width(vht_cap: bytes) -> Dict:
+def parse_vht_nss_and_width(vht_cap: bytes) -> dict:
     """Parse VHT capabilities for NSS and channel width"""
     if not vht_cap or len(vht_cap) < 12:
         return {"present": False}
@@ -127,7 +124,7 @@ def parse_vht_nss_and_width(vht_cap: bytes) -> Dict:
     }
 
 
-def parse_he_nss_and_width(he_cap: bytes) -> Dict:
+def parse_he_nss_and_width(he_cap: bytes) -> dict:
     """Parse HE capabilities for NSS and channel width"""
     if not he_cap or len(he_cap) < 22:
         return {"present": False}
@@ -178,7 +175,7 @@ def parse_he_nss_and_width(he_cap: bytes) -> Dict:
     return result
 
 
-def parse_eht_nss(eht_cap: bytes) -> Dict:
+def parse_eht_nss(eht_cap: bytes) -> dict:
     """Parse EHT capabilities for NSS"""
     if not eht_cap or len(eht_cap) < 15:
         return {"present": False}
@@ -249,7 +246,7 @@ def ota_interface():
     except subprocess.CalledProcessError as e:
         pytest.skip(f"Failed to configure {iface}: {e}")
 
-    yield iface
+    return iface
 
 
 @pytest.fixture(scope="module")
@@ -270,12 +267,12 @@ def remote_host():
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pytest.skip(f"Cannot reach {host}")
 
-    yield host
+    return host
 
 
 def start_profiler_and_capture(
     iface: str, host: str, ssid: str, channel: int = 36
-) -> Tuple[Optional[Dot11Beacon], str]:
+) -> tuple[Dot11Beacon | None, str]:
     """Start profiler and capture beacon (helper function)"""
     # Stop any existing instances
     subprocess.run(

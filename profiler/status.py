@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 from profiler.__version__ import __version__
 from profiler.constants import (
@@ -198,7 +199,7 @@ def write_status(
     with contextlib.suppress(OSError):
         os.makedirs(os.path.dirname(status_file), mode=0o755, exist_ok=True)
 
-    status_data: dict = {
+    status_data: dict[str, Any] = {
         "schema_version": "1.0",
         "state": state.value,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -419,7 +420,7 @@ def delete_info() -> None:
     _delete_file(get_info_file_path())
 
 
-def get_status() -> dict | None:
+def get_status() -> dict[str, Any] | None:
     """
     Read and parse status file.
 
@@ -429,7 +430,7 @@ def get_status() -> dict | None:
     return _read_json(get_status_file_path())
 
 
-def get_info() -> dict | None:
+def get_info() -> dict[str, Any] | None:
     """
     Read and parse info file.
 
@@ -476,7 +477,7 @@ def _get_frequency_from_channel(channel: int) -> int | None:
     return None
 
 
-def _write_json_atomic(filepath: str, data: dict) -> None:
+def _write_json_atomic(filepath: str, data: dict[str, Any]) -> None:
     """
     Write JSON to file atomically (write to temp, then rename).
     Cleans up temp file on failure.
@@ -518,7 +519,7 @@ def _write_json_atomic(filepath: str, data: dict) -> None:
                     os.remove(temp_file)
 
 
-def _read_json(filepath: str) -> dict | None:
+def _read_json(filepath: str) -> dict[str, Any] | None:
     """
     Read and parse JSON file.
 
@@ -624,7 +625,7 @@ def write_last_session(
     log.info(f"Last session file written: {exit_status} (code {exit_code})")
 
 
-def read_last_session() -> dict | None:
+def read_last_session() -> dict[str, Any] | None:
     """
     Read persistent last-session file.
 

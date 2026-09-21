@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-
-
 import pytest
+
 from profiler import helpers
 from profiler.__version__ import __version__
 from profiler.interface import Interface, InterfaceError
@@ -44,7 +42,7 @@ class TestArgParsing:
     def test_read_pcap_fail(self, parser, capsys):
         with pytest.raises(SystemExit):
             parser.parse_args(["--pcap"])
-        out, err = capsys.readouterr()
+        _, err = capsys.readouterr()
         assert "expected one argument" in err
 
     def test_unknown_args(self, parser, capsys):
@@ -80,12 +78,10 @@ class TestArgParsing:
         assert "invalid channel value" in err
 
     def test_invalid_interface(self, parser, capsys):
+        helpers.setup_config(parser.parse_args(["-i", "fakest_interface_ever"]))
+        iface = Interface()
+        iface.name = "fakest_iface_ever"
         with pytest.raises(InterfaceError):
-            config = helpers.setup_config(
-                parser.parse_args(["-i", "fakest_interface_ever"])
-            )
-            iface = Interface()
-            iface.name = "fakest_iface_ever"
             iface.setup()
 
     @pytest.mark.parametrize(
@@ -107,7 +103,7 @@ class TestArgParsing:
     )
     def test_valid_args(self, args, expected, parser, capsys):
         parser.parse_args(args)
-        out, err = capsys.readouterr()
+        _, err = capsys.readouterr()
         assert err == expected
 
     def test_no_interface_prep_new_flag(self, parser):
@@ -124,7 +120,7 @@ class TestArgParsing:
         """Test that --no-interface-prep shows in help (but not --noprep)"""
         with pytest.raises(SystemExit):
             parser.parse_args(["-h"])
-        out, err = capsys.readouterr()
+        out, _ = capsys.readouterr()
         assert "--no-interface-prep" in out
         # Old flag should still work but be hidden in main help display
         # (argparse shows all aliases, so --noprep will appear)

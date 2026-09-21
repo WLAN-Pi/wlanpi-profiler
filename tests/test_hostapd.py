@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import logging
 import os
 import tempfile
@@ -7,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+
 from profiler.config_generator import (
     ConfigGeneratorError,
     calculate_center_frequency,
@@ -277,7 +276,7 @@ class TestConfigGenerator:
 
     def test_generate_invalid_2ghz_channel(self):
         """Test error on invalid 2.4 GHz channel"""
-        with pytest.raises(ConfigGeneratorError, match="Invalid 2.4 GHz channel"):
+        with pytest.raises(ConfigGeneratorError, match=r"Invalid 2\.4 GHz channel"):
             generate_hostapd_config(
                 interface="wlan0",
                 channel=15,  # Invalid
@@ -868,8 +867,8 @@ class TestHostapdWatchdog:
 
     def test_log_monitoring_ignores_errors_after_startup_window(self):
         """Test that errors after 10 seconds don't set init_failed flag"""
-        from io import StringIO
         import time
+        from io import StringIO
 
         config = {"interface": "wlan0", "channel": 36, "ssid": "Test"}
         log = logging.getLogger("test")
@@ -961,8 +960,8 @@ class TestHostapdWatchdog:
         mgr.start()
 
         # Wait for watchdog to detect crash
-        import time
         import signal
+        import time
 
         time.sleep(1.5)
 
@@ -994,8 +993,8 @@ class TestHostapdWatchdog:
         3. Hostapd exits with code 0 (handled error gracefully)
         4. Watchdog must detect _init_failed and trigger shutdown
         """
-        from io import StringIO
         import signal
+        from io import StringIO
 
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True

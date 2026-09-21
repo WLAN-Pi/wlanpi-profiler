@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Test file I/O error paths for wlanpi-profiler
 """
 
 import json
-import pytest
 from unittest import mock
+
+import pytest
 
 
 class TestReportWriteFailures:
@@ -194,7 +194,7 @@ class TestJSONCorruptionRecovery:
 
         # Try to read it
         try:
-            with open(invalid_json_file, "r") as f:
+            with open(invalid_json_file) as f:
                 json.load(f)
             pytest.fail("Should have raised JSONDecodeError")
         except json.JSONDecodeError:
@@ -216,8 +216,8 @@ class TestConcurrentFileAccess:
 
         # Simulate multiple readers
         readers = []
-        for i in range(3):
-            with open(report_file, "r") as f:
+        for _ in range(3):
+            with open(report_file) as f:
                 data = json.load(f)
                 readers.append(data)
 
@@ -226,8 +226,8 @@ class TestConcurrentFileAccess:
 
     def test_write_race_condition_safety(self, tmp_path):
         """Test that write operations are safe from race conditions"""
-        import tempfile
         import shutil
+        import tempfile
 
         status_file = tmp_path / "status.json"
 
@@ -241,7 +241,7 @@ class TestConcurrentFileAccess:
             shutil.move(tmp_name, str(status_file))
 
         # Verify final write succeeded
-        with open(status_file, "r") as f:
+        with open(status_file) as f:
             data = json.load(f)
             assert "iteration" in data
             assert data["iteration"] == 4  # Last write

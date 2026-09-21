@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 OTA Beacon Verification Tests for Wi-Fi 7 (802.11be) Capability Fixes
 
@@ -38,7 +36,6 @@ Environment Variables:
 import os
 import subprocess
 import time
-from typing import Dict, Optional
 
 import pytest
 from scapy.all import Dot11Beacon, Dot11Elt, sniff
@@ -58,7 +55,7 @@ class WiFi7BeaconAnalyzer:
         self.timeout = timeout
         self.beacons = []
 
-    def capture_beacon(self, ssid: str, count: int = 3) -> Optional[Dot11Beacon]:
+    def capture_beacon(self, ssid: str, count: int = 3) -> Dot11Beacon | None:
         """Capture beacon for specified SSID"""
         self.beacons = []
         filter_str = "type mgt subtype beacon"
@@ -92,7 +89,7 @@ class WiFi7BeaconAnalyzer:
         return self.beacons[0] if self.beacons else None
 
     @staticmethod
-    def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> Optional[bytes]:
+    def get_extension_ie(beacon: Dot11Beacon, ext_id: int) -> bytes | None:
         """Extract Extension IE from beacon by extension ID"""
         elt = beacon.getlayer(Dot11Elt)
         while elt:
@@ -103,7 +100,7 @@ class WiFi7BeaconAnalyzer:
         return None
 
     @staticmethod
-    def get_ie(beacon: Dot11Beacon, ie_id: int) -> Optional[bytes]:
+    def get_ie(beacon: Dot11Beacon, ie_id: int) -> bytes | None:
         """Extract Information Element from beacon by ID"""
         elt = beacon.getlayer(Dot11Elt)
         while elt:
@@ -113,7 +110,7 @@ class WiFi7BeaconAnalyzer:
         return None
 
     @staticmethod
-    def verify_he_160_8080_support(beacon: Dot11Beacon) -> Dict:
+    def verify_he_160_8080_support(beacon: Dot11Beacon) -> dict:
         """
         Verify HE PHY Channel Width supports 160 MHz and 80+80 MHz
 
@@ -147,7 +144,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_eht_mcs15_support(beacon: Dot11Beacon) -> Dict:
+    def verify_eht_mcs15_support(beacon: Dot11Beacon) -> dict:
         """
         Verify EHT PHY MCS-15 support across all variants
 
@@ -175,7 +172,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_eht_mu_beamformer(beacon: Dot11Beacon) -> Dict:
+    def verify_eht_mu_beamformer(beacon: Dot11Beacon) -> dict:
         """
         Verify EHT PHY MU Beamformer support for 80/160/320 MHz
 
@@ -209,7 +206,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_eht_mcs_nss_4ss(beacon: Dot11Beacon) -> Dict:
+    def verify_eht_mcs_nss_4ss(beacon: Dot11Beacon) -> dict:
         """
         Verify EHT-MCS NSS Set advertises NSS=4 for all MCS ranges
 
@@ -266,7 +263,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_eht_operation_basic_mcs_nss(beacon: Dot11Beacon) -> Dict:
+    def verify_eht_operation_basic_mcs_nss(beacon: Dot11Beacon) -> dict:
         """
         Verify EHT Operation Basic MCS/NSS Set
 
@@ -320,7 +317,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_mld_max_simul_links(beacon: Dot11Beacon) -> Dict:
+    def verify_mld_max_simul_links(beacon: Dot11Beacon) -> dict:
         """
         Verify MLD Maximum Simultaneous Links
 
@@ -360,7 +357,7 @@ class WiFi7BeaconAnalyzer:
         }
 
     @staticmethod
-    def verify_vht_beamformee_sts_sounding(beacon: Dot11Beacon) -> Dict:
+    def verify_vht_beamformee_sts_sounding(beacon: Dot11Beacon) -> dict:
         """
         Verify VHT Beamformee STS and Sounding Dimensions
 

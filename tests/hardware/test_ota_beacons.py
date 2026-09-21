@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 OTA (Over-The-Air) Beacon Verification Tests
 
@@ -44,7 +42,6 @@ Environment Variables:
 import os
 import subprocess
 import time
-from typing import List, Optional
 
 import pytest
 from scapy.all import (
@@ -74,14 +71,14 @@ class BeaconCapture:
         """
         self.interface = interface
         self.timeout = timeout
-        self.beacons: List[Dot11Beacon] = []
+        self.beacons: list[Dot11Beacon] = []
 
     def _packet_handler(self, pkt):
         """Handler for captured packets"""
         if pkt.haslayer(Dot11Beacon):
             self.beacons.append(pkt)
 
-    def capture(self, ssid: str, count: int = 5) -> List[Dot11Beacon]:
+    def capture(self, ssid: str, count: int = 5) -> list[Dot11Beacon]:
         """
         Capture beacons for specified SSID
 
@@ -130,7 +127,7 @@ class BeaconCapture:
         return self.beacons
 
     @staticmethod
-    def get_ie(beacon: Dot11Beacon, ie_id: int) -> Optional[Dot11Elt]:
+    def get_ie(beacon: Dot11Beacon, ie_id: int) -> Dot11Elt | None:
         """
         Extract Information Element from beacon by ID
 
@@ -154,7 +151,7 @@ class BeaconCapture:
         return BeaconCapture.get_ie(beacon, ie_id) is not None
 
     @staticmethod
-    def verify_rsn_akm(beacon: Dot11Beacon, expected_akms: List[str]) -> bool:
+    def verify_rsn_akm(beacon: Dot11Beacon, expected_akms: list[str]) -> bool:
         """
         Verify RSN IE contains expected AKM suites
 
@@ -219,7 +216,7 @@ class BeaconCapture:
         return all(akm in found_akms for akm in expected_akms)
 
     @staticmethod
-    def verify_rsn_ciphers(beacon: Dot11Beacon, expected_ciphers: List[str]) -> bool:
+    def verify_rsn_ciphers(beacon: Dot11Beacon, expected_ciphers: list[str]) -> bool:
         """
         Verify RSN IE contains expected pairwise cipher suites
 
@@ -313,7 +310,7 @@ class BeaconCapture:
         return BeaconCapture.has_ie(beacon, 0x36)  # Mobility Domain IE
 
     @staticmethod
-    def get_vendor_ie(beacon: Dot11Beacon, oui: bytes) -> Optional[Dot11Elt]:
+    def get_vendor_ie(beacon: Dot11Beacon, oui: bytes) -> Dot11Elt | None:
         """
         Extract vendor-specific IE by OUI
 
@@ -414,7 +411,7 @@ class BeaconCapture:
         return BeaconCapture.has_ie(beacon, 0xF4)  # RSNX IE
 
     @staticmethod
-    def get_extended_capabilities(beacon: Dot11Beacon) -> Optional[bytes]:
+    def get_extended_capabilities(beacon: Dot11Beacon) -> bytes | None:
         """
         Extract Extended Capabilities IE
 
@@ -450,8 +447,8 @@ class RemoteProfilerRunner:
         self.interface = interface
         self.channel = channel
         self.ssid = ssid
-        self.ssh_process: Optional[subprocess.Popen] = None
-        self.pid: Optional[int] = None
+        self.ssh_process: subprocess.Popen | None = None
+        self.pid: int | None = None
 
     def start(
         self,
@@ -459,7 +456,7 @@ class RemoteProfilerRunner:
         no11ax: bool = False,
         no11be: bool = False,
         fakeap: bool = False,
-        extra_args: Optional[List[str]] = None,
+        extra_args: list[str] | None = None,
     ) -> None:
         """
         Start profiler on remote WLAN Pi
@@ -667,7 +664,7 @@ def ota_interface():
 
     # Verify interface exists
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["iw", "dev", iface, "info"],
             capture_output=True,
             text=True,
@@ -1885,7 +1882,7 @@ class TestOTAInformationElements:
 
 class TestOTAModeFeatureMatrix:
     """
-    Comprehensive test matrix: Mode (AP/FakeAP) × Feature Toggles
+    Comprehensive test matrix: Mode (AP/FakeAP) x Feature Toggles
 
     Tests every combination of:
     - Mode: AP (hostapd), FakeAP (Scapy)
@@ -1919,7 +1916,7 @@ class TestOTAModeFeatureMatrix:
         expected_ciphers,
         auto_disables_11be,
     ):
-        """Test all mode × security combinations"""
+        """Test all mode x security combinations"""
         ssid = f"OTA-{mode.upper()}-{security_mode}"
         runner = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid
@@ -2326,7 +2323,7 @@ class TestOTAPassphrase:
 
             # If we get here, profiler started (might accept and fail later)
             # Check log for error
-            log_output = runner.stop()
+            runner.stop()
 
             # Should have error about passphrase length
             # Note: This might fail if hostapd validates later
@@ -2359,7 +2356,7 @@ class TestOTAPassphrase:
             )
 
             # Check log for error
-            log_output = runner.stop()
+            runner.stop()
 
         except Exception:
             # Expected: profiler failed to start
@@ -2441,7 +2438,7 @@ class TestOTAIEStructureValidation:
                         )
 
                 except AssertionError as e:
-                    malformed_ies.append(f"IE {ie_count} (ID={ie_id}): {str(e)}")
+                    malformed_ies.append(f"IE {ie_count} (ID={ie_id}): {e!s}")
 
                 # Move to next IE
                 elt = elt.payload.getlayer(Dot11Elt)
@@ -2688,13 +2685,11 @@ class TestOTAIEStructureValidation:
             assert len(mcs_set) == 16, f"HT MCS Set wrong length: {len(mcs_set)}"
 
             # Parse HT Extended Capabilities (bytes 19-20, 2 bytes)
-            ht_ext_cap = ht_cap.info[19:21]
 
             # Parse Transmit Beamforming Capabilities (bytes 21-24, 4 bytes)
             txbf_cap = ht_cap.info[21:25]
 
             # Parse ASEL Capabilities (byte 25, 1 byte)
-            asel_cap = ht_cap.info[25]
 
             print(f"\n{mode} HT Capabilities structure validated:")
             print(f"  Total length: {len(ht_cap.info)} bytes")

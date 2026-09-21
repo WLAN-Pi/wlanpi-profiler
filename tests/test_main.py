@@ -1,69 +1,51 @@
-# -*- coding: utf-8 -*-
-
-
-import pytest
 from unittest.mock import patch
 
-fake_version_info = (3, 6)
+import pytest
 
 
-@patch("sys.version_info", fake_version_info)
-def test_version():
-    # Test that Python < 3.9 raises SystemExit in init()
-    with pytest.raises(SystemExit) as pytest_wrapped_exit:
-        import sys
+def test_version(monkeypatch):
+    """init() refuses to run on Python older than 3.13"""
+    from profiler import __main__
 
-        if sys.version_info < (3, 9):
-            sys.exit("Python version too old")
-    assert pytest_wrapped_exit.type == SystemExit
+    monkeypatch.setattr(__main__.sys, "version_info", (3, 6))
+    with pytest.raises(SystemExit):
+        __main__.init()
 
 
-def test_platform():
-    # Platform check is now conditional - only raises SystemExit for live capture on non-Linux
-    # This test verifies the conditional logic works correctly
-    from profiler import helpers
+def test_platform(monkeypatch):
+    """--pcap is allowed off-Linux; live capture is refused"""
+    from profiler import __main__, manager
 
-    parser = helpers.setup_parser()
+    monkeypatch.setattr(__main__.sys, "platform", "win32")
+    monkeypatch.setattr(manager, "start", lambda args: None)
 
-    # Test 1: pcap mode should work on any platform (no SystemExit)
-    args_pcap = parser.parse_args(["--pcap", "test.pcap"])
-    with patch("sys.platform", "win32"):
-        # This should NOT raise SystemExit because --pcap is set
-        import sys
+    # pcap mode is allowed on non-Linux
+    monkeypatch.setattr(__main__.sys, "argv", ["profiler", "--pcap", "x.pcap"])
+    __main__.main()
 
-        if "linux" not in sys.platform:
-            if not args_pcap.pcap_analysis:  # dest is pcap_analysis
-                pytest.fail("Should not reach here with --pcap set")
-
-    # Test 2: live capture mode should fail on non-Linux
-    args_live = parser.parse_args([])
-    with patch("sys.platform", "win32"):
-        with pytest.raises(SystemExit):
-            import sys
-
-            if "linux" not in sys.platform:
-                if not args_live.pcap_analysis:  # dest is pcap_analysis
-                    sys.exit("Live capture mode requires Linux")
+    # live capture mode exits on non-Linux
+    monkeypatch.setattr(__main__.sys, "argv", ["profiler"])
+    with pytest.raises(SystemExit):
+        __main__.main()
 
 
-def test_main():
-    with pytest.raises(SystemExit) as pytest_wrapped_exit:
-        with patch("sys.argv", ["profiler", "--pytest"]):
-            from profiler import __main__
+def test_main(monkeypatch):
+    from profiler import __main__
 
-            __main__.main()
-    assert str(pytest_wrapped_exit.value) == "pytest"
+    monkeypatch.setattr(__main__.sys, "argv", ["profiler", "--pytest"])
+    with pytest.raises(SystemExit) as exc:
+        __main__.main()
+    assert str(exc.value) == "pytest"
 
 
 def test_init():
     from profiler import __main__
 
-    with patch.object(__main__, "main", return_value=42):
+    with patch.object(__main__, "main") as mock_main:
         with patch.object(__main__, "__name__", "__main__"):
-            with patch.object(__main__.sys, "exit") as mock_exit:
-                __main__.init()
+            __main__.init()
 
-    assert mock_exit.call_args[0][0] == 42
+    mock_main.assert_called_once()
 
 
 def test_handle_broken_pipe_without_sigpipe(monkeypatch):
