@@ -300,9 +300,13 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
         write_status(state=ProfilerState.STARTING, pid=os.getpid())
 
-    # Check required tools after arg parsing (allows -h/--help to work quickly).
-    # pcap analysis requires no external tools and must work cross-platform.
-    if not args.pcap_analysis:
+    # Check only the tools the selected mode actually uses, so utility commands
+    # and offline analysis respond quickly.
+    if args.pcap_analysis or args.clean or args.oui_update:
+        helpers.check_required_tools(required=[], optional=[])
+    elif args.list_interfaces:
+        helpers.check_required_tools(required=helpers.INTERFACE_INFO_TOOLS, optional=[])
+    else:
         helpers.check_required_tools()
 
     # Check for already-running profiler instances

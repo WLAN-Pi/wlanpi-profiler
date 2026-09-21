@@ -46,17 +46,35 @@ except ModuleNotFoundError:
     manuf2 = None  # type: ignore[assignment]  # OUI lookups disabled but core works
 
 
-__tools = [
-    "tcpdump",
+# Tools the profiler must have for live interface staging / capture.
+LIVE_REQUIRED_TOOLS = [
     "iw",
     "ip",  # iproute2
     "ethtool",
     "lspci",  # usbutils
     "lsusb",  # pciutils
+]
+
+# Tools expected to be present by default but never invoked directly by the
+# profiler; a missing entry is a warning, not a hard failure.
+LIVE_OPTIONAL_TOOLS = [
+    "tcpdump",
     "modprobe",  # kmod
     "modinfo",  # kmod
     "wpa_cli",  # wpa_supplicant
 ]
+
+# Tools used to enumerate interface information (--list-interfaces).
+INTERFACE_INFO_TOOLS = [
+    "iw",
+    "ip",  # iproute2
+    "ethtool",
+    "lspci",  # usbutils
+    "lsusb",  # pciutils
+]
+
+# Offline pcap analysis runs entirely in-process (scapy); no external tools.
+PCAP_REQUIRED_TOOLS: list[str] = []
 
 is_wpa_cli_present = True
 
@@ -77,25 +95,25 @@ BOOLEAN_CONFIG_KEYS = {
 }
 
 
-def check_required_tools():
-    """Check if required tools are installed. Call this after arg parsing to allow -h/--help to work fast."""
+def check_required_tools(required=None, optional=None):
+    """Check the external tools needed for the current mode.
+
+    Missing ``required`` tools abort startup. Missing ``optional`` tools only
+    warn. Defaults to the live-capture requirements.
+
+    Call this after arg parsing so utility modes (``--pcap``, ``--clean``,
+    ``--oui-update``) can skip checks they do not need.
+    """
     global is_wpa_cli_present
     logging.getLogger("check_required_tools")
-    for tool in __tools:
-        if shutil.which(tool) is None:
-            if tool == "wpa_cli":
-                # Only warn if wpa_supplicant is installed but wpa_cli is missing
-                # If wpa_supplicant isn't installed, we don't need wpa_cli
-                if shutil.which("wpa_supplicant") is not None:
-                    print(
-                        "\n[!] WARNING: wpa_cli not found but wpa_supplicant is installed.\n"
-                        "    wpa_cli is used to stop wpa_supplicant on the interface.\n"
-                        "    Please install wpa_cli (usually part of wpasupplicant package).\n"
-                    )
-                is_wpa_cli_present = False
-                continue
 
-            # For other critical tools, print and exit
+    if required is None:
+        required = LIVE_REQUIRED_TOOLS
+    if optional is None:
+        optional = LIVE_OPTIONAL_TOOLS
+
+    for tool in required:
+        if shutil.which(tool) is None:
             print(f"It looks like you do not have {tool} installed.")
             print("Please install using your distro's package manager.")
 
@@ -108,6 +126,26 @@ def check_required_tools():
                 error=f"Required tool '{tool}' not found. Please install using your distro's package manager.",
             )
             sys.exit(signal.SIGABRT)
+
+    for tool in optional:
+        if shutil.which(tool) is None:
+            if tool == "wpa_cli":
+                # Only warn if wpa_supplicant is installed but wpa_cli is missing
+                # If wpa_supplicant isn't installed, we don't need wpa_cli
+                is_wpa_cli_present = False
+                if shutil.which("wpa_supplicant") is not None:
+                    print(
+                        "\n[!] WARNING: wpa_cli not found but wpa_supplicant is installed.\n"
+                        "    wpa_cli is used to stop wpa_supplicant on the interface.\n"
+                        "    Please install wpa_cli (usually part of wpasupplicant package).\n"
+                    )
+                continue
+
+            print(
+                f"\n[!] WARNING: optional tool '{tool}' not found.\n"
+                "    The profiler does not invoke it directly; install it if your "
+                "setup expects it.\n"
+            )
 
 
 from .__version__ import __version__

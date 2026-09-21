@@ -635,3 +635,35 @@ class TestIsRandomized:
 
     def test_locally_assigned_detected(self):
         assert helpers.is_randomized("02:11:22:33:44:55") is True
+
+
+class TestCheckRequiredTools:
+    """Tool checks are scoped per mode (phase 0 follow-up)."""
+
+    def test_no_requirements_does_not_raise(self):
+        helpers.check_required_tools(required=[], optional=[])
+
+    def test_missing_optional_only_warns(self):
+        # A missing optional tool must not abort startup.
+        helpers.check_required_tools(
+            required=[], optional=["profiler-definitely-missing-tool"]
+        )
+
+    def test_missing_required_aborts(self, monkeypatch):
+        import profiler.status as status_mod
+
+        monkeypatch.setattr(status_mod, "write_status", lambda **kwargs: None)
+        with pytest.raises(SystemExit):
+            helpers.check_required_tools(
+                required=["profiler-definitely-missing-tool"], optional=[]
+            )
+
+    def test_pcap_requires_no_tools(self):
+        assert helpers.PCAP_REQUIRED_TOOLS == []
+
+    def test_expected_tools_are_optional_not_required(self):
+        for tool in ("tcpdump", "modprobe", "modinfo"):
+            assert tool not in helpers.LIVE_REQUIRED_TOOLS
+            assert tool in helpers.LIVE_OPTIONAL_TOOLS
+        assert "iw" in helpers.LIVE_REQUIRED_TOOLS
+        assert "ip" in helpers.LIVE_REQUIRED_TOOLS
