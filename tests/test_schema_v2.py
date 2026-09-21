@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # profiler : a Wi-Fi client capability analyzer tool
 # Copyright : (c) 2024 Josh Schmelzle

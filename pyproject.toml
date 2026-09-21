@@ -1,28 +1,112 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "profiler"
+description = "a Wi-Fi client capability analyzer"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "BSD-3-Clause"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+authors = [
+    {name = "Josh Schmelzle", email = "josh@joshschmelzle.com"},
+]
+classifiers = [
+    "Natural Language :: English",
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: System Administrators",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Documentation = "https://docs.wlanpi.com"
+Source = "https://github.com/wlan-pi/profiler"
+
+[project.scripts]
+profiler = "profiler.__main__:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["profiler*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "profiler.__version__.__version__"}
+# Preserve the pinned dependency set used by the Debian build
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.dynamic.optional-dependencies]
+testing = {file = ["extras.txt"]}
+
+# ============================================================================
+# PYTEST
+# ============================================================================
+
+[tool.pytest.ini_options]
+markers = [
+    "ondevice: marks tests as requiring run on hardware (deselect with -m 'not ondevice')",
+]
+
+# ============================================================================
+# COVERAGE
+# ============================================================================
+
+[tool.coverage.run]
+omit = [
+    "*/site-packages/*",
+    "*/distutils/*",
+    "tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+
+# ============================================================================
+# RUFF
+# ============================================================================
+
 [tool.ruff]
 target-version = "py313"
+line-length = 88
 exclude = [".tox"]
 extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
-select = [
-    "F",      # pyflakes
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "I",      # isort
-    "UP",     # pyupgrade
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "SIM",    # flake8-simplify
-    "PT",     # flake8-pytest-style 
-]
-ignore = [
-    "E501",   # line too long
-    "E402",   # module level import not at top
-    "SIM108", # sometimes if/else is clearer
-]
+# E/W/F core style + pyflakes, I imports, B/BLE bugbear+blind-except, C4
+# comprehensions, UP pyupgrade modernization, RUF ruff-specific, PT
+# pytest-style. Docstring (D) rules are intentionally not enabled: this is a
+# CLI tool with no docstring-as-API surface. E501 is owned by `ruff format`.
+select = ["E", "W", "F", "I", "B", "BLE", "C4", "UP", "RUF", "PT"]
+ignore = ["E501", "BLE001"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
+# Mid-file imports break import cycles in these modules.
+"profiler/helpers.py" = ["E402"]
+"profiler/fakeap.py" = ["E402"]
+# Package __init__ files are re-export shims.
+"profiler/**/__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["profiler"]
+
+[tool.ruff.lint.flake8-pytest-style]
+# The test suite uses comma-separated parametrize name strings
+parametrize-names-type = "csv"
+
+# ============================================================================
+# MYPY
+# ============================================================================
+
+[tool.mypy]
+python_version = "3.13"
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = ['\.tox', 'venv', 'build', 'dist']

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Comprehensive OTA Test Suite - Consolidated tests for all modes and CLI arguments
 
@@ -12,11 +10,12 @@ validations per beacon capture to reduce the ~25-second overhead per test.
 
 import os
 import subprocess
-import pytest
-from scapy.layers.dot11 import Dot11Elt
 
 # Import helpers from existing test file
 import sys
+
+import pytest
+from scapy.layers.dot11 import Dot11Elt
 
 sys.path.insert(0, os.path.dirname(__file__))
 from test_ota_beacons import BeaconCapture, RemoteProfilerRunner
@@ -34,7 +33,7 @@ def ota_interface():
     channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["iw", "dev", iface, "info"],
             capture_output=True,
             text=True,
@@ -222,7 +221,7 @@ class TestComprehensiveModeAndArgs:
         capture = BeaconCapture(interface=ota_interface, timeout=15)
         is_fakeap = mode == "fakeap"
 
-        extra_args = phy_flags + ["--noprofilertlv"]
+        extra_args = [*phy_flags, "--noprofilertlv"]
 
         try:
             runner.start(

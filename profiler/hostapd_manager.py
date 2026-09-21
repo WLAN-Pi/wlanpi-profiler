@@ -15,6 +15,7 @@ import os
 import subprocess
 import threading
 import time
+from typing import IO, Any
 
 from profiler.constants import (
     HOSTAPD_BINARY,
@@ -46,7 +47,9 @@ class HostapdDriverError(HostapdError):
 class HostapdManager:
     """Manages hostapd subprocess for AP mode"""
 
-    def __init__(self, config: dict, country_code: str, logger: logging.Logger):
+    def __init__(
+        self, config: dict[str, Any], country_code: str, logger: logging.Logger
+    ) -> None:
         """
         Initialize hostapd manager.
 
@@ -58,7 +61,7 @@ class HostapdManager:
         self.config = config
         self.country_code = country_code
         self.log = logger
-        self.process: subprocess.Popen | None = None
+        self.process: subprocess.Popen[str] | None = None
         self.config_path: str | None = None
         # Use ap_interface (wlan0) if available, otherwise fall back to interface
         self.interface = config.get("ap_interface", config.get("interface", "wlan0"))
@@ -75,7 +78,7 @@ class HostapdManager:
         self._init_error_msg: str | None = None
         self._startup_time: float | None = None
 
-    def _stream_logs(self, stream, prefix: str):
+    def _stream_logs(self, stream: IO[str], prefix: str) -> None:
         """
         Stream logs from hostapd stdout/stderr to profiler logger.
         Also monitors for fatal errors during startup window.
@@ -143,7 +146,7 @@ class HostapdManager:
         except Exception as e:
             self.log.debug(f"Log streaming thread ({prefix}) stopped: {e}")
 
-    def _watchdog(self):
+    def _watchdog(self) -> None:
         """
         Background thread that monitors hostapd process health indefinitely.
         Triggers profiler shutdown if hostapd exits unexpectedly or fails during startup.
@@ -265,7 +268,7 @@ class HostapdManager:
 
         try:
             # Determine band from channel/frequency
-            channel = self.config.get("channel")
+            channel = int(self.config.get("channel") or 0)
             frequency = self.config.get("frequency")
 
             if frequency:
@@ -309,7 +312,7 @@ class HostapdManager:
         except Exception as e:
             raise HostapdConfigError(f"Failed to generate config: {e}") from e
 
-    def start(self) -> subprocess.Popen:
+    def start(self) -> subprocess.Popen[str]:
         """
         Start hostapd subprocess.
 
@@ -354,24 +357,25 @@ class HostapdManager:
             self._startup_time = time.time()
 
             self.log.info(f"Starting hostapd: {' '.join(hostapd_cmd)}")
-            self.process = subprocess.Popen(
+            process = subprocess.Popen(
                 hostapd_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,  # Line buffered for real-time streaming
             )
+            self.process = process
 
             # Start log streaming threads
             stdout_thread = threading.Thread(
                 target=self._stream_logs,
-                args=(self.process.stdout, "HOSTAPD"),
+                args=(process.stdout, "HOSTAPD"),
                 daemon=True,
                 name="hostapd-stdout",
             )
             stderr_thread = threading.Thread(
                 target=self._stream_logs,
-                args=(self.process.stderr, "HOSTAPD-ERR"),
+                args=(process.stderr, "HOSTAPD-ERR"),
                 daemon=True,
                 name="hostapd-stderr",
             )
@@ -384,8 +388,8 @@ class HostapdManager:
             time.sleep(2)
 
             # Check if process died immediately
-            if self.process.poll() is not None:
-                exit_code = self.process.returncode
+            if process.poll() is not None:
+                exit_code = process.returncode
 
                 # Provide helpful error messages based on exit code
                 error_msg = (
@@ -408,7 +412,7 @@ class HostapdManager:
                 error_msg += "(See hostapd logs above for details)"
                 raise HostapdStartupError(error_msg)
 
-            self.log.info(f"Hostapd started successfully (PID: {self.process.pid})")
+            self.log.info(f"Hostapd started successfully (PID: {process.pid})")
 
             # Start watchdog thread to monitor process health indefinitely
             self._watchdog_stop.clear()
@@ -423,7 +427,7 @@ class HostapdManager:
             # Get BSSID from interface
             self._get_bssid()
 
-            return self.process
+            return process
 
         except FileNotFoundError as err:
             raise HostapdNotFoundError(
@@ -434,7 +438,7 @@ class HostapdManager:
         except Exception as err:
             raise HostapdStartupError(f"Failed to start hostapd: {err}") from err
 
-    def stop(self, timeout: int = 5):
+    def stop(self, timeout: int = 5) -> None:
         """
         Gracefully stop hostapd (SIGTERM → SIGKILL).
 
@@ -478,7 +482,7 @@ class HostapdManager:
         """
         return self.bssid
 
-    def _get_bssid(self):
+    def _get_bssid(self) -> None:
         """
         Read actual transmitted BSSID from hostapd control interface.
 
@@ -527,7 +531,7 @@ class HostapdManager:
         except Exception as e:
             self.log.warning(f"Failed to get BSSID: {e}")
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Cleanup temp files and resources"""
         self.log.debug("Cleaning up hostapd...")
 

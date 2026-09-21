@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import pytest
 
 from profiler.interface import Interface
@@ -20,23 +18,10 @@ class TestInterface:
                 0       0       0       0       0       0       0       0               0
         """
 
-        iw_dev_wlan2_info = """
-        Interface wlan2
-        ifindex 7
-        wdev 0x200000001
-        addr 8c:88:2b:00:26:36
-        type managed
-        wiphy 2
-        txpower 22.00 dBm
-        multicast TXQ:
-                qsz-byt qsz-pkt flows   drops   marks   overlmt hashcol tx-bytes        tx-packets
-                0       0       0       0       0       0       0       0               0
-        """
-
         freq = Interface.get_frequency(iw_dev_wlan0_info, "wlan0")
-        assert freq == None
+        assert freq is None
         ch = Interface.get_channel(iw_dev_wlan0_info, "wlan0")
-        assert ch == None
+        assert ch is None
 
     def test_parsing_iw_dev_mon0_info(self):
         iw_dev_mon0_info = """
@@ -74,85 +59,85 @@ class TestInterface:
 
     def test_get_channels_status(self):
         iw_phy_ax210_channels = """Band 1:
-                * 2412 MHz [1] 
+                * 2412 MHz [1]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2417 MHz [2] 
+                * 2417 MHz [2]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2422 MHz [3] 
+                * 2422 MHz [3]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2427 MHz [4] 
+                * 2427 MHz [4]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2432 MHz [5] 
+                * 2432 MHz [5]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2437 MHz [6] 
+                * 2437 MHz [6]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2442 MHz [7] 
+                * 2442 MHz [7]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2447 MHz [8] 
+                * 2447 MHz [8]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2452 MHz [9] 
+                * 2452 MHz [9]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2457 MHz [10] 
+                * 2457 MHz [10]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2462 MHz [11] 
+                * 2462 MHz [11]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2467 MHz [12] 
+                * 2467 MHz [12]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2472 MHz [13] 
+                * 2472 MHz [13]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40-
                 * 2484 MHz [14] (disabled)
         Band 2:
-                * 5180 MHz [36] 
+                * 5180 MHz [36]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40+ VHT80 VHT160
-                * 5200 MHz [40] 
+                * 5200 MHz [40]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40- VHT80 VHT160
-                * 5220 MHz [44] 
+                * 5220 MHz [44]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40+ VHT80 VHT160
-                * 5240 MHz [48] 
+                * 5240 MHz [48]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40- VHT80 VHT160
-                * 5260 MHz [52] 
+                * 5260 MHz [52]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5280 MHz [56] 
+                * 5280 MHz [56]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5300 MHz [60] 
+                * 5300 MHz [60]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5320 MHz [64] 
+                * 5320 MHz [64]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
@@ -167,107 +152,107 @@ class TestInterface:
                 * 5440 MHz [88] (disabled)
                 * 5460 MHz [92] (disabled)
                 * 5480 MHz [96] (disabled)
-                * 5500 MHz [100] 
+                * 5500 MHz [100]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5520 MHz [104] 
+                * 5520 MHz [104]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5540 MHz [108] 
+                * 5540 MHz [108]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5560 MHz [112] 
+                * 5560 MHz [112]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5580 MHz [116] 
+                * 5580 MHz [116]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5600 MHz [120] 
+                * 5600 MHz [120]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5620 MHz [124] 
+                * 5620 MHz [124]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5640 MHz [128] 
+                * 5640 MHz [128]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80 VHT160
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5660 MHz [132] 
+                * 5660 MHz [132]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5680 MHz [136] 
+                * 5680 MHz [136]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5700 MHz [140] 
+                * 5700 MHz [140]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5720 MHz [144] 
+                * 5720 MHz [144]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80
                 DFS state: usable (for 934 sec)
                 DFS CAC time: 60000 ms
-                * 5745 MHz [149] 
+                * 5745 MHz [149]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40+ VHT80
-                * 5765 MHz [153] 
+                * 5765 MHz [153]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40- VHT80
-                * 5785 MHz [157] 
+                * 5785 MHz [157]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40+ VHT80
-                * 5805 MHz [161] 
+                * 5805 MHz [161]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz HT40- VHT80
-                * 5825 MHz [165] 
+                * 5825 MHz [165]
                 Maximum TX power: 22.0 dBm
                 No IR
                 Channel widths: 20MHz
@@ -338,164 +323,164 @@ class TestInterface:
         """
 
         iw_phy_mt76x2u_channels = """Band 1:
-                * 2412 MHz [1] 
+                * 2412 MHz [1]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2417 MHz [2] 
+                * 2417 MHz [2]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2422 MHz [3] 
+                * 2422 MHz [3]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2427 MHz [4] 
+                * 2427 MHz [4]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40+
-                * 2432 MHz [5] 
+                * 2432 MHz [5]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2437 MHz [6] 
+                * 2437 MHz [6]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2442 MHz [7] 
+                * 2442 MHz [7]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40- HT40+
-                * 2447 MHz [8] 
+                * 2447 MHz [8]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2452 MHz [9] 
+                * 2452 MHz [9]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2457 MHz [10] 
+                * 2457 MHz [10]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40-
-                * 2462 MHz [11] 
+                * 2462 MHz [11]
                 Maximum TX power: 21.0 dBm
                 Channel widths: 20MHz HT40-
                 * 2467 MHz [12] (disabled)
                 * 2472 MHz [13] (disabled)
                 * 2484 MHz [14] (disabled)
         Band 2:
-                * 5180 MHz [36] 
+                * 5180 MHz [36]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+ VHT80
-                * 5200 MHz [40] 
+                * 5200 MHz [40]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5220 MHz [44] 
+                * 5220 MHz [44]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5240 MHz [48] 
+                * 5240 MHz [48]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5260 MHz [52] 
-                Maximum TX power: 22.0 dBm
-                Radar detection
-                Channel widths: 20MHz HT40- HT40+ VHT80
-                DFS state: usable (for 8743 sec)
-                DFS CAC time: 60000 ms
-                * 5280 MHz [56] 
+                * 5260 MHz [52]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5300 MHz [60] 
+                * 5280 MHz [56]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5320 MHz [64] 
+                * 5300 MHz [60]
+                Maximum TX power: 22.0 dBm
+                Radar detection
+                Channel widths: 20MHz HT40- HT40+ VHT80
+                DFS state: usable (for 8743 sec)
+                DFS CAC time: 60000 ms
+                * 5320 MHz [64]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5500 MHz [100] 
+                * 5500 MHz [100]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5520 MHz [104] 
+                * 5520 MHz [104]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5540 MHz [108] 
+                * 5540 MHz [108]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5560 MHz [112] 
+                * 5560 MHz [112]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5580 MHz [116] 
+                * 5580 MHz [116]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5600 MHz [120] 
+                * 5600 MHz [120]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5620 MHz [124] 
+                * 5620 MHz [124]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5640 MHz [128] 
+                * 5640 MHz [128]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5660 MHz [132] 
+                * 5660 MHz [132]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5680 MHz [136] 
+                * 5680 MHz [136]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5700 MHz [140] 
+                * 5700 MHz [140]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- HT40+ VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5720 MHz [144] 
+                * 5720 MHz [144]
                 Maximum TX power: 22.0 dBm
                 Radar detection
                 Channel widths: 20MHz HT40- VHT80
                 DFS state: usable (for 8743 sec)
                 DFS CAC time: 60000 ms
-                * 5745 MHz [149] 
+                * 5745 MHz [149]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40+ VHT80
-                * 5765 MHz [153] 
+                * 5765 MHz [153]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5785 MHz [157] 
+                * 5785 MHz [157]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5805 MHz [161] 
+                * 5805 MHz [161]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- HT40+ VHT80
-                * 5825 MHz [165] 
+                * 5825 MHz [165]
                 Maximum TX power: 22.0 dBm
                 Channel widths: 20MHz HT40- VHT80
                 * 5845 MHz [169] (disabled)
@@ -504,8 +489,8 @@ class TestInterface:
 
         channels = Interface.get_channels_status(iw_phy_ax210_channels)
         assert len(channels) == 3
-        for _band, channels in channels.items():
-            for channel in channels:
+        for _band, band_channels in channels.items():
+            for channel in band_channels:
                 if channel.freq == "6295":
                     assert True
                     assert channel.ch == "69"

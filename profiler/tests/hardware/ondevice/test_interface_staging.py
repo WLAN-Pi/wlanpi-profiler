@@ -20,7 +20,7 @@ import pytest
 
 
 # Check if we're running on actual WLAN Pi hardware
-def find_iw_path():
+def find_iw_path() -> str | None:
     """Find the path to the 'iw' command, checking common locations."""
     for path in ["/sbin/iw", "/usr/sbin/iw", "iw"]:
         try:
@@ -37,7 +37,7 @@ def find_iw_path():
 IW_PATH = find_iw_path()
 
 
-def is_wlanpi_hardware():
+def is_wlanpi_hardware() -> bool:
     """
     Check if we're on WLAN Pi hardware by looking for wireless interfaces.
     Uses 'iw dev' if available, otherwise falls back to 'ip link'.
@@ -73,7 +73,7 @@ pytestmark = [
 class TestRealInterfaceOperations:
     """Test actual interface operations on real hardware"""
 
-    def test_list_wireless_interfaces(self):
+    def test_list_wireless_interfaces(self) -> None:
         """Test that we can list wireless interfaces"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
@@ -84,7 +84,7 @@ class TestRealInterfaceOperations:
         assert result.returncode == 0
         assert "Interface" in result.stdout or "phy#" in result.stdout
 
-    def test_list_physical_devices(self):
+    def test_list_physical_devices(self) -> None:
         """Test that we can list wireless physical devices"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
@@ -96,7 +96,7 @@ class TestRealInterfaceOperations:
         # Should show capabilities
         assert "Wiphy" in result.stdout or "Band" in result.stdout
 
-    def test_rfkill_list(self):
+    def test_rfkill_list(self) -> None:
         """Test that rfkill can list wireless devices"""
         result = subprocess.run(
             ["rfkill", "list"], capture_output=True, text=True, timeout=5
@@ -104,7 +104,7 @@ class TestRealInterfaceOperations:
         assert result.returncode == 0
         # Should show at least some devices (may be empty, that's ok)
 
-    def test_interface_info_command(self):
+    def test_interface_info_command(self) -> None:
         """Test that we can query interface information"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
@@ -133,7 +133,7 @@ class TestRealInterfaceOperations:
 class TestProfilerInterfaceModule:
     """Test the profiler's Interface class with real operations"""
 
-    def test_interface_module_import(self):
+    def test_interface_module_import(self) -> None:
         """Test that Interface module can be imported"""
         try:
             from profiler.interface import Interface
@@ -142,7 +142,7 @@ class TestProfilerInterfaceModule:
         except ImportError as e:
             pytest.fail(f"Cannot import Interface module: {e}")
 
-    def test_interface_instantiation(self):
+    def test_interface_instantiation(self) -> None:
         """Test that Interface can be instantiated"""
         from profiler.interface import Interface
 
@@ -150,7 +150,7 @@ class TestProfilerInterfaceModule:
         interface = Interface()
         assert interface is not None
 
-    def test_interface_detection(self):
+    def test_interface_detection(self) -> None:
         """Test that Interface can detect available wireless interfaces"""
         from profiler.interface import Interface
 
@@ -164,26 +164,26 @@ class TestProfilerInterfaceModule:
 class TestCommandAvailability:
     """Test that required system commands are available"""
 
-    def test_iw_command_exists(self):
+    def test_iw_command_exists(self) -> None:
         """Test that 'iw' command is available"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
         )
         assert "/iw" in IW_PATH
 
-    def test_ip_command_exists(self):
+    def test_ip_command_exists(self) -> None:
         """Test that 'ip' command is available"""
         result = subprocess.run(["which", "ip"], capture_output=True, text=True)
         assert result.returncode == 0
         assert "/ip" in result.stdout
 
-    def test_rfkill_command_exists(self):
+    def test_rfkill_command_exists(self) -> None:
         """Test that 'rfkill' command is available"""
         result = subprocess.run(["which", "rfkill"], capture_output=True, text=True)
         assert result.returncode == 0
         assert "/rfkill" in result.stdout
 
-    def test_hostapd_binary_exists(self):
+    def test_hostapd_binary_exists(self) -> None:
         """Test that custom hostapd binary is installed"""
         hostapd_path = "/opt/wlanpi-profiler/bin/hostapd"
         assert os.path.exists(hostapd_path)
@@ -194,7 +194,7 @@ class TestInterfaceStageability:
     """Test that interfaces can be staged (requires sudo)"""
 
     @pytest.mark.skipif(os.geteuid() != 0, reason="Requires root privileges")
-    def test_can_set_interface_down(self):
+    def test_can_set_interface_down(self) -> None:
         """Test that we can bring an interface down"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
@@ -231,7 +231,7 @@ class TestInterfaceStageability:
                 break
 
     @pytest.mark.skipif(os.geteuid() != 0, reason="Requires root privileges")
-    def test_can_query_interface_capabilities(self):
+    def test_can_query_interface_capabilities(self) -> None:
         """Test that we can query wireless capabilities"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
@@ -247,13 +247,13 @@ class TestInterfaceStageability:
 class TestProfilerIntegration:
     """Test integration with profiler's actual staging functions"""
 
-    def test_profiler_command_available(self):
+    def test_profiler_command_available(self) -> None:
         """Test that profiler command is available"""
         result = subprocess.run(["which", "profiler"], capture_output=True, text=True)
         assert result.returncode == 0
         assert "/profiler" in result.stdout
 
-    def test_profiler_help_command(self):
+    def test_profiler_help_command(self) -> None:
         """Test that profiler help works"""
         result = subprocess.run(
             ["profiler", "--help"], capture_output=True, text=True, timeout=10
@@ -262,7 +262,7 @@ class TestProfilerIntegration:
         assert "profiler" in result.stdout.lower()
         assert "ssid" in result.stdout.lower() or "interface" in result.stdout.lower()
 
-    def test_profiler_list_interfaces(self):
+    def test_profiler_list_interfaces(self) -> None:
         """Test that profiler can list interfaces"""
         result = subprocess.run(
             ["profiler", "--list_interfaces"],

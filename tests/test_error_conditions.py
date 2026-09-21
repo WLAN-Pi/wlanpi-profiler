@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Test boundary conditions and error handling for wlanpi-profiler
 """
 
-import pytest
 from unittest import mock
+
+import pytest
 
 
 class TestChannelValidation:
@@ -87,7 +87,7 @@ class TestPermissionErrors:
             }
         }
 
-        profiler = Profiler(config=config)
+        Profiler(config=config)
 
         # Mock os.chmod to raise PermissionError
         with mock.patch("os.chmod", side_effect=PermissionError("Permission denied")):
@@ -119,7 +119,7 @@ class TestDiskFullErrors:
             }
         }
 
-        profiler = Profiler(config=config)
+        Profiler(config=config)
 
         # Mock wrpcap to raise OSError (disk full)
         with mock.patch(

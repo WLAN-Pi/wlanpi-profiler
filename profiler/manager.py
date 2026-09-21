@@ -23,6 +23,7 @@ import sys
 from datetime import UTC, datetime
 from multiprocessing import Queue
 from time import sleep
+from typing import Any
 
 from . import helpers
 from .__version__ import __version__
@@ -32,8 +33,8 @@ from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, SSID_TMP_FILE
 
 # Conditional imports for Linux-only live capture features
 # Interface and HostapdManager are only needed for live capture mode
-Interface = None
-InterfaceError = Exception
+Interface: Any = None
+InterfaceError: Any = Exception
 if sys.platform.startswith("linux"):
     with contextlib.suppress(ImportError):
         from .interface import Interface, InterfaceError
@@ -41,8 +42,8 @@ if sys.platform.startswith("linux"):
 
 __PIDS: list[tuple[str, int]] = []
 __PIDS.append(("main", os.getpid()))
-__IFACE = Interface() if Interface is not None else None
-__HOSTAPD_MGR = None  # Global hostapd manager for cleanup
+__IFACE: Any = Interface() if Interface is not None else None
+__HOSTAPD_MGR: Any = None  # Global hostapd manager for cleanup
 __RUNNING_PROCESSES: list[mp.Process] = []  # Global list of child processes for cleanup
 
 # Session start time for state file (set in start(), used by signal handlers)
@@ -140,7 +141,7 @@ def _shutdown(
     sys.exit(exit_code)
 
 
-def receiveSignal(signum: int, _frame) -> None:
+def receiveSignal(signum: int, _frame: Any) -> None:
     """Handle noisy keyboardinterrupt"""
     for name, pid in __PIDS:
         # We only want to print exit messages once as multiple processes close
@@ -156,7 +157,7 @@ def receiveSignal(signum: int, _frame) -> None:
             _shutdown(0 if signum in (2, 15) else 1, "success")
 
 
-def receiveWatchdogSignal(_signum: int, _frame) -> None:
+def receiveWatchdogSignal(_signum: int, _frame: Any) -> None:
     """Handle SIGUSR1 from hostapd watchdog indicating hostapd failure.
 
     This is only triggered by the watchdog thread when hostapd dies unexpectedly
@@ -324,7 +325,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     helpers.setup_logger(args)
 
     # Collect environment info into structured JSON for easy parsing
-    env_info = {
+    env_info: dict[str, Any] = {
         "profiler": {
             "version": __version__,
         },
@@ -356,11 +357,11 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
     # Lazy import scapy to speed up -h/--help response
     try:
-        import scapy  # type: ignore
+        import scapy
 
         env_info["dependencies"] = {"scapy": scapy.__version__}
     except (AttributeError, ImportError) as e:
-        env_info["dependencies"] = {"scapy": f"not available ({str(e)})"}
+        env_info["dependencies"] = {"scapy": f"not available ({e!s})"}
 
     # Log as single JSON entry for easy parsing
     import json
@@ -453,7 +454,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     running_processes = __RUNNING_PROCESSES  # Use global list for signal handler access
     finished_processes = []
     queue: Queue[str] = Queue()
-    pcap_analysis = config.get("GENERAL").get("pcap_analysis")
+    pcap_analysis = (config.get("GENERAL") or {}).get("pcap_analysis")
     parent_pid = os.getpid()
     log.debug("%s pid %s", __name__, parent_pid)
 
@@ -464,8 +465,8 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
         helpers.verify_reporting_directories(config)
 
         # Lazy import scapy for pcap analysis
-        import scapy  # type: ignore
-        from scapy.all import rdpcap  # type: ignore
+        import scapy
+        from scapy.all import rdpcap
 
         # Validate PCAP file before analysis to prevent path traversal attacks
         log.debug("Validating PCAP file: %s", pcap_analysis)
@@ -609,8 +610,8 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                 log.debug("finish interface setup with no staging ...")
             else:
                 # get channel from config setup by helpers.py (either passed in via CLI option or config.ini)
-                channel = int(config.get("GENERAL").get("channel"))
-                freq = int(config.get("GENERAL").get("frequency"))
+                channel = int((config.get("GENERAL") or {}).get("channel") or 0)
+                freq = int((config.get("GENERAL") or {}).get("frequency") or 0)
                 if channel != 0:
                     # channel was provided, map it:
                     for freq, ch in _20MHZ_FREQUENCY_CHANNEL_MAP.items():
@@ -638,7 +639,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                 config["GENERAL"]["mac"] = __IFACE.mac
 
                 # Check if using hostapd AP mode (before staging interface)
-                ap_mode = config.get("GENERAL").get("ap_mode", False)
+                ap_mode = (config.get("GENERAL") or {}).get("ap_mode", False)
 
                 if listen_only:
                     # Listen-only mode: create monitor interface for passive sniffing
@@ -752,7 +753,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             log.debug("Sniffer set to listen-only mode (hostapd handles all TX)")
 
             # update ssid record for sharing with other apps like FPMS for QR code generation
-            helpers.update_ssid_record(config.get("GENERAL").get("ssid"))
+            helpers.update_ssid_record((config.get("GENERAL") or {}).get("ssid") or "")
 
             try:
                 __HOSTAPD_MGR = HostapdManager(config["GENERAL"], country_code, log)
@@ -809,7 +810,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             helpers.generate_run_message(config)
 
             # update ssid record for sharing with other apps like FPMS for QR code generation
-            helpers.update_ssid_record(config.get("GENERAL").get("ssid"))
+            helpers.update_ssid_record((config.get("GENERAL") or {}).get("ssid") or "")
 
             # Write info file for fakeAP mode
             from profiler.status import write_info

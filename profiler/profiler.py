@@ -37,11 +37,11 @@ except ImportError:
     pass  # cryptography not installed
 
 try:
-    from manuf2 import manuf  # type: ignore
+    from manuf2 import manuf
 except ModuleNotFoundError:
     manuf = None  # OUI lookups will be disabled
 
-from scapy.all import Dot11, Dot11FCS, RadioTap, wrpcap  # type: ignore
+from scapy.all import Dot11, Dot11FCS, RadioTap, wrpcap
 
 from .__version__ import __version__
 from .constants import (
@@ -120,20 +120,29 @@ class Profiler:
             self.config = config
             if config:
                 self.log.debug("profiler __init__: processing config")
-                channel = config.get("GENERAL").get("channel")
+                channel = (config.get("GENERAL") or {}).get("channel")
                 if channel:
                     self.channel = int(channel)
                 else:
                     self.log.warning("profiler cannot determine channel from config")
-                self.listen_only = config.get("GENERAL").get("listen_only")
-                self.files_path = config.get("GENERAL").get("files_path")
+                self.listen_only: bool = bool(
+                    (config.get("GENERAL") or {}).get("listen_only")
+                )
+                _files_path = (config.get("GENERAL") or {}).get("files_path")
                 # Support both single path and list of paths
-                if not isinstance(self.files_path, list):
-                    self.files_path = [self.files_path]
-                self.pcap_analysis = config.get("GENERAL").get("pcap_analysis")
-                self.ft_disabled = config.get("GENERAL").get("ft_disabled")
-                self.he_disabled = config.get("GENERAL").get("he_disabled")
-                self.be_disabled = config.get("GENERAL").get("be_disabled")
+                self.files_path: list[Any] = (
+                    _files_path if isinstance(_files_path, list) else [_files_path]
+                )
+                self.pcap_analysis = (config.get("GENERAL") or {}).get("pcap_analysis")
+                self.ft_disabled: bool = bool(
+                    (config.get("GENERAL") or {}).get("ft_disabled")
+                )
+                self.he_disabled: bool = bool(
+                    (config.get("GENERAL") or {}).get("he_disabled")
+                )
+                self.be_disabled: bool = bool(
+                    (config.get("GENERAL") or {}).get("be_disabled")
+                )
                 self.log.debug(
                     "profiler __init__: ft_disabled=%s, he_disabled=%s, be_disabled=%s",
                     self.ft_disabled,
@@ -168,14 +177,14 @@ class Profiler:
             sys.stderr.flush()
             raise
 
-    def run(self, queue) -> None:
+    def run(self, queue: Any) -> None:
         """Runner which performs checks prior to profiling an association request"""
 
         try:
             self.log.debug("profiler run(): starting")
 
             # Set up signal handlers for graceful shutdown
-            def shutdown_handler(signum, _frame):
+            def shutdown_handler(signum: int, _frame: Any) -> None:
                 self.log.info(f"Received signal {signum}, shutting down gracefully")
                 self.running = False
 
@@ -185,7 +194,7 @@ class Profiler:
             self.log.debug("profiler run(): signal handlers registered")
 
             if queue:
-                buffer: dict = {}
+                buffer: dict[Any, Any] = {}
                 buffer_squelch = 3
 
                 while self.running:
@@ -236,7 +245,7 @@ class Profiler:
             sys.stderr.flush()
             raise
 
-    def profile(self, frame) -> None:
+    def profile(self, frame: Any) -> None:
         """Handle profiling clients as they come into the queue"""
         # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
@@ -355,7 +364,7 @@ class Profiler:
     def generate_text_report(
         oui_manuf: str,
         chipset: str,
-        capabilities: list,
+        capabilities: list[Capability],
         client_mac: str,
         channel: int,
         band: str,
@@ -398,16 +407,16 @@ class Profiler:
 
     def write_analysis_to_file_system(
         self,
-        text_report,
-        capabilities,
-        frame,
-        oui_manuf,
-        chipset,
+        text_report: str,
+        capabilities: list[Capability],
+        frame: Any,
+        oui_manuf: str,
+        chipset: str,
         randomized: bool,
-        band,
-        channel,
-        listen_only,
-    ):
+        band: Any,
+        channel: Any,
+        listen_only: bool,
+    ) -> None:
         """Write report files out to directories on the WLAN Pi (supports multi-path)"""
         log = logging.getLogger(inspect.stack()[0][3])
         client_mac = frame.addr2.replace(":", "-", 5)
@@ -568,7 +577,7 @@ class Profiler:
                 csv_writer.writerow(out_row)
 
     @staticmethod
-    def process_information_elements(buffer: bytes) -> dict:
+    def process_information_elements(buffer: bytes) -> dict[Any, Any]:
         """
         Parse a 802.11 payload and returns a dict of IEs
 
@@ -577,7 +586,7 @@ class Profiler:
         You must strip those before passing the payload in.
         """
         # init element vars
-        information_elements: dict = {}
+        information_elements: dict[Any, Any] = {}
 
         # Handle empty buffer (malformed frame with no IEs)
         if not buffer:
@@ -637,7 +646,7 @@ class Profiler:
 
         return information_elements
 
-    def resolve_oui_manuf(self, mac: str, dot11_elt_dict):
+    def resolve_oui_manuf(self, mac: str, dot11_elt_dict: dict[Any, Any]) -> str:
         """Resolve client's manuf using manuf database and other heuristics"""
         log = logging.getLogger(inspect.stack()[0][3])
 
@@ -686,7 +695,9 @@ class Profiler:
         log.debug("finished oui lookup for %s: %s", mac, oui_manuf)
         return oui_manuf
 
-    def resolve_vendor_specific_tag_chipset(self, dot11_elt_dict) -> str:
+    def resolve_vendor_specific_tag_chipset(
+        self, dot11_elt_dict: dict[Any, Any]
+    ) -> str:
         """Resolve client's chipset via heuristics of vendor specific tags"""
         # Broadcom
         # MediaTek
@@ -721,7 +732,7 @@ class Profiler:
         return chipset
 
     @staticmethod
-    def analyze_ssid_ie(dot11_elt_dict) -> str:
+    def analyze_ssid_ie(dot11_elt_dict: dict[Any, Any]) -> str:
         """Parse SSID Information Element from 802.11 association request.
 
         Extracts the network name (SSID) from the SSID parameter set IE.
@@ -749,7 +760,9 @@ class Profiler:
         return out
 
     @staticmethod
-    def analyze_ht_capabilities_ie(dot11_elt_dict) -> list:
+    def analyze_ht_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Parse HT Capabilities Information Element from 802.11n association request.
 
         Extracts 802.11n (High Throughput) capabilities including spatial stream support
@@ -802,7 +815,9 @@ class Profiler:
         return [dot11n, dot11n_nss]
 
     @staticmethod
-    def _parse_mcs_nss(octets, mcs_9_label: str, mcs_11_label: str) -> tuple:
+    def _parse_mcs_nss(
+        octets: list[int], mcs_9_label: str, mcs_11_label: str
+    ) -> tuple[int, list[str]]:
         """Parse MCS/NSS bit-pairs into (nss, sorted unique MCS labels).
 
         Each 2-bit pair encodes: 0b11 not supported, 0b00 MCS 0-7, 0b10 MCS 0-9,
@@ -827,7 +842,9 @@ class Profiler:
         return nss, sorted(set(mcs))
 
     @staticmethod
-    def analyze_vht_capabilities_ie(dot11_elt_dict) -> list:
+    def analyze_vht_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Parse VHT Capabilities Information Element from 802.11ac association request.
 
         Extracts 802.11ac (Very High Throughput) capabilities including spatial streams,
@@ -954,7 +971,9 @@ class Profiler:
         ]
 
     @staticmethod
-    def analyze_rm_capabilities_ie(dot11_elt_dict) -> list:
+    def analyze_rm_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Parse RM (Radio Measurement) Capabilities IE for 802.11k support.
 
         Detects 802.11k radio resource measurement capabilities which enable clients
@@ -984,7 +1003,9 @@ class Profiler:
         return [dot11k]
 
     @staticmethod
-    def analyze_ft_capabilities_ie(dot11_elt_dict, ft_disabled: bool) -> list:
+    def analyze_ft_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any], ft_disabled: bool
+    ) -> list[Capability]:
         """Parse FT (Fast Transition) Capabilities IE for 802.11r support.
 
         Detects 802.11r fast BSS transition support via mobility domain element.
@@ -1014,7 +1035,9 @@ class Profiler:
         return [dot11r]
 
     @staticmethod
-    def analyze_extended_capabilities_ie(dot11_elt_dict) -> list:
+    def analyze_extended_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Parse Extended Capabilities IE for 802.11v/aa/QoS feature support.
 
         Extracts extended capability flags from the bitmap including:
@@ -1100,7 +1123,9 @@ class Profiler:
         return [dot11v, scs_support, mscs_support]
 
     @staticmethod
-    def analyze_rsn_capabilities_ie(dot11_elt_dict) -> list:
+    def analyze_rsn_capabilities_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Parse RSN (Robust Security Network) Capabilities IE from association request.
 
         Extracts security capabilities including 802.11w/MFP (Management Frame Protection),
@@ -1310,7 +1335,7 @@ class Profiler:
         return [group_cipher, pairwise_cipher, akm_suite, dot11w]
 
     @staticmethod
-    def analyze_rsnx_ie(dot11_elt_dict) -> list:
+    def analyze_rsnx_ie(dot11_elt_dict: dict[Any, Any]) -> list[Capability]:
         """Check for RSNX capabilities (SAE H2E)"""
         rsnx_sae_h2e = Capability(
             name="RSNX SAE H2E",
@@ -1335,7 +1360,9 @@ class Profiler:
         return [rsnx_sae_h2e]
 
     @staticmethod
-    def analyze_power_capability_ie(dot11_elt_dict) -> list:
+    def analyze_power_capability_ie(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Check for supported power capabilities"""
         max_power_cap = Capability(
             name="Max Power",
@@ -1377,7 +1404,9 @@ class Profiler:
         return [max_power_cap, min_power_cap]
 
     @staticmethod
-    def analyze_supported_channels_ie(dot11_elt_dict, is_6ghz: bool) -> list:
+    def analyze_supported_channels_ie(
+        dot11_elt_dict: dict[Any, Any], is_6ghz: bool
+    ) -> list[Capability]:
         """Check supported channels"""
         supported_channels = Capability(
             name="Supported Channels",
@@ -1444,7 +1473,9 @@ class Profiler:
         return [supported_channels, number_of_supported_channels]
 
     @staticmethod
-    def analyze_operating_classes(dot11_elt_dict) -> list:
+    def analyze_operating_classes(
+        dot11_elt_dict: dict[Any, Any],
+    ) -> list[Capability]:
         """Check if 6 GHz is a supported alternative operating class"""
         six_ghz_operating_class_cap = Capability(
             db_key="six_ghz_operating_class_supported",
@@ -1475,8 +1506,8 @@ class Profiler:
 
     @staticmethod
     def analyze_extension_ies(
-        dot11_elt_dict, he_disabled: bool, be_disabled: bool
-    ) -> list:
+        dot11_elt_dict: dict[Any, Any], he_disabled: bool, be_disabled: bool
+    ) -> list[Capability]:
         """Check for 802.11ax and 802.11be support"""
         dot11ax = Capability(
             name="802.11ax",
@@ -2107,7 +2138,9 @@ class Profiler:
             dot11be_mle_link_reconfig_support,
         ]
 
-    def analyze_assoc_req(self, frame, is_6ghz: bool):
+    def analyze_assoc_req(
+        self, frame: Any, is_6ghz: bool
+    ) -> tuple[str, str, str, list[Capability]]:
         """Analyze 802.11 association request frame to extract client capabilities.
 
         This is the main analysis function that orchestrates parsing of all information

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Real Interface Staging Tests (Execute on WLAN Pi Hardware)
 
@@ -14,9 +13,10 @@ Execute on WLAN Pi:
 Note: Requires sudo because interface operations need root privileges.
 """
 
-import pytest
-import subprocess
 import os
+import subprocess
+
+import pytest
 
 
 # Check if we're running on actual WLAN Pi hardware

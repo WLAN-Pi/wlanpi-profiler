@@ -17,6 +17,7 @@ import os
 import subprocess
 import time
 from collections import namedtuple
+from typing import Any
 
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .helpers import flag_last_object, run_command
@@ -26,7 +27,7 @@ class InterfaceError(Exception):
     """Custom exception used when there are problems staging the interface for injection"""
 
 
-def _run_staging_command(cmd: list) -> str:
+def _run_staging_command(cmd: list[str]) -> str:
     """Run an interface-mutating command, turning a non-zero exit into InterfaceError.
 
     Staging commands that fail must not be silently ignored; a monitor vif on
@@ -46,14 +47,14 @@ class InterfaceInformation:
 
     def __init__(
         self,
-        phy,
-        interface,
-        mode,
-        driver,
-        driver_version,
-        firmware_rev,
-        chipset,
-    ):
+        phy: str,
+        interface: str,
+        mode: str,
+        driver: str,
+        driver_version: str,
+        firmware_rev: str,
+        chipset: str,
+    ) -> None:
         self.phy = phy
         self.interface = interface
         self.mode = mode
@@ -66,14 +67,14 @@ class InterfaceInformation:
 class Interface:
     """WLAN Interface data class"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = ""
         self.mon = ""
-        self.channel = None
-        self.frequency = None
+        self.channel: int = 0
+        self.frequency: int = 0
         self.requires_vif = False
-        self.phys = []
+        self.phys: list[Any] = []
         self.no_interface_prep = False
         self.removed = False
 
@@ -88,7 +89,7 @@ class Interface:
             with contextlib.suppress(Exception):
                 subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
 
-    def setup(self):
+    def setup(self) -> None:
         """Perform setup for the interface"""
         if not self.name:
             raise InterfaceError("interface name not set")
@@ -104,8 +105,8 @@ class Interface:
         # if we're not managing interface prep, we need to get freq and channel from iw.
         if self.no_interface_prep:
             iw_dev_iface_info = run_command(["iw", "dev", f"{self.name}", "info"])
-            self.frequency = self.get_frequency(iw_dev_iface_info, self.name)
-            self.channel = self.get_channel(iw_dev_iface_info, self.name)
+            self.frequency = self.get_frequency(iw_dev_iface_info, self.name) or 0
+            self.channel = self.get_channel(iw_dev_iface_info, self.name) or 0
         else:
             # the rtl88XXau is crap and doesn't support vifs, otherwise lets create a mon interface for iwlwifi, mt76x2u, etc
             if "88XXau" not in self.driver:
@@ -158,7 +159,7 @@ class Interface:
         self.log_debug()
 
     @staticmethod
-    def get_attr_max_len(searchList, attr):
+    def get_attr_max_len(searchList: list[Any], attr: str) -> int:
         """Find all matching attributes in a list and return max length"""
         _list = []
         for _obj in searchList:
@@ -285,7 +286,7 @@ class Interface:
             run_command(cmd)
 
     def check_for_disabled_or_noir_channels(
-        self, freq: int, iw_phy_channels, verbose=False
+        self, freq: int, iw_phy_channels: str, verbose: bool = False
     ) -> bool:
         """Check iw phy channels for disabled, No IR, or Radar detection and return True if found"""
         channels_status = self.get_channels_status(iw_phy_channels)
@@ -421,7 +422,7 @@ class Interface:
 
         self.log.debug("finish stage_interface")
 
-    def is_up(self, iface="") -> bool:
+    def is_up(self, iface: str = "") -> bool:
         """Check if interface has the UP flag set"""
         if not iface:
             iface = self.name
@@ -798,7 +799,7 @@ class Interface:
             return ""
 
     @staticmethod
-    def get_channels_status(iw_phy_channels) -> dict:
+    def get_channels_status(iw_phy_channels: str) -> dict[str, Any]:
         """Run `iw phy phyX channels` and analyze channel information"""
         log = logging.getLogger(inspect.stack()[0][3])
         if not iw_phy_channels or "command failed" in iw_phy_channels:
@@ -862,9 +863,9 @@ class Interface:
                 bands[band] = channels
         return bands
 
-    def checks(self, staged=False) -> None:
+    def checks(self, staged: bool = False) -> None:
         """Perform self checks and warn as neccessary"""
-        if self.no_interface_prep or staged and "monitor" not in self.mode:
+        if self.no_interface_prep or (staged and "monitor" not in self.mode):
             self.log.warning(
                 "%s mode is in %s mode when we expected monitor mode",
                 self.name,
@@ -938,19 +939,19 @@ class Interface:
             self.chipset,
         )
 
-    def get_ethtool_info(self, iface) -> str:
+    def get_ethtool_info(self, iface: str) -> str:
         """Gather ethtool information for interface"""
         ethtool = run_command(["ethtool", "-i", f"{iface}"])
         return ethtool.strip()
 
-    def get_driver(self, iface) -> str:
+    def get_driver(self, iface: str) -> str:
         """Gather driver information for interface"""
         driver = run_command(
             ["readlink", "-f", f"/sys/class/net/{iface}/device/driver"]
         )
         return driver.split("/")[-1].strip()
 
-    def get_driver_version(self, eth_tool_info) -> str:
+    def get_driver_version(self, eth_tool_info: str) -> str:
         """Gather driver version for interface"""
         out = ""
         for line in eth_tool_info.lower().splitlines():
@@ -958,7 +959,7 @@ class Interface:
                 out = line.replace("version:", "").strip()
         return out
 
-    def get_firmware_revision(self, eth_tool_info) -> str:
+    def get_firmware_revision(self, eth_tool_info: str) -> str:
         """Gather driver firmware version for interface"""
         out = ""
         for line in eth_tool_info.lower().splitlines():
@@ -966,7 +967,7 @@ class Interface:
                 out = line.replace("firmware-version:", "").strip()
         return out
 
-    def cleanup_chipset(self, chipset) -> str:
+    def cleanup_chipset(self, chipset: str) -> str:
         """Remove extraneous words"""
         words = [
             "Wireless LAN Controllers",
@@ -993,7 +994,7 @@ class Interface:
         chipset = " ".join(chipset.split())
         return chipset
 
-    def get_chipset(self, iface) -> str:
+    def get_chipset(self, iface: str) -> str:
         """Gather chipset information for interface"""
         modalias = run_command(["cat", f"/sys/class/net/{iface}/device/modalias"])
         bus = modalias.split(":")[0]
@@ -1037,14 +1038,14 @@ class Interface:
         return mac.strip().lower()
 
     @staticmethod
-    def get_frequency(iw_dev_iface_info, iface):
+    def get_frequency(iw_dev_iface_info: str, iface: str) -> int | None:
         """Determine which frequency the interfac is set to"""
         return Interface.parse_iw_dev_iface_info(
             iw_dev_iface_info, iface, get_frequency=True
         )
 
     @staticmethod
-    def get_channel(iw_dev_iface_info, iface):
+    def get_channel(iw_dev_iface_info: str, iface: str) -> int | None:
         """Determine which channel the interface is set to"""
         return Interface.parse_iw_dev_iface_info(
             iw_dev_iface_info, iface, get_channel=True
@@ -1052,8 +1053,11 @@ class Interface:
 
     @staticmethod
     def parse_iw_dev_iface_info(
-        iw_dev_iface_info, iface, get_frequency=False, get_channel=False
-    ):
+        iw_dev_iface_info: str,
+        iface: str,
+        get_frequency: bool = False,
+        get_channel: bool = False,
+    ) -> int | None:
         """Determine what channel or frequency the interface is set to"""
         log = logging.getLogger(inspect.stack()[0][3])
         for line in iw_dev_iface_info.splitlines():
@@ -1084,7 +1088,7 @@ class Interface:
                     return channel
         return None
 
-    def get_operstate(self, iface="") -> str:
+    def get_operstate(self, iface: str = "") -> str:
         """
         Get the current operating state of the interface.
 
@@ -1105,14 +1109,14 @@ class Interface:
         return operstate.strip().lower()
 
     @staticmethod
-    def build_iw_phy_list() -> list:
+    def build_iw_phy_list() -> list[Any]:
         """Create map of phy to iface using /sys filesystem"""
         iface = namedtuple("iface", ["name", "ifindex", "addr", "type"])
         phy = namedtuple("phy", ["phy_id", "interfaces"])
-        phys = []
+        phys: list[Any] = []
 
         # Build mapping from phy_id to interfaces using /sys
-        phy_to_interfaces = {}
+        phy_to_interfaces: dict[str, list[Any]] = {}
 
         # Iterate over all network interfaces in /sys/class/net
         try:
@@ -1191,7 +1195,7 @@ class Interface:
             self.log.debug("Could not read phy index from %s: %s", phy_index_path, e)
             return ""
 
-    def get_mode(self, iface="") -> str:
+    def get_mode(self, iface: str = "") -> str:
         """Get the current mode of the interface {unknown/managed/monitor}"""
         if not iface:
             iface = self.name

@@ -7,11 +7,12 @@ device pcap files. If the implementation changes, these tests will catch
 any regressions.
 """
 
-import pytest
 from pathlib import Path
-from scapy.all import rdpcap
-from profiler import profiler
 
+import pytest
+from scapy.all import rdpcap
+
+from profiler import profiler
 
 # Expected capabilities for each Wi-Fi 7 device
 # These are the ACTUAL values detected from real device pcaps.
@@ -136,7 +137,7 @@ WIFI7_DEVICE_EXPECTED_CAPS = {
             #   B0=1: 52+26 and 106+26-tone MRUs
             #   B1=1: 484+242-tone MRU (80 MHz)
             #   B2=1: 996+484+242-tone MRU (160 MHz)
-            #   B3=0: NOT in 3×996-tone MRU (320 MHz)
+            #   B3=0: NOT in 3x996-tone MRU (320 MHz)
             "dot11be_mcs15_support": 7,
             "dot11be_mcs14_support": 1,
             "rsnx_sae_h2e": 1,
@@ -258,7 +259,7 @@ class TestWiFi7DeviceRegression:
         - B0=1: MCS 15 in 52+26 and 106+26-tone MRUs
         - B1=1: MCS 15 in 484+242-tone MRU (80 MHz)
         - B2=1: MCS 15 in 996+484+242-tone MRU (160 MHz)
-        - B3=0: NOT in 3×996-tone MRU (320 MHz)
+        - B3=0: NOT in 3x996-tone MRU (320 MHz)
 
         This test ensures we extract the full 4-bit value, not just a boolean.
         """
@@ -320,8 +321,10 @@ class TestWiFi7DeviceRegression:
             (c for c in capabilities if c.db_key == "dot11be_mle_mlc_type"), None
         )
 
-        assert mle_cap is not None and mle_cap.db_value == 1, "MLE not detected"
-        assert mlc_type is not None and mlc_type.db_value == 0, (
+        assert mle_cap is not None
+        assert mle_cap.db_value == 1, "MLE not detected"
+        assert mlc_type is not None
+        assert mlc_type.db_value == 0, (
             "MLC Type should be 0 (Basic) if Common Info Length is correctly parsed"
         )
 
