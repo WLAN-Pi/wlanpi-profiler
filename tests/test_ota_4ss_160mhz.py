@@ -385,15 +385,15 @@ class BeaconAnalyzer:
         # Byte 1: Rx MCS 10-11 (lower nibble), Tx MCS 10-11 (upper nibble)
         # Byte 2: Rx MCS 12-13 (lower nibble), Tx MCS 12-13 (upper nibble)
 
-        rx_nss_0_9 = (mcs_map_80 & 0xF) + 1 if (mcs_map_80 & 0xF) != 0xF else 0
+        rx_nss_0_9 = (mcs_map_80 & 0xF) if (mcs_map_80 & 0xF) != 0xF else 0
         tx_nss_0_9 = (
-            ((mcs_map_80 >> 4) & 0xF) + 1 if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 4) & 0xF) if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
         )
         rx_nss_10_11 = (
-            ((mcs_map_80 >> 8) & 0xF) + 1 if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 8) & 0xF) if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
         )
         tx_nss_10_11 = (
-            ((mcs_map_80 >> 12) & 0xF) + 1 if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 12) & 0xF) if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
         )
 
         advertises_4ss = (

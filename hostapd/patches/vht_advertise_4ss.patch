@@ -7,7 +7,7 @@
 +	/* WLAN Pi Profiler: Override VHT capabilities for profiling */
 +	static int profiler_vht_4ss_logged = 0;
 +	if (!profiler_vht_4ss_logged) {
-+		wpa_printf(MSG_DEBUG, "PROFILER: VHT caps override: 160 MHz, Short GI 160, 4 SS, max beamforming");
++		wpa_printf(MSG_DEBUG, "PROFILER: Advertising VHT 4 SS support (160 MHz, Short GI 160, max beamforming)");
 +		profiler_vht_4ss_logged = 1;
 +	}
 +	/* VHT MCS Map: 0xaa = MCS 0-9 for each SS (2 bits per SS, 0b10 = MCS 0-9) */

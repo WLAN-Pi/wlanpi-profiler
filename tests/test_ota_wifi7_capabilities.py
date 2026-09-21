@@ -149,8 +149,10 @@ class WiFi7BeaconAnalyzer:
         """
         Verify EHT PHY MCS-15 support across all variants
 
-        Issue #2: EHT PHY capabilities should enable ALL MCS-15 support bits
-        Bits 40-55 (bytes 5-6) should be 0xFF 0xFF
+        Issue #2: EHT PHY capabilities should enable the MCS-15 support bits
+        (byte 6) plus the advanced PHY bits in byte 5. PPE_THRESHOLD_PRESENT
+        (byte 5 bit 3) is excluded because hostapd only emits the PPE
+        Thresholds field when the driver advertises it.
         """
         eht_cap = WiFi7BeaconAnalyzer.get_extension_ie(beacon, 0x6C)
         if not eht_cap or len(eht_cap) < 12:
@@ -169,7 +171,7 @@ class WiFi7BeaconAnalyzer:
             "present": True,
             "phy_cap_5": f"0x{phy_cap_5:02x}",
             "phy_cap_6": f"0x{phy_cap_6:02x}",
-            "all_mcs15_enabled": phy_cap_5 == 0xFF and phy_cap_6 == 0xFF,
+            "all_mcs15_enabled": phy_cap_5 == 0xF7 and phy_cap_6 == 0xFF,
         }
 
     @staticmethod
@@ -224,22 +226,22 @@ class WiFi7BeaconAnalyzer:
         # BW <= 80 MHz: 3 bytes
         mcs_map_80 = int.from_bytes(eht_cap[12:15], "little")
 
-        # Extract NSS values (nibbles, value is NSS-1)
-        rx_nss_0_9 = (mcs_map_80 & 0xF) + 1 if (mcs_map_80 & 0xF) != 0xF else 0
+        # Extract NSS values (nibbles; each 4-bit field is the max NSS directly)
+        rx_nss_0_9 = (mcs_map_80 & 0xF) if (mcs_map_80 & 0xF) != 0xF else 0
         tx_nss_0_9 = (
-            ((mcs_map_80 >> 4) & 0xF) + 1 if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 4) & 0xF) if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
         )
         rx_nss_10_11 = (
-            ((mcs_map_80 >> 8) & 0xF) + 1 if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 8) & 0xF) if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
         )
         tx_nss_10_11 = (
-            ((mcs_map_80 >> 12) & 0xF) + 1 if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 12) & 0xF) if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
         )
         rx_nss_12_13 = (
-            ((mcs_map_80 >> 16) & 0xF) + 1 if ((mcs_map_80 >> 16) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 16) & 0xF) if ((mcs_map_80 >> 16) & 0xF) != 0xF else 0
         )
         tx_nss_12_13 = (
-            ((mcs_map_80 >> 20) & 0xF) + 1 if ((mcs_map_80 >> 20) & 0xF) != 0xF else 0
+            ((mcs_map_80 >> 20) & 0xF) if ((mcs_map_80 >> 20) & 0xF) != 0xF else 0
         )
 
         return {
@@ -269,22 +271,20 @@ class WiFi7BeaconAnalyzer:
         Verify EHT Operation Basic MCS/NSS Set
 
         Issue #5: EHT Operation IE should advertise NSS=4 for all basic MCS ranges
-        Expected: All 4 bytes should be 0x33 (NSS=4)
+        Expected: All 4 bytes should be 0x44 (each nibble = max NSS = 4)
         """
-        eht_oper = WiFi7BeaconAnalyzer.get_extension_ie(beacon, 0x6D)
-        if not eht_oper or len(eht_oper) < 8:
+        # Extension ID 0x6A = EHT Operation (0x6D is TID-to-Link Mapping)
+        eht_oper = WiFi7BeaconAnalyzer.get_extension_ie(beacon, 0x6A)
+        if not eht_oper or len(eht_oper) < 6:
             return {"present": False, "error": "EHT Operation IE not found"}
 
-        # Basic EHT-MCS NSS Set is 4 bytes, starting at offset 4
-        if len(eht_oper) < 8:
-            return {"present": True, "error": "EHT Operation IE too short"}
+        # Info layout: ext_id(1) + EHT Operation Parameters(1) + Basic EHT-MCS/NSS Set(4)
+        basic_mcs_nss = eht_oper[2:6]
 
-        basic_mcs_nss = eht_oper[4:8]
-
-        # Decode NSS values (each nibble represents NSS-1 for a MCS range)
+        # Decode NSS values (each nibble is the max NSS directly; 0xF = unsupported)
         def decode_nss(byte_val):
-            rx = (byte_val & 0xF) + 1 if (byte_val & 0xF) != 0xF else 0
-            tx = ((byte_val >> 4) & 0xF) + 1 if ((byte_val >> 4) & 0xF) != 0xF else 0
+            rx = (byte_val & 0xF) if (byte_val & 0xF) != 0xF else 0
+            tx = ((byte_val >> 4) & 0xF) if ((byte_val >> 4) & 0xF) != 0xF else 0
             return rx, tx
 
         nss_0_7 = decode_nss(basic_mcs_nss[0])
@@ -343,8 +343,9 @@ class WiFi7BeaconAnalyzer:
         if len(mld_ie) < 4 + common_info_len:
             return {"present": True, "error": "Multi-Link IE too short"}
 
+        # Common Info Length counts itself, so Common Info starts at offset 3
         # MLD Capabilities is 2 bytes before end of common info
-        mld_cap_offset = 4 + common_info_len - 2
+        mld_cap_offset = 3 + common_info_len - 2
         mld_cap = int.from_bytes(mld_ie[mld_cap_offset : mld_cap_offset + 2], "little")
 
         # Bits 0-3 (mask 0x000F) are Maximum Number of Simultaneous Links

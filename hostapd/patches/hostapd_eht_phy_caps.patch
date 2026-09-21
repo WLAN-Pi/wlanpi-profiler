@@ -1,0 +1,34 @@
+--- a/src/ap/ieee802_11_eht.c
++++ b/src/ap/ieee802_11_eht.c
+@@ -156,6 +156,31 @@
+ 		cap->phy_cap[EHT_PHYCAP_MU_BEAMFORMER_IDX] &=
+ 			~EHT_PHYCAP_MU_BEAMFORMER_MASK;
+ 
++	/* WLAN Pi Profiler: advertise advanced EHT PHY capabilities.
++	 * PPE_THRESHOLD_PRESENT (phy_cap[5] bit 3) is intentionally left unset:
++	 * hostapd only writes the PPE Thresholds field when the driver
++	 * advertises it, so setting the bit here would malform the IE.
++	 */
++	cap->phy_cap[0] |= (1 << 3);  /* NDP 4x EHT-LTF with 32 GI */
++	cap->phy_cap[0] |= (1 << 4);  /* Partial BW UL MU-MIMO */
++	cap->phy_cap[0] |= (1 << 5);  /* SU Beamformer */
++	cap->phy_cap[1] |= (1 << 1);  /* Beamformee SS (80 MHz) */
++	cap->phy_cap[1] |= (1 << 2);  /* Beamformee SS (160 MHz) */
++	cap->phy_cap[2] |= (1 << 3);  /* Sounding Dimensions (160 MHz) */
++	cap->phy_cap[3] |= (1 << 7);  /* Triggered CQI Feedback */
++	cap->phy_cap[4] |= (1 << 0);  /* Partial BW DL MU-MIMO */
++	cap->phy_cap[5] |= 0xf7;      /* CQI/LTF/pad bits (not PPE) */
++	cap->phy_cap[6] = 0xff;       /* MCS 15 (80/160/320) + EHT DUP 6 GHz + LTF */
++	cap->phy_cap[7] |= (1 << 0);  /* 20 MHz STA RX NDP Wider BW */
++	cap->phy_cap[7] |= (1 << 4);  /* MU Beamformer 80 MHz */
++	cap->phy_cap[7] |= (1 << 5);  /* MU Beamformer 160 MHz */
++	cap->phy_cap[7] |= (1 << 6);  /* MU Beamformer 320 MHz */
++	static int profiler_eht_phy_logged = 0;
++	if (!profiler_eht_phy_logged) {
++		wpa_printf(MSG_DEBUG, "PROFILER: Enhanced EHT PHY caps");
++		profiler_eht_phy_logged = 1;
++	}
++
+ 	pos = cap->optional;
+ 
+ 	mcs_nss_len = ieee80211_eht_mcs_set_size(mode->mode,

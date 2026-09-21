@@ -489,7 +489,6 @@ class RemoteProfilerRunner:
                 "--security-mode",
                 security_mode,
                 "--debug",
-                "--expert",
             ]
         )
 

@@ -1,3 +1,13 @@
+wlanpi-profiler (2.1.1-1) unstable; urgency=medium
+
+  * Fix EHT Operation Basic MCS/NSS Set encoding (0xff -> 0x44)
+  * Advertise 4 spatial streams in the HE-MCS maps
+  * Re-enable advanced EHT PHY capabilities (MCS 15, MU beamformer)
+  * OTA test fixes: EHT NSS decode, MLD max-simul-links offset, EHT MAC
+    expectation (0xb7), and patch log-message expectations
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Mon, 21 Sep 2026 14:31:53 -0400
+
 wlanpi-profiler (2.1.0-1) unstable; urgency=medium
 
   * Update bundled hostapd from 2.11 to 2.12
