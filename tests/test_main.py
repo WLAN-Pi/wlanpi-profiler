@@ -64,3 +64,13 @@ def test_init():
                 __main__.init()
 
     assert mock_exit.call_args[0][0] == 42
+
+
+def test_handle_broken_pipe_without_sigpipe(monkeypatch):
+    """handle_broken_pipe must not raise on platforms without SIGPIPE (Windows)."""
+    import signal
+
+    from profiler import __main__ as main_mod
+
+    monkeypatch.delattr(signal, "SIGPIPE", raising=False)
+    main_mod.handle_broken_pipe()

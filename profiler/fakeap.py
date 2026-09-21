@@ -453,32 +453,9 @@ class TxBeacons(multiprocessing.Process):
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
         scapyconf.iface = self.interface
+        # Socket is opened in the child process (run()) so the parent does not
+        # inherit a duplicate raw socket fd.
         self.l2socket = None
-        try:
-            self.l2socket = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
-            )
-            self.l2socket.bind((self.interface, 0))
-        except OSError as error:
-            if error.strerror and "No such device" in error.strerror:
-                self.log.warning(
-                    "TxBeacons: no such device (%s) ... exiting ...", self.interface
-                )
-                sys.exit(1)
-        if not self.l2socket:
-            self.log.error(
-                "TxBeacons(): unable to create raw socket with %s ... exiting ...",
-                self.interface,
-            )
-            sys.exit(1)
-        self.log.debug("Raw AF_PACKET socket created for beacons on %s", self.interface)
-
-        # Set socket priority for beacons
-        try:
-            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
-            self.log.info("Socket priority set to 7 (highest) for beacons")
-        except OSError as e:
-            self.log.warning("Could not set socket priority for beacons: %s", e)
         self.beacon_interval = 0.102_400
 
         # Beacon process uses its own local sequence counter (no lock contention!)
@@ -522,6 +499,34 @@ class TxBeacons(multiprocessing.Process):
                 self.l2socket.close()
             self.l2socket = None
 
+    def _open_socket(self):
+        """Create the raw AF_PACKET socket in the child process."""
+        try:
+            self.l2socket = socket.socket(
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
+            )
+            self.l2socket.bind((self.interface, 0))
+        except OSError as error:
+            if error.strerror and "No such device" in error.strerror:
+                self.log.warning(
+                    "TxBeacons: no such device (%s) ... exiting ...", self.interface
+                )
+                sys.exit(1)
+        if not self.l2socket:
+            self.log.error(
+                "TxBeacons(): unable to create raw socket with %s ... exiting ...",
+                self.interface,
+            )
+            sys.exit(1)
+        self.log.debug("Raw AF_PACKET socket created for beacons on %s", self.interface)
+
+        # Set socket priority for beacons
+        try:
+            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
+            self.log.info("Socket priority set to 7 (highest) for beacons")
+        except OSError as e:
+            self.log.warning("Could not set socket priority for beacons: %s", e)
+
     def __del__(self):
         """Destructor to ensure socket cleanup"""
         self.cleanup()
@@ -529,6 +534,7 @@ class TxBeacons(multiprocessing.Process):
     def run(self):
         """Main beacon transmission loop - called by multiprocessing.Process.start()"""
         self.log.debug("TxBeacons process started, beginning beacon transmission")
+        self._open_socket()
         try:
             while True:
                 self.beacon()
@@ -544,6 +550,9 @@ class TxBeacons(multiprocessing.Process):
                 reason=StatusReason.FAKEAP_CRASHED,
                 error=str(e),
             )
+            # Exit non-zero so the manager treats this as an abnormal exit and
+            # does not report a crashed beacon process as a clean shutdown.
+            sys.exit(1)
         finally:
             self.log.debug("TxBeacons shutting down")
             self.cleanup()
@@ -638,32 +647,9 @@ class Sniffer(multiprocessing.Process):
         # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
         # self.log.debug(scapyconf.ifaces)
+        # Socket is opened in the child process (run()) so the parent does not
+        # inherit a duplicate raw socket fd.
         self.l2socket = None
-        try:
-            self.l2socket = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
-            )
-            self.l2socket.bind((self.interface, 0))
-        except OSError as error:
-            if error.strerror and "No such device" in error.strerror:
-                self.log.warning(
-                    "Sniffer: No such device (%s) ... exiting ...", self.interface
-                )
-                sys.exit(1)
-        if not self.l2socket:
-            self.log.error(
-                "Sniffer(): unable to create raw socket with %s ... exiting ...",
-                self.interface,
-            )
-            sys.exit(1)
-        self.log.debug("Raw AF_PACKET socket created for %s", self.interface)
-
-        # Set socket priority for probe responses
-        try:
-            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
-            self.log.info("Socket priority set to 7 (highest) for probe responses")
-        except OSError as e:
-            self.log.warning("Could not set socket priority for responses: %s", e)
 
         self.received_frame_cb = self.received_frame
         # Determine if we're in Rx-only mode (listen-only or hostapd mode)
@@ -754,8 +740,37 @@ class Sniffer(multiprocessing.Process):
         """Destructor to ensure socket cleanup"""
         self.cleanup()
 
+    def _open_socket(self):
+        """Create the raw AF_PACKET socket in the child process."""
+        try:
+            self.l2socket = socket.socket(
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)
+            )
+            self.l2socket.bind((self.interface, 0))
+        except OSError as error:
+            if error.strerror and "No such device" in error.strerror:
+                self.log.warning(
+                    "Sniffer: No such device (%s) ... exiting ...", self.interface
+                )
+                sys.exit(1)
+        if not self.l2socket:
+            self.log.error(
+                "Sniffer(): unable to create raw socket with %s ... exiting ...",
+                self.interface,
+            )
+            sys.exit(1)
+        self.log.debug("Raw AF_PACKET socket created for %s", self.interface)
+
+        # Set socket priority for probe responses
+        try:
+            self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
+            self.log.info("Socket priority set to 7 (highest) for probe responses")
+        except OSError as e:
+            self.log.warning("Could not set socket priority for responses: %s", e)
+
     def run(self):
         """Main process loop - called by multiprocessing.Process.start()"""
+        self._open_socket()
         try:
             sniff(
                 iface=self.interface,
@@ -786,10 +801,7 @@ class Sniffer(multiprocessing.Process):
                         promisc=False,
                     )
                 except Exception:
-                    self.log.exception(
-                        "scapy.sniff() failed even without BPF filters: %s",
-                        exc_info=True,
-                    )
+                    self.log.exception("scapy.sniff() failed even without BPF filters")
                     from profiler.status import (
                         ProfilerState,
                         StatusReason,
@@ -804,8 +816,7 @@ class Sniffer(multiprocessing.Process):
                     sys.exit(1)
             else:
                 self.log.exception(
-                    "scappy.sniff() problem in fakeap.py sniffer(): %s",
-                    exc_info=True,
+                    "scappy.sniff() problem in fakeap.py sniffer()",
                 )
                 from profiler.status import ProfilerState, StatusReason, write_status
 

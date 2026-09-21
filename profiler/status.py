@@ -16,9 +16,9 @@ import logging
 import os
 import re
 import subprocess
-from datetime import datetime, timezone
+import tempfile
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from profiler.__version__ import __version__
 from profiler.constants import (
@@ -99,7 +99,7 @@ def detect_country_code() -> str:
     try:
         # Run iw reg get to get regulatory domain
         result = subprocess.run(
-            ["/usr/sbin/iw", "reg", "get"],
+            ["iw", "reg", "get"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -176,9 +176,9 @@ def detect_startup_method() -> str:
 
 def write_status(
     state: ProfilerState,
-    reason: Optional[StatusReason] = None,
-    pid: Optional[int] = None,
-    error: Optional[str] = None,
+    reason: StatusReason | None = None,
+    pid: int | None = None,
+    error: str | None = None,
 ) -> None:
     """
     Write profiler status to JSON file.
@@ -201,7 +201,7 @@ def write_status(
     status_data: dict = {
         "schema_version": "1.0",
         "state": state.value,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "startup_method": detect_startup_method(),  # Auto-detect (cached after first call)
     }
 
@@ -223,11 +223,11 @@ def write_info(
     bssid: str,
     mode: str,
     monitor_interface: str,
-    ap_interface: Optional[str] = None,
-    passphrase: Optional[str] = None,
-    profiler_version: Optional[str] = None,
-    last_profile: Optional[str] = None,
-    last_profile_timestamp: Optional[str] = None,
+    ap_interface: str | None = None,
+    passphrase: str | None = None,
+    profiler_version: str | None = None,
+    last_profile: str | None = None,
+    last_profile_timestamp: str | None = None,
     profile_count: int = 0,
     failed_profile_count: int = 0,
     total_clients_seen: int = 0,
@@ -272,7 +272,7 @@ def write_info(
             f"Frequency will be set to null in info file."
         )
 
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
 
     info_data = {
         "schema_version": "1.0",
@@ -324,7 +324,7 @@ def update_last_profile_in_info(mac: str) -> None:
         info_data["last_profile"] = mac
 
         # Update last_profile_timestamp
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         info_data["last_profile_timestamp"] = now.isoformat()
 
         # Increment profile_count
@@ -350,10 +350,10 @@ def update_last_profile_in_info(mac: str) -> None:
 
 
 def update_monitoring_metrics_in_info(
-    total_clients_seen: Optional[int] = None,
-    failed_profile_count: Optional[int] = None,
-    invalid_frame_count: Optional[int] = None,
-    bad_fcs_count: Optional[int] = None,
+    total_clients_seen: int | None = None,
+    failed_profile_count: int | None = None,
+    invalid_frame_count: int | None = None,
+    bad_fcs_count: int | None = None,
 ) -> None:
     """
     Update monitoring metrics in info file (atomic operation).
@@ -388,7 +388,7 @@ def update_monitoring_metrics_in_info(
             info_data["bad_fcs_count"] = bad_fcs_count
 
         # Update uptime_seconds
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if "started_at" in info_data:
             # Handle both 'Z' suffix and '+00:00' for UTC timestamps
             started_at_str = info_data["started_at"].replace("Z", "+00:00")
@@ -419,7 +419,7 @@ def delete_info() -> None:
     _delete_file(get_info_file_path())
 
 
-def get_status() -> Optional[dict]:
+def get_status() -> dict | None:
     """
     Read and parse status file.
 
@@ -429,7 +429,7 @@ def get_status() -> Optional[dict]:
     return _read_json(get_status_file_path())
 
 
-def get_info() -> Optional[dict]:
+def get_info() -> dict | None:
     """
     Read and parse info file.
 
@@ -456,7 +456,7 @@ def is_process_alive(pid: int) -> bool:
         return False
 
 
-def _get_frequency_from_channel(channel: int) -> Optional[int]:
+def _get_frequency_from_channel(channel: int) -> int | None:
     """
     Get frequency (MHz) from channel number.
 
@@ -486,28 +486,39 @@ def _write_json_atomic(filepath: str, data: dict) -> None:
         data: Dictionary to write as JSON
     """
     log = logging.getLogger(__name__)
-    temp_file = f"{filepath}.tmp"
+    temp_file = None
 
     try:
-        with open(temp_file, "w") as f:
+        # Unique temp file per writer so concurrent processes (sniffer and
+        # profiler children) cannot clobber each other's temp file.
+        directory = os.path.dirname(filepath) or "."
+        fd, temp_file = tempfile.mkstemp(
+            dir=directory, prefix=os.path.basename(filepath) + ".", suffix=".tmp"
+        )
+        with os.fdopen(fd, "w") as f:
             json.dump(data, f, indent=2)
             f.write("\n")  # Trailing newline
+            f.flush()
+            os.fsync(f.fileno())
 
         # Set permissions before rename so final file has correct perms
         set_file_permissions(temp_file)
 
-        # Atomic rename
-        os.rename(temp_file, filepath)
+        # Atomic replace (overwrites existing target on POSIX and Windows)
+        os.replace(temp_file, filepath)
+        temp_file = None
 
     except Exception as e:
         log.warning(f"Failed to write {filepath}: {e}")
+    finally:
         # Clean up temp file on failure
-        with contextlib.suppress(Exception):
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+        if temp_file is not None:
+            with contextlib.suppress(Exception):
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
 
 
-def _read_json(filepath: str) -> Optional[dict]:
+def _read_json(filepath: str) -> dict | None:
     """
     Read and parse JSON file.
 
@@ -540,8 +551,8 @@ def write_last_session(
     exit_status: str,
     exit_code: int,
     start_time: str,
-    exit_reason: Optional[str] = None,
-    error_message: Optional[str] = None,
+    exit_reason: str | None = None,
+    error_message: str | None = None,
 ) -> None:
     """
     Write persistent last-session file for post-mortem analysis.
@@ -564,7 +575,7 @@ def write_last_session(
     if not info_data:
         info_data = {}
 
-    ended_at = datetime.now(timezone.utc).isoformat()
+    ended_at = datetime.now(UTC).isoformat()
     started_at = start_time
 
     try:
@@ -613,7 +624,7 @@ def write_last_session(
     log.info(f"Last session file written: {exit_status} (code {exit_code})")
 
 
-def read_last_session() -> Optional[dict]:
+def read_last_session() -> dict | None:
     """
     Read persistent last-session file.
 

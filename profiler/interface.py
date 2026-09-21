@@ -26,6 +26,21 @@ class InterfaceError(Exception):
     """Custom exception used when there are problems staging the interface for injection"""
 
 
+def _run_staging_command(cmd: list) -> str:
+    """Run an interface-mutating command, turning a non-zero exit into InterfaceError.
+
+    Staging commands that fail must not be silently ignored; a monitor vif on
+    the wrong channel or an interface that never entered the requested mode
+    would otherwise be treated as success.
+    """
+    try:
+        return run_command(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise InterfaceError(
+            f"staging command failed: {' '.join(str(part) for part in cmd)} ({exc})"
+        ) from exc
+
+
 class InterfaceInformation:
     """Base class for Interface Information"""
 
@@ -236,10 +251,18 @@ class Interface:
             self.log.debug("see 'iw reg get' for details")
 
     def reset_interface(self) -> None:
-        """Delete monitor interface and restore interface"""
-        commands = [
-            ["ip", "link", "set", f"{self.mon}", "down"],
-            ["iw", "dev", f"{self.mon}", "del"],
+        """Delete monitor interface and restore the primary interface to managed mode"""
+        commands = []
+        if self.requires_vif:
+            commands += [
+                ["ip", "link", "set", f"{self.mon}", "down"],
+                ["iw", "dev", f"{self.mon}", "del"],
+            ]
+        # Restore the primary interface to managed so the device is left usable
+        # after hostapd (__ap) or monitor-mode staging.
+        commands += [
+            ["ip", "link", "set", f"{self.name}", "down"],
+            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
             ["ip", "link", "set", f"{self.name}", "up"],
         ]
         for cmd in commands:
@@ -350,17 +373,13 @@ class Interface:
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
             if "monitor" in cmd:
-                stdout = run_command(cmd).strip()
-                if "non-zero" not in stdout:
+                stdout = _run_staging_command(cmd).strip()
+                if stdout:
                     self.log.debug(stdout)
-                    if "not supported" in stdout:
-                        raise InterfaceError(
-                            f"{self.name} does not appear to support monitor mode"
-                        )
             elif "scan" in cmd:
                 run_command(cmd, suppress_output=True)
             else:
-                run_command(cmd)
+                _run_staging_command(cmd)
 
         # check if the interface is in monitor mode and operstate up
         # self.operstate = self.get_operstate(iface=self.mon)
@@ -413,7 +432,7 @@ class Interface:
             if "scan" in cmd:
                 run_command(cmd, suppress_output=True)
             else:
-                run_command(cmd)
+                _run_staging_command(cmd)
 
         # Set primary interface to AP mode
         cmds = [
@@ -451,7 +470,7 @@ class Interface:
         # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
-            stdout = run_command(cmd).strip()
+            stdout = _run_staging_command(cmd).strip()
             if stdout and "not supported" in stdout:
                 raise InterfaceError(
                     f"{self.name} does not support required interface types"
@@ -501,7 +520,7 @@ class Interface:
             if "scan" in cmd:
                 run_command(cmd, suppress_output=True)
             else:
-                run_command(cmd)
+                _run_staging_command(cmd)
 
         # Explicitly remove existing monitor vif if it already exists
         with contextlib.suppress(Exception):
@@ -536,7 +555,7 @@ class Interface:
         # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
-            stdout = run_command(cmd).strip()
+            stdout = _run_staging_command(cmd).strip()
             if stdout and "not supported" in stdout:
                 raise InterfaceError(
                     f"{self.name} does not support required interface types"
@@ -1074,39 +1093,39 @@ class Interface:
                 # Get phy index from /sys/class/net/<iface>/phy80211/index
                 phy_index_path = os.path.join(phy80211_path, "index")
                 try:
-                    with open(phy_index_path, "r") as f:
+                    with open(phy_index_path) as f:
                         phy_id = f.read().strip()
-                except (IOError, OSError):
+                except OSError:
                     continue
 
                 # Get ifindex
                 ifindex_path = os.path.join(iface_path, "ifindex")
                 try:
-                    with open(ifindex_path, "r") as f:
+                    with open(ifindex_path) as f:
                         ifindex = f.read().strip()
-                except (IOError, OSError):
+                except OSError:
                     ifindex = ""
 
                 # Get MAC address
                 addr_path = os.path.join(iface_path, "address")
                 try:
-                    with open(addr_path, "r") as f:
+                    with open(addr_path) as f:
                         addr = f.read().strip()
-                except (IOError, OSError):
+                except OSError:
                     addr = ""
 
                 # Get interface type/mode from /sys/class/net/<iface>/type
                 type_path = os.path.join(iface_path, "type")
                 iface_type = "unknown"
                 try:
-                    with open(type_path, "r") as f:
+                    with open(type_path) as f:
                         type_val = f.read().strip()
                         type_int = int(type_val)
                         if type_int == 1:
                             iface_type = "managed"
                         elif type_int in (801, 802, 803):
                             iface_type = "monitor"
-                except (IOError, OSError, ValueError):
+                except (OSError, ValueError):
                     pass
 
                 # Create iface tuple and add to mapping
@@ -1128,11 +1147,11 @@ class Interface:
         # Read phy index directly from /sys
         phy_index_path = f"/sys/class/net/{self.name}/phy80211/index"
         try:
-            with open(phy_index_path, "r") as f:
+            with open(phy_index_path) as f:
                 phy_id = f.read().strip()
             self.log.debug("phy%s maps to provided %s", phy_id, self.name)
             return phy_id
-        except (IOError, OSError) as e:
+        except OSError as e:
             self.log.debug("Could not read phy index from %s: %s", phy_index_path, e)
             return ""
 

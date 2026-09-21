@@ -138,3 +138,30 @@ class TestFakeAP:
         # (Scapy should be able to parse the patched bytes)
         assert len(patched) == len(template_bytes)
         assert patched != template_bytes  # Should be different due to patches
+
+
+class TestTxBeaconsFailure:
+    """A crashed beacon process must exit non-zero (phase 0)."""
+
+    def test_run_exits_nonzero_on_error(self, monkeypatch):
+        import logging
+
+        import profiler.status as status_mod
+
+        tx = object.__new__(fakeap.TxBeacons)
+        tx.log = logging.getLogger("test.txbeacons")
+        tx.beacon_interval = 0
+
+        def _boom():
+            raise RuntimeError("boom")
+
+        tx.beacon = _boom
+        tx.cleanup = lambda: None
+        tx._open_socket = lambda: None
+
+        monkeypatch.setattr(status_mod, "write_status", lambda **kwargs: None)
+
+        with pytest.raises(SystemExit) as exc:
+            tx.run()
+
+        assert exc.value.code == 1

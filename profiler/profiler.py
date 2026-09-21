@@ -21,7 +21,7 @@ import time
 import traceback
 import warnings
 from queue import Empty
-from typing import Any, Optional
+from typing import Any
 
 # Suppress cryptography deprecation warnings before importing scapy
 # (TripleDES moving to cryptography.hazmat.decrepit)
@@ -41,7 +41,7 @@ try:
 except ModuleNotFoundError:
     manuf = None  # OUI lookups will be disabled
 
-from scapy.all import Dot11, RadioTap, wrpcap  # type: ignore
+from scapy.all import Dot11, Dot11FCS, RadioTap, wrpcap  # type: ignore
 
 from .__version__ import __version__
 from .constants import (
@@ -82,7 +82,7 @@ from .helpers import (
 class Profiler:
     """Code handling analysis of client capablities"""
 
-    def _setup_subprocess_logging(self, config: Optional[dict[str, Any]]) -> None:
+    def _setup_subprocess_logging(self, config: dict[str, Any] | None) -> None:
         """Configure logging for profiler subprocess.
 
         When running as a multiprocessing.Process, the logging configuration from
@@ -104,7 +104,7 @@ class Profiler:
         )
 
     def __init__(
-        self, config: Optional[dict[str, Any]] = None, queue: Optional[Any] = None
+        self, config: dict[str, Any] | None = None, queue: Any | None = None
     ) -> None:
         try:
             # Re-initialize logging for this subprocess since it doesn't inherit
@@ -543,9 +543,15 @@ class Profiler:
             # dump out the frame to a file
             pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
             log.debug("writing to %s", pcap_filename)
-            wrpcap(pcap_filename, [frame])
-            # Set permissions and group ownership for webui access
-            set_file_permissions(pcap_filename)
+            try:
+                wrpcap(pcap_filename, [frame])
+                # Set permissions and group ownership for webui access
+                set_file_permissions(pcap_filename)
+            except OSError:
+                log.exception(
+                    "error creating pcap file to dump client frame (%s)", pcap_filename
+                )
+                continue  # Skip this path and try the next
 
             # check if csv file exists (use path-specific csv_file)
             if not os.path.exists(csv_file):
@@ -1350,14 +1356,19 @@ class Profiler:
                 max_power = power_data[1]
                 min_power = power_data[0]
 
-                # check if signed
+                # check if signed (both min and max are signed 8-bit values)
                 if min_power > 127:
                     signed_min_power = (256 - min_power) * (-1)
                 else:
                     signed_min_power = min_power
 
-                max_power_cap.value = f"{max_power} dBm"
-                max_power_cap.db_value = max_power
+                if max_power > 127:
+                    signed_max_power = (256 - max_power) * (-1)
+                else:
+                    signed_max_power = max_power
+
+                max_power_cap.value = f"{signed_max_power} dBm"
+                max_power_cap.db_value = signed_max_power
                 min_power_cap.value = f"{signed_min_power} dBm"
                 min_power_cap.db_value = signed_min_power
 
@@ -1444,9 +1455,9 @@ class Profiler:
             supported_operating_classes = dot11_elt_dict[
                 SUPPORTED_OPERATING_CLASSES_IE_TAG
             ]
-            # pop current operating class from list
+            # pop current operating class from list (first octet is the current class)
             if supported_operating_classes:
-                supported_operating_classes.pop()
+                supported_operating_classes.pop(0)
             for alternative_operating_class in supported_operating_classes:
                 if alternative_operating_class in six_ghz_alternative_operating_classes:
                     supported_6ghz_alternative_operating_classes.append(
@@ -1538,15 +1549,28 @@ class Profiler:
                 ext_ie_ids = [
                     int(str(element_data[0]))
                     for element_data in dot11_elt_dict[IE_EXT_TAG]
+                    if element_data
                 ]
                 log.debug(
                     f"Extension IEs (tag 255) found: {ext_ie_ids} (35=HE Caps, 36=HE Op, 39=6GHz, 107=MLE, 108=EHT Caps)"
                 )
 
                 for element_data in dot11_elt_dict[IE_EXT_TAG]:
+                    if not element_data:
+                        continue
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
+                        # HE Capabilities IE is a fixed 19-byte payload after the
+                        # extension id; a truncated/malformed IE must not crash the
+                        # whole capture session.
+                        if len(element_data) < 20:
+                            log.debug(
+                                "Skipping truncated HE Capabilities IE (%d bytes)",
+                                len(element_data),
+                            )
+                            continue
+
                         # dot11ax is supported
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
@@ -1862,6 +1886,8 @@ class Profiler:
         else:
             if IE_EXT_TAG in dot11_elt_dict:
                 for element_data in dot11_elt_dict[IE_EXT_TAG]:
+                    if not element_data:
+                        continue
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == EHT_CAPABILITIES_IE_EXT_TAG:
@@ -2189,8 +2215,10 @@ class Profiler:
         # strip params
         ie_buffer = ie_buffer[4:]
 
-        # strip fcs
-        ie_buffer = ie_buffer[:-4]
+        # strip fcs only when the frame actually carries one; otherwise the
+        # final 4 bytes of the last IE would be truncated
+        if frame.haslayer(Dot11FCS):
+            ie_buffer = ie_buffer[:-4]
 
         # convert buffer to ie dict
         dot11_elt_dict = self.process_information_elements(ie_buffer)

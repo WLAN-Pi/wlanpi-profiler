@@ -463,7 +463,7 @@ class TestHelpers:
         assert config["GENERAL"]["be_disabled"] == False
 
     def test_wpa2_with_config_be_enabled(self, tmp_path):
-        """Test that config.ini be_disabled:false overrides auto-disable"""
+        """config be_disabled:false no longer overrides auto-disable; use --11be"""
         config_file = tmp_path / "test.ini"
         config_file.write_text("[GENERAL]\nsecurity_mode: wpa2\nbe_disabled: false\n")
 
@@ -471,9 +471,73 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # Config file should override auto-disable
+        # be_disabled: false is treated as "not set", so 11be is auto-disabled
         assert error is None
-        assert config["GENERAL"]["be_disabled"] == False
+        assert config["GENERAL"]["be_disabled"] == True
+
+    def test_wpa2_shipped_default_auto_disables_11be(self, tmp_path):
+        """The shipped default (be_disabled: false) must not suppress auto-disable"""
+        config_file = tmp_path / "test.ini"
+        config_file.write_text("[GENERAL]\nsecurity_mode: wpa2\nbe_disabled: false\n")
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file)])
+        config, error = helpers.setup_config(args)
+
+        assert error is None
+        assert config["GENERAL"]["be_disabled"] == True
+
+    def test_wpa2_be_disabled_true_overrides_auto_disable(self, tmp_path):
+        """An explicit be_disabled:true is honored"""
+        config_file = tmp_path / "test.ini"
+        config_file.write_text("[GENERAL]\nsecurity_mode: wpa2\nbe_disabled: true\n")
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file)])
+        config, error = helpers.setup_config(args)
+
+        assert error is None
+        assert config["GENERAL"]["be_disabled"] == True
+
+    def test_ssid_and_passphrase_truthy_strings_not_coerced(self, tmp_path):
+        """String values like '1'/'on'/'no' must stay strings, not become bools"""
+        config_file = tmp_path / "test.ini"
+        config_file.write_text("[GENERAL]\nssid: on\npassphrase: no\n")
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file)])
+        config, error = helpers.setup_config(args)
+
+        assert error is None
+        assert config["GENERAL"]["ssid"] == "on"
+        assert config["GENERAL"]["passphrase"] == "no"
+
+    def test_non_numeric_channel_returns_clean_error(self, tmp_path):
+        config_file = tmp_path / "test.ini"
+        config_file.write_text("[GENERAL]\nchannel: abc\n")
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file)])
+        config, error = helpers.setup_config(args)
+
+        assert config is None
+        assert error is not None
+        assert "channel" in error.lower()
+
+    def test_11ax_flag_prevents_auto_disable(self, tmp_path):
+        """--11ax re-enables 11ax so 11be must not be auto-disabled for that reason"""
+        config_file = tmp_path / "test.ini"
+        config_file.write_text(
+            "[GENERAL]\nsecurity_mode: ft-wpa3-mixed\nhe_disabled: true\n"
+        )
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file), "--11ax"])
+        config, error = helpers.setup_config(args)
+
+        assert error is None
+        assert config["GENERAL"]["he_disabled"] is False
+        assert config["GENERAL"]["be_disabled"] is False
 
     def test_11ax_disabled_auto_disables_11be(self, tmp_path):
         """Test that disabling 11ax auto-disables 11be"""
@@ -518,3 +582,56 @@ class TestHelpers:
 
         # Should see deprecation warning
         assert "DEPRECATED: --no11r" in caplog.text
+
+
+class TestUpdateManuf2:
+    """update_manuf2 must report failure instead of silently succeeding."""
+
+    def _patch_env(self, monkeypatch, out):
+        from unittest import mock
+
+        fake_manuf2 = mock.Mock()
+        fake_manuf2.__path__ = ["/tmp"]
+        monkeypatch.setattr(helpers, "manuf2", fake_manuf2)
+        monkeypatch.setattr(helpers.os.path, "isfile", lambda p: True)
+        monkeypatch.setattr(helpers.os, "access", lambda p, m: True)
+        monkeypatch.setattr(helpers.os.path, "getmtime", lambda p: 0)
+        monkeypatch.setattr(helpers, "run_command", lambda cmd: out)
+
+    def test_returns_false_on_urlerror(self, monkeypatch):
+        self._patch_env(monkeypatch, "URLError: <urlopen error timed out>")
+        assert helpers.update_manuf2() is False
+
+    def test_returns_true_on_success(self, monkeypatch):
+        self._patch_env(monkeypatch, "updated successfully")
+        assert helpers.update_manuf2() is True
+
+
+class TestRunCommand:
+    """run_command must surface non-zero exits (phase 0)."""
+
+    def test_success_returns_stdout(self):
+        assert helpers.run_command(["echo", "hello"]).strip() == "hello"
+
+    def test_failure_does_not_raise_by_default(self):
+        # Lenient by default to preserve existing callers
+        helpers.run_command(["false"])
+
+    def test_failure_raises_when_check_true(self):
+        import subprocess
+
+        with pytest.raises(subprocess.CalledProcessError):
+            helpers.run_command(["false"], check=True)
+
+
+class TestIsRandomized:
+    """is_randomized must not raise on empty/short input (phase 0)."""
+
+    def test_empty_mac_returns_false(self):
+        assert helpers.is_randomized("") is False
+
+    def test_short_mac_returns_false(self):
+        assert helpers.is_randomized("a") is False
+
+    def test_locally_assigned_detected(self):
+        assert helpers.is_randomized("02:11:22:33:44:55") is True

@@ -295,3 +295,28 @@ class TestGCMP256CipherRegression:
         # For now, just ensure the capability exists with appropriate value
         # We test this in test_capability_migration.py::test_gcmp256_no_rsn_ie
         pass
+
+
+class TestPhase0Parsing:
+    """Parsing correctness fixes (phase 0)."""
+
+    def test_operating_classes_pops_current_class(self):
+        # 131 is the *current* operating class; it must be dropped, and no
+        # 6 GHz alternative classes are actually present.
+        caps = profiler.Profiler.analyze_operating_classes(
+            {59: [131, 81, 115, 118, 121]}
+        )
+        cap = next(c for c in caps if c.db_key == "six_ghz_operating_class_supported")
+        assert cap.db_value == 0
+
+    def test_operating_classes_detects_6ghz_alternative(self):
+        caps = profiler.Profiler.analyze_operating_classes({59: [81, 131, 132]})
+        cap = next(c for c in caps if c.db_key == "six_ghz_operating_class_supported")
+        assert cap.db_value == 1
+
+    def test_power_capability_sign_extends_max(self):
+        caps = profiler.Profiler.analyze_power_capability_ie({33: [10, 0xF8]})
+        max_cap = next(c for c in caps if c.db_key == "max_power")
+        min_cap = next(c for c in caps if c.db_key == "min_power")
+        assert max_cap.db_value == -8
+        assert min_cap.db_value == 10

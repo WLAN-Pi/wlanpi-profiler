@@ -36,8 +36,10 @@ def handle_broken_pipe():
     """Install handler to suppress BrokenPipeError traceback"""
     import signal
 
-    # Ignore SIGPIPE (write to closed pipe)
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    # Ignore SIGPIPE (write to closed pipe). SIGPIPE does not exist on Windows,
+    # and this must not break the cross-platform --pcap path.
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
 def main():
@@ -116,10 +118,10 @@ def main():
 def init():
     """Handle main init"""
 
-    # hard set no support for python < v3.9
-    if sys.version_info < (3, 9):  # noqa: UP036
+    # hard set no support for python < v3.13
+    if sys.version_info < (3, 13):  # noqa: UP036
         sys.exit(
-            f"{os.path.basename(__file__)} requires Python version 3.9 or higher...\nyou are trying to run with Python version {platform.python_version()}...\nexiting..."
+            f"{os.path.basename(__file__)} requires Python version 3.13...\nyou are trying to run with Python version {platform.python_version()}...\nexiting..."
         )
 
     if __name__ == "__main__":
