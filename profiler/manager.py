@@ -20,7 +20,7 @@ import os
 import platform
 import signal
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from multiprocessing import Queue
 from time import sleep
 
@@ -52,10 +52,15 @@ _pcap_analysis_mode: bool = False
 
 
 def removeVif() -> None:
-    """Remove the vif we created if exists"""
-    if __IFACE and __IFACE.requires_vif and not __IFACE.removed:
+    """Remove the vif we created and restore the primary interface"""
+    if (
+        __IFACE
+        and __IFACE.name
+        and not __IFACE.removed
+        and not __IFACE.no_interface_prep
+    ):
         log = logging.getLogger(inspect.stack()[0][3])
-        log.debug("Removing monitor vif ...")
+        log.debug("Restoring interface ...")
         __IFACE.reset_interface()
         __IFACE.removed = True
 
@@ -103,7 +108,7 @@ def receiveSignal(signum: int, _frame) -> None:
                     # Logger closed during cleanup, ignore
                     pass
 
-            if os.path.isfile(SSID_TMP_FILE):
+            with contextlib.suppress(OSError):
                 os.remove(SSID_TMP_FILE)
 
             # Write last-session file BEFORE deleting runtime files
@@ -120,7 +125,7 @@ def receiveSignal(signum: int, _frame) -> None:
             delete_info()
 
             # Cleanup interface (suppress logging errors)
-            if __IFACE and __IFACE.requires_vif:
+            if __IFACE and __IFACE.name:
                 with contextlib.suppress(BrokenPipeError, ValueError):
                     removeVif()
 
@@ -172,7 +177,7 @@ def receiveWatchdogSignal(_signum: int, _frame) -> None:
                 except (BrokenPipeError, ValueError):
                     pass
 
-            if os.path.isfile(SSID_TMP_FILE):
+            with contextlib.suppress(OSError):
                 os.remove(SSID_TMP_FILE)
 
             # Read status for error details, write state file, then cleanup
@@ -202,7 +207,7 @@ def receiveWatchdogSignal(_signum: int, _frame) -> None:
             delete_status()
             delete_info()
 
-            if __IFACE and __IFACE.requires_vif:
+            if __IFACE and __IFACE.name:
                 with contextlib.suppress(BrokenPipeError, ValueError):
                     removeVif()
 
@@ -226,9 +231,8 @@ def are_we_root() -> bool:
 def start(args: argparse.Namespace) -> None:
     """Main entry point for the WLAN Pi Profiler application."""
     global _session_start_time, _pcap_analysis_mode
-    from datetime import timezone
 
-    _session_start_time = datetime.now(timezone.utc).isoformat()
+    _session_start_time = datetime.now(UTC).isoformat()
     _pcap_analysis_mode = getattr(args, "pcap_analysis", False)
     log = logging.getLogger(inspect.stack()[0][3])
 
@@ -296,8 +300,10 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
         write_status(state=ProfilerState.STARTING, pid=os.getpid())
 
-    # Check required tools after arg parsing (allows -h/--help to work quickly)
-    helpers.check_required_tools()
+    # Check required tools after arg parsing (allows -h/--help to work quickly).
+    # pcap analysis requires no external tools and must work cross-platform.
+    if not args.pcap_analysis:
+        helpers.check_required_tools()
 
     # Check for already-running profiler instances
     try:
@@ -414,7 +420,12 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
     if args.oui_update:
         # run manuf oui update and exit
-        sys.exit(0) if helpers.update_manuf2() else sys.exit(-1)
+        from profiler.status import delete_status
+
+        success = helpers.update_manuf2()
+        # Clean up status file before exit (utility command, not a real profiler run)
+        delete_status()
+        sys.exit(0) if success else sys.exit(-1)
 
     # Load config first (needed for files_path)
     config, config_error = helpers.setup_config(args)
@@ -820,8 +831,10 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                     reason=StatusReason.HOSTAPD_START_FAILED,
                     error=str(e),
                 )
-                if __IFACE.requires_vif:
-                    removeVif()
+                # Clean up hostapd's temp config/ctrl socket and the monitor vif
+                if __HOSTAPD_MGR is not None:
+                    __HOSTAPD_MGR.cleanup()
+                removeVif()
                 sys.exit(1)
         else:
             # EXISTING: fakeAP mode
@@ -879,6 +892,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     __PIDS.append(("profiler", profiler.pid))  # type: ignore
 
     shutdown = False
+    session_failed = False
 
     # keep main process alive until all subprocesses are finished or closed
     while running_processes:
@@ -889,6 +903,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             if process.exitcode is not None:
                 # Check if this is an abnormal exit (non-zero exit code)
                 if process.exitcode != 0:
+                    session_failed = True
                     # Interpret exit code for better diagnostics
                     if process.exitcode == -9:
                         error_detail = f"Process {process.name} was killed (SIGKILL)"
@@ -948,18 +963,22 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                             error_message=error_detail,
                         )
 
-                if __IFACE.requires_vif and not __IFACE.removed:
+                if __IFACE and __IFACE.name and not __IFACE.removed:
                     removeVif()
-                    if os.path.isfile(SSID_TMP_FILE):
-                        os.remove(SSID_TMP_FILE)
+
+                with contextlib.suppress(OSError):
+                    os.remove(SSID_TMP_FILE)
 
                 if __HOSTAPD_MGR is not None:
                     __HOSTAPD_MGR.cleanup()
 
                 from profiler.status import delete_info, delete_status
 
-                delete_status()
-                delete_info()
+                # Keep FAILED status observable after a crash; only clear state
+                # files on a clean shutdown.
+                if not session_failed:
+                    delete_status()
+                    delete_info()
                 log.debug("shutdown %s process (%s)", process.name, process.exitcode)
                 running_processes.remove(process)
                 finished_processes.append(process)

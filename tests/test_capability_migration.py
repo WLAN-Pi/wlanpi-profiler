@@ -1056,3 +1056,31 @@ class TestMLECapabilities:
         assert reconfig_cap is not None and reconfig_cap.db_value == 0
         # EMLSR not reported (EML Caps not present)
         assert emlsr_cap is not None and emlsr_cap.db_value == -1
+
+
+class TestMalformedExtensionIEs:
+    """Malformed extension IEs must not crash the capture session (phase 0)."""
+
+    def test_empty_extension_ie_does_not_raise(self):
+        capabilities = profiler.Profiler.analyze_extension_ies(
+            {255: [b""]}, he_disabled=False, be_disabled=False
+        )
+        assert isinstance(capabilities, list)
+
+    def test_truncated_he_capabilities_ie_does_not_raise(self):
+        # Extension id 35 (HE Capabilities) with a 2-byte payload; the parser
+        # indexes up to byte 19, so this used to raise IndexError.
+        capabilities = profiler.Profiler.analyze_extension_ies(
+            {255: [bytes([35, 0, 0])]}, he_disabled=False, be_disabled=False
+        )
+        dot11ax = next(c for c in capabilities if c.db_key == "dot11ax")
+        assert dot11ax.value != "Supported"
+
+    def test_zero_length_entry_in_mixed_list_does_not_raise(self):
+        capabilities = profiler.Profiler.analyze_extension_ies(
+            {255: [bytes([35]) + bytes(19), b"", bytes([36, 0])]},
+            he_disabled=False,
+            be_disabled=False,
+        )
+        dot11ax = next(c for c in capabilities if c.db_key == "dot11ax")
+        assert dot11ax.value == "Supported"

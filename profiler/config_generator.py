@@ -12,7 +12,6 @@ Generate hostapd configuration files using Jinja2 templates
 
 import os
 from pathlib import Path
-from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
@@ -143,8 +142,8 @@ def generate_hostapd_config(
     he_disabled: bool = False,
     be_disabled: bool = False,
     profiler_tlv_disabled: bool = False,
-    output_path: Optional[str] = None,
-    mac_address: Optional[str] = None,
+    output_path: str | None = None,
+    mac_address: str | None = None,
 ) -> str:
     """
     Generate hostapd configuration file.

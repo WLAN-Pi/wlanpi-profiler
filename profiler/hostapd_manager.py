@@ -15,7 +15,6 @@ import os
 import subprocess
 import threading
 import time
-from typing import Optional
 
 from profiler.constants import (
     HOSTAPD_BINARY,
@@ -59,22 +58,22 @@ class HostapdManager:
         self.config = config
         self.country_code = country_code
         self.log = logger
-        self.process: Optional[subprocess.Popen] = None
-        self.config_path: Optional[str] = None
+        self.process: subprocess.Popen | None = None
+        self.config_path: str | None = None
         # Use ap_interface (wlan0) if available, otherwise fall back to interface
         self.interface = config.get("ap_interface", config.get("interface", "wlan0"))
-        self.bssid: Optional[str] = None
+        self.bssid: str | None = None
         self._log_threads: list[threading.Thread] = []  # Track log streaming threads
 
         # Watchdog thread for monitoring process health
-        self._watchdog_thread: Optional[threading.Thread] = None
+        self._watchdog_thread: threading.Thread | None = None
         self._watchdog_stop = threading.Event()
         self._watchdog_running = False
 
         # Log monitoring for fatal errors
         self._init_failed = False
-        self._init_error_msg: Optional[str] = None
-        self._startup_time: Optional[float] = None
+        self._init_error_msg: str | None = None
+        self._startup_time: float | None = None
 
     def _stream_logs(self, stream, prefix: str):
         """
@@ -470,7 +469,7 @@ class HostapdManager:
             return False
         return self.process.poll() is None
 
-    def get_bssid(self) -> Optional[str]:
+    def get_bssid(self) -> str | None:
         """
         Get AP BSSID (MAC address).
 

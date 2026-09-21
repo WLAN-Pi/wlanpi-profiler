@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import pytest
+
 from profiler.interface import Interface
 
 
@@ -510,3 +512,13 @@ class TestInterface:
 
         channels = Interface.get_channels_status(iw_phy_mt76x2u_channels)
         assert len(channels) == 2
+
+
+class TestRunStagingCommand:
+    """Staging commands must fail loudly (phase 0)."""
+
+    def test_nonzero_raises_interface_error(self):
+        from profiler.interface import InterfaceError, _run_staging_command
+
+        with pytest.raises(InterfaceError):
+            _run_staging_command(["false"])

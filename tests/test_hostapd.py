@@ -109,6 +109,29 @@ class TestConfigGenerator:
         # Cleanup
         os.remove(config_path)
 
+    @pytest.mark.parametrize(
+        "band,channel",
+        [
+            ("5ghz", 36),
+            ("2ghz", 6),
+        ],
+    )
+    def test_generate_no_beacon_rate(self, band, channel):
+        """beacon_rate must not be emitted: drivers lacking BEACON_RATE_LEGACY
+        refuse to start the AP when a legacy beacon rate is configured."""
+        config_path = generate_hostapd_config(
+            interface="wlan0",
+            channel=channel,
+            ssid="Test",
+            band=band,
+            country_code="US",
+        )
+
+        config = Path(config_path).read_text()
+        assert "beacon_rate" not in config
+
+        os.remove(config_path)
+
     def test_generate_5ghz_he_disabled(self):
         """Test 5 GHz config with Wi-Fi 6 disabled"""
         config_path = generate_hostapd_config(

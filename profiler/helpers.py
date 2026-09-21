@@ -31,7 +31,7 @@ from base64 import b64encode
 from dataclasses import dataclass
 from pathlib import Path
 from time import ctime
-from typing import Any, Optional, Union
+from typing import Any
 
 try:
     import grp
@@ -59,6 +59,22 @@ __tools = [
 ]
 
 is_wpa_cli_present = True
+
+
+# Config options that carry boolean values. Kept in one place so that config
+# parsing (convert_configparser_to_dict) and validation agree on exactly which
+# keys may be coerced from strings like "true"/"false". Coercing every option
+# corrupts string values that happen to look truthy (e.g. ssid "1" or "on").
+BOOLEAN_CONFIG_KEYS = {
+    "he_disabled",
+    "be_disabled",
+    "ft_disabled",
+    "listen_only",
+    "debug",
+    "expert",
+    "hostname_ssid",
+    "profiler_tlv_disabled",
+}
 
 
 def check_required_tools():
@@ -665,7 +681,7 @@ def get_iface_mac(iface: str):
     return ""
 
 
-def setup_config(args) -> tuple[Optional[dict], Optional[str]]:
+def setup_config(args) -> tuple[dict | None, str | None]:
     """Create the configuration (SSID, channel, interface, etc) for the Profiler.
 
     Returns:
@@ -773,14 +789,21 @@ def setup_config(args) -> tuple[Optional[dict], Optional[str]]:
     security_mode = config["GENERAL"]["security_mode"]
     wpa2_only_modes = ["wpa2", "ft-wpa2"]
 
-    # Check if user explicitly configured be_disabled in config.ini or via CLI
-    config_has_be_setting = "be_disabled" in config["GENERAL"]
+    # Check if the user explicitly disabled 11be. Only an explicit `true` counts:
+    # the shipped default (`be_disabled: false`) must not suppress the auto-disable
+    # below. Force-enable for testing with the --11be flag.
+    config_has_be_setting = config["GENERAL"].get("be_disabled") is True
     cli_has_be_setting = args.be_enabled or args.be_disabled
 
+    # Apply CLI 11ax overrides before deciding whether 11ax is disabled so that
+    # --11ax can prevent the 11be auto-disable.
+    if args.he_enabled:
+        config["GENERAL"]["he_disabled"] = False
+    if args.he_disabled:
+        config["GENERAL"]["he_disabled"] = args.he_disabled
+
     # Check if 11ax will be disabled
-    he_will_be_disabled = (
-        config["GENERAL"].get("he_disabled", False) or args.he_disabled
-    )
+    he_will_be_disabled = config["GENERAL"].get("he_disabled", False)
 
     # Auto-disable 11be if: (WPA2-only mode OR 11ax disabled) AND user hasn't overridden
     should_auto_disable_be = False
@@ -800,14 +823,10 @@ def setup_config(args) -> tuple[Optional[dict], Optional[str]]:
         config["GENERAL"]["be_disabled"] = True
         log.warning(
             f"Auto-disabling 802.11be (Wi-Fi 7): {auto_disable_reason}. "
-            f"Override with --11be flag or 'be_disabled: false' in config.ini for testing (non-standard)."
+            f"Override with --11be for testing (non-standard)."
         )
 
     # User explicit overrides (CLI takes highest precedence)
-    if args.he_enabled:
-        config["GENERAL"]["he_disabled"] = False
-    if args.he_disabled:
-        config["GENERAL"]["he_disabled"] = args.he_disabled
     if args.be_enabled:
         config["GENERAL"]["be_disabled"] = False
         # Warn if enabling 11be with WPA2-only or when 11ax is disabled
@@ -880,14 +899,16 @@ def setup_config(args) -> tuple[Optional[dict], Optional[str]]:
         log.error(error_msg)
         return None, error_msg
 
-    # ensure channel 1 is an integer and not a bool
-    try:
-        ch = config.get("GENERAL").get("channel")
-        if ch:
+    # ensure channel is an integer and not a bool
+    ch = config.get("GENERAL").get("channel")
+    if ch:
+        try:
             ch = int(ch)
-        config["GENERAL"]["channel"] = ch
-    except KeyError:
-        log.warning("config.ini does not have channel defined")
+        except (TypeError, ValueError):
+            error_msg = f"Invalid channel: {ch!r}. Must be an integer."
+            log.error(error_msg)
+            return None, error_msg
+    config["GENERAL"]["channel"] = ch
 
     return config, None
 
@@ -920,8 +941,9 @@ def convert_configparser_to_dict(config: configparser.ConfigParser) -> dict:
     for section in config.sections():
         _dict[section] = {}
         for key, _value in config.items(section):
-            with contextlib.suppress(ValueError):
-                _value = bool(strtobool(_value))  # type: ignore
+            if key in BOOLEAN_CONFIG_KEYS:
+                with contextlib.suppress(ValueError):
+                    _value = bool(strtobool(_value))  # type: ignore
             _dict[section][key] = _value
     return _dict
 
@@ -933,7 +955,7 @@ def load_config(config_file: str) -> configparser.ConfigParser:
     return config
 
 
-def validate(config) -> tuple[bool, Optional[str]]:
+def validate(config) -> tuple[bool, str | None]:
     """Validate minimum config to run is OK.
 
     Returns:
@@ -976,18 +998,8 @@ def validate(config) -> tuple[bool, Optional[str]]:
         # Validate boolean config options
         # These should be bool after convert_configparser_to_dict, but if strtobool
         # failed (suppressed), they'll still be strings
-        bool_options = [
-            "he_disabled",
-            "be_disabled",
-            "ft_disabled",
-            "listen_only",
-            "debug",
-            "expert",
-            "hostname_ssid",
-            "profiler_tlv_disabled",
-        ]
         general = config.get("GENERAL", {})
-        for opt in bool_options:
+        for opt in BOOLEAN_CONFIG_KEYS:
             val = general.get(opt)
             if val is not None and not isinstance(val, bool):
                 raise ValueError(
@@ -1056,10 +1068,12 @@ def validate(config) -> tuple[bool, Optional[str]]:
 
 def is_randomized(mac) -> bool:
     """Check if MAC Address <format>:'00:00:00:00:00:00' is locally assigned"""
+    if not mac or len(mac) < 2:
+        return False
     return any(local == mac.lower()[1] for local in ["2", "6", "a", "e"])
 
 
-def check_config_missing(config: dict) -> tuple[bool, Optional[str]]:
+def check_config_missing(config: dict) -> tuple[bool, str | None]:
     """Check that the minimal config items exist.
 
     Returns:
@@ -1086,8 +1100,13 @@ def check_config_missing(config: dict) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def run_command(cmd: list, suppress_output=False) -> str:
-    """Run a single CLI command with subprocess and return stdout or stderr response"""
+def run_command(cmd: list, suppress_output=False, check=False) -> str:
+    """Run a single CLI command with subprocess and return stdout or stderr response.
+
+    A non-zero exit code is always logged as a warning. When ``check`` is True
+    a ``subprocess.CalledProcessError`` is raised instead of returning output,
+    so callers that must not proceed on failure can opt in.
+    """
     cp = subprocess.run(
         cmd,
         encoding="utf-8",
@@ -1095,6 +1114,17 @@ def run_command(cmd: list, suppress_output=False) -> str:
         check=False,
         capture_output=True,
     )
+
+    if cp.returncode != 0:
+        logging.getLogger(__name__).warning(
+            "command failed rc=%s: %s",
+            cp.returncode,
+            " ".join(str(part) for part in cmd),
+        )
+        if check:
+            raise subprocess.CalledProcessError(
+                cp.returncode, cmd, output=cp.stdout, stderr=cp.stderr
+            )
 
     if not suppress_output:
         if cp.stdout:
@@ -1144,11 +1174,14 @@ def update_manuf2() -> bool:
         log.info("running 'sudo manuf2 --update'")
         out = run_command(["sudo", manuf2_location, "--update"])
         log.info("%s", str(out))
-        if "URLError" not in out:
-            log.info(
-                "manuf2 file last modified at: %s",
-                ctime(os.path.getmtime(flat_file)),
-            )
+        if "URLError" in out:
+            log.error("manuf2 update failed: %s", str(out))
+            print("Failed to update manuf2 OUI database (network error)")
+            return False
+        log.info(
+            "manuf2 file last modified at: %s",
+            ctime(os.path.getmtime(flat_file)),
+        )
     except OSError as e:
         log.debug("Failed to update manuf2 OUI database: %s", e)
         print(f"Failed to update manuf2 OUI database: {e}")
@@ -1611,9 +1644,9 @@ class Capability:
     """Define custom fields for reporting"""
 
     name: str = ""
-    value: Union[str, int] = ""
+    value: str | int = ""
     db_key: str = ""
-    db_value: Union[int, str, list[str]] = 0
+    db_value: int | str | list[str] = 0
 
 
 def get_bit(byteval, index) -> bool:

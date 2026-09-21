@@ -982,3 +982,31 @@ class TestLastSessionFile:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+class TestAtomicJsonWrite:
+    """Concurrent atomic writes must not raise or leave temp files (phase 0)."""
+
+    def test_concurrent_writes_are_safe(self, tmp_path):
+        import threading
+
+        target = tmp_path / "wlanpi-profiler.info.json"
+        errors = []
+
+        def writer(n):
+            try:
+                for i in range(25):
+                    _write_json_atomic(str(target), {"writer": n, "seq": i})
+            except Exception as exc:  # pragma: no cover - failure path
+                errors.append(exc)
+
+        threads = [threading.Thread(target=writer, args=(n,)) for n in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        assert target.exists()
+        assert isinstance(json.loads(target.read_text()), dict)
+        assert list(tmp_path.glob("*.tmp")) == []
