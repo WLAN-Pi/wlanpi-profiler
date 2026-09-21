@@ -4,9 +4,7 @@
 #
 #    pip-compile extras.in
 #
-cachetools==6.2.5
-    # via tox
-chardet==5.2.0
+cachetools==7.2.0
     # via tox
 colorama==0.4.6
     # via tox
@@ -18,8 +16,9 @@ coverage-badge==1.1.2
     # via -r extras.in
 distlib==0.4.0
     # via virtualenv
-filelock==3.20.3
+filelock==3.32.7
     # via
+    #   python-discovery
     #   tox
     #   virtualenv
 iniconfig==2.1.0
@@ -39,7 +38,7 @@ packaging==26.0
     #   tox
 pathspec==1.0.3
     # via mypy
-platformdirs==4.5.1
+platformdirs==4.11.11
     # via
     #   tox
     #   virtualenv
@@ -60,13 +59,19 @@ pytest-cov==7.0.0
     # via -r extras.in
 pytest-mock==3.15.1
     # via -r extras.in
+python-discovery==1.6.1
+    # via
+    #   tox
+    #   virtualenv
 ruff==0.14.14
     # via -r extras.in
-tox==4.34.1
+tomli-w==1.2.0
+    # via tox
+tox==4.61.5
     # via -r extras.in
 typing-extensions==4.15.0
     # via mypy
-virtualenv==20.36.1
+virtualenv==21.9.0
     # via tox
 
 # The following packages are considered to be unsafe in a requirements file:
