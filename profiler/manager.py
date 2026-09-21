@@ -453,7 +453,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     global __RUNNING_PROCESSES
     running_processes = __RUNNING_PROCESSES  # Use global list for signal handler access
     finished_processes = []
-    queue: Queue[str] = Queue()
+    queue: Queue[Any] = Queue()
     pcap_analysis = (config.get("GENERAL") or {}).get("pcap_analysis")
     parent_pid = os.getpid()
     log.debug("%s pid %s", __name__, parent_pid)

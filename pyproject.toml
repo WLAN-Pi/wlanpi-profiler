@@ -110,3 +110,10 @@ check_untyped_defs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 exclude = ['\.tox', 'venv', 'build', 'dist']
+
+# scapy builds its public namespace dynamically, so mypy cannot resolve names
+# such as `scapy.all.Dot11`. Skip analyzing it and treat it as Any.
+[[tool.mypy.overrides]]
+module = ["scapy", "scapy.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
