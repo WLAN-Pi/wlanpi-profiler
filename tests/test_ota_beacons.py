@@ -113,19 +113,32 @@ class BeaconCapture:
                     pass
             return False
 
-        # Capture packets
-        try:
-            sniff(
-                iface=self.interface,
-                prn=ssid_filter,
-                filter=filter_str,
-                timeout=self.timeout,
-                store=False,
-            )
-        except Scapy_Exception as e:
-            pytest.fail(f"Failed to capture on {self.interface}: {e}")
+        # Capture packets. The capture interface and the profiler's interface
+        # are on the same host, so the driver can momentarily drop monitor mode
+        # while the profiler stages; retry a couple of times.
+        channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                sniff(
+                    iface=self.interface,
+                    prn=ssid_filter,
+                    filter=filter_str,
+                    timeout=self.timeout,
+                    store=False,
+                )
+                return self.beacons
+            except Scapy_Exception as e:
+                last_error = e
+                self.beacons = []
+                if attempt < 2:
+                    try:
+                        _ensure_monitor(self.interface, channel)
+                    except subprocess.CalledProcessError:
+                        pass
+                    time.sleep(1)
 
-        return self.beacons
+        pytest.fail(f"Failed to capture on {self.interface}: {last_error}")
 
     @staticmethod
     def get_ie(beacon: Dot11Beacon, ie_id: int) -> Dot11Elt | None:
@@ -431,7 +444,7 @@ class RemoteProfilerRunner:
     def __init__(
         self,
         remote_host: str = "wlanpi@198.18.42.1",
-        interface: str = "wlan0",
+        interface: str | None = None,
         channel: int = 36,
         ssid: str = "OTA-Test",
     ):
@@ -469,6 +482,18 @@ class RemoteProfilerRunner:
             fakeap: Use fakeap mode (Scapy-based) instead of AP mode (hostapd-based)
             extra_args: Additional CLI arguments
         """
+        # Resolve the profiler interface. fakeAP injects frames, which some
+        # drivers (e.g. iwlwifi/iwlmld) do not support, so allow a separate
+        # injection-capable interface via PROFILER_OTA_FAKEAP_INTERFACE.
+        iface = self.interface
+        if iface is None:
+            if fakeap:
+                iface = os.getenv("PROFILER_OTA_FAKEAP_INTERFACE") or os.getenv(
+                    "PROFILER_OTA_AP_INTERFACE", "wlan0"
+                )
+            else:
+                iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
+
         # Build profiler command
         cmd_parts = [
             "sudo",
@@ -485,7 +510,7 @@ class RemoteProfilerRunner:
         cmd_parts.extend(
             [
                 "-i",
-                self.interface,
+                iface,
                 "--security-mode",
                 security_mode,
                 "--debug",
@@ -658,9 +683,17 @@ class RemoteProfilerRunner:
 
 
 @pytest.fixture
-def ota_interface():
-    """Get local OTA test interface (monitor mode) from environment"""
+def ota_interface(request):
+    """Get the local OTA capture interface in monitor mode.
+
+    AP-mode tests capture on ``PROFILER_OTA_INTERFACE``. fakeAP tests capture
+    on ``PROFILER_OTA_FAKEAP_CAPTURE_INTERFACE`` (defaults to
+    ``PROFILER_OTA_INTERFACE``) because fakeAP injects from a different
+    interface (``PROFILER_OTA_FAKEAP_INTERFACE``).
+    """
     iface = os.getenv("PROFILER_OTA_INTERFACE", "wlu1u3")
+    if "fakeap" in request.node.name.lower():
+        iface = os.getenv("PROFILER_OTA_FAKEAP_CAPTURE_INTERFACE", iface)
     channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
 
     # Verify interface exists
@@ -676,31 +709,62 @@ def ota_interface():
 
     # Put interface in monitor mode if not already
     try:
-        subprocess.run(
-            ["sudo", "ip", "link", "set", iface, "down"],
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["sudo", "iw", "dev", iface, "set", "type", "monitor"],
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["sudo", "ip", "link", "set", iface, "up"],
-            check=True,
-            capture_output=True,
-        )
-        # Set channel to match remote profiler
-        subprocess.run(
-            ["sudo", "iw", "dev", iface, "set", "channel", str(channel)],
-            check=True,
-            capture_output=True,
-        )
+        _ensure_monitor(iface, channel)
     except subprocess.CalledProcessError as e:
         pytest.skip(f"Failed to configure {iface} for monitor mode: {e}")
 
     return iface
+
+
+def _ensure_monitor(iface: str, channel: int) -> None:
+    """Put ``iface`` into monitor mode on ``channel``.
+
+    Retries once and verifies the resulting type, since a driver may need a
+    moment to settle after a previous test reconfigures the interface.
+    Raises subprocess.CalledProcessError if it cannot be staged.
+    """
+    last_error: subprocess.CalledProcessError | None = None
+    for _ in range(2):
+        try:
+            subprocess.run(
+                ["sudo", "ip", "link", "set", iface, "down"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "type", "monitor"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "ip", "link", "set", iface, "up"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "channel", str(channel)],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            last_error = e
+            time.sleep(0.5)
+            continue
+
+        info = subprocess.run(
+            ["sudo", "iw", "dev", iface, "info"],
+            capture_output=True,
+            text=True,
+        )
+        if "type monitor" in info.stdout:
+            return
+        time.sleep(0.5)
+
+    if last_error is not None:
+        raise last_error
+    raise subprocess.CalledProcessError(
+        1, ["iw", "dev", iface, "set", "type", "monitor"]
+    )
 
 
 def setup_ssh_key_auth(host: str) -> bool:
@@ -2389,7 +2453,7 @@ class TestOTAIEStructureValidation:
         3. IE length matches actual data length
         4. No parsing exceptions occur
         """
-        ssid = f"OTA-IE-Parse-{mode}-{security_mode}"
+        ssid = f"OTA-IEP-{mode}-{security_mode}"
         runner = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid
         )

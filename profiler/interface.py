@@ -77,6 +77,9 @@ class Interface:
         self.phys: list[Any] = []
         self.no_interface_prep = False
         self.removed = False
+        # Set when fakeAP staging switches the primary interface itself to
+        # monitor mode (iwlwifi/88XXau); reset_interface must restore it.
+        self.primary_staged_as_monitor = False
 
     @property
     def mon_is_primary(self) -> bool:
@@ -265,7 +268,7 @@ class Interface:
 
     def reset_interface(self) -> None:
         """Delete monitor interface and restore the primary interface to managed mode"""
-        if self.mon_is_primary:
+        if self.mon_is_primary and not self.primary_staged_as_monitor:
             # The provided interface is the monitor interface; leave it as-is
             return
         commands = []
@@ -324,12 +327,6 @@ class Interface:
         """Prepare the interface for fakeAP monitor mode and injection"""
         import shutil
 
-        if self.mon_is_primary:
-            raise InterfaceError(
-                f"AP modes require a separate monitor interface; {self.name} was "
-                "provided as the monitor interface. Stage it yourself and use --noprep."
-            )
-
         # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
 
@@ -360,9 +357,34 @@ class Interface:
             self.log.debug("%s", iw_version.strip())
 
         cmds = []
-        # If the driver is crap, like 88XXau and does not support vif, we handle staging the old way:
-        if "88XXau" in self.driver:
+        # Some drivers cannot inject from a monitor vif:
+        #  - rtl88XXau does not support vifs at all
+        #  - iwlwifi crashes the firmware ("Device error - reprobe!") when
+        #    injecting from a monitor vif while the primary vif is down, and
+        #    cannot set the monitor vif channel while the primary is up.
+        # For those, switch the primary interface itself to monitor mode and
+        # inject from it.
+        if "iwlwifi" in self.driver:
+            self.mon = self.name
+            self.requires_vif = False
+            self.primary_staged_as_monitor = True
+            cmds = [
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "type", "managed"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                # Blanket scan triggers the LAR regulatory update and clears
+                # No-IR on the operating channel (iwlwifi).
+                ["iw", f"{self.name}", "scan"],
+                ["ip", "link", "set", f"{self.name}", "down"],
+                ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                ["ip", "link", "set", f"{self.name}", "up"],
+                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+            ]
+        elif "88XXau" in self.driver:
             # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
+            self.mon = self.name
+            self.requires_vif = False
+            self.primary_staged_as_monitor = True
             cmds = [
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
@@ -651,7 +673,11 @@ class Interface:
                     requested_channel_info = ch
                     if ch.disabled:
                         restriction_type.append("Disabled")
-                    if ch.no_ir:
+                    # A monitor interface reports No IR for channels that are
+                    # still usable for injection (e.g. iwlwifi fakeAP, where
+                    # the primary is staged as the monitor), so only block on
+                    # No IR for real AP (non-monitor) staging.
+                    if ch.no_ir and not self.primary_staged_as_monitor:
                         restriction_type.append("No IR (No initiation of radiation)")
                     if ch.radar_detect:
                         restriction_type.append("Radar detection")
