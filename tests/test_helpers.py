@@ -524,6 +524,18 @@ class TestHelpers:
         assert error is not None
         assert "channel" in error.lower()
 
+    def test_blank_channel_returns_clean_error(self, tmp_path):
+        config_file = tmp_path / "test.ini"
+        config_file.write_text("[GENERAL]\nchannel:\n")
+
+        parser = helpers.setup_parser()
+        args = parser.parse_args(["--config", str(config_file)])
+        config, error = helpers.setup_config(args)
+
+        assert config is None
+        assert error is not None
+        assert "channel" in error.lower()
+
     def test_11ax_flag_prevents_auto_disable(self, tmp_path):
         """--11ax re-enables 11ax so 11be must not be auto-disabled for that reason"""
         config_file = tmp_path / "test.ini"
@@ -596,7 +608,7 @@ class TestUpdateManuf2:
         monkeypatch.setattr(helpers.os.path, "isfile", lambda p: True)
         monkeypatch.setattr(helpers.os, "access", lambda p, m: True)
         monkeypatch.setattr(helpers.os.path, "getmtime", lambda p: 0)
-        monkeypatch.setattr(helpers, "run_command", lambda cmd: out)
+        monkeypatch.setattr(helpers, "run_command", lambda cmd, **kwargs: out)
 
     def test_returns_false_on_urlerror(self, monkeypatch):
         self._patch_env(monkeypatch, "URLError: <urlopen error timed out>")
@@ -667,3 +679,24 @@ class TestCheckRequiredTools:
             assert tool in helpers.LIVE_OPTIONAL_TOOLS
         assert "iw" in helpers.LIVE_REQUIRED_TOOLS
         assert "ip" in helpers.LIVE_REQUIRED_TOOLS
+
+
+class TestUpdateManuf2NonZero:
+    """update_manuf2 reports failure on a non-zero rc (phase 0 follow-up)."""
+
+    def test_returns_false_on_nonzero_rc(self, monkeypatch):
+        import subprocess
+        from unittest import mock
+
+        fake_manuf2 = mock.Mock()
+        fake_manuf2.__path__ = ["/tmp"]
+        monkeypatch.setattr(helpers, "manuf2", fake_manuf2)
+        monkeypatch.setattr(helpers.os.path, "isfile", lambda p: True)
+        monkeypatch.setattr(helpers.os, "access", lambda p, m: True)
+        monkeypatch.setattr(helpers.os.path, "getmtime", lambda p: 0)
+
+        def _raise(cmd, **kwargs):
+            raise subprocess.CalledProcessError(1, cmd)
+
+        monkeypatch.setattr(helpers, "run_command", _raise)
+        assert helpers.update_manuf2() is False

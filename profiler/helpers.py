@@ -64,15 +64,6 @@ LIVE_OPTIONAL_TOOLS = [
     "wpa_cli",  # wpa_supplicant
 ]
 
-# Tools used to enumerate interface information (--list-interfaces).
-INTERFACE_INFO_TOOLS = [
-    "iw",
-    "ip",  # iproute2
-    "ethtool",
-    "lspci",  # usbutils
-    "lsusb",  # pciutils
-]
-
 # Offline pcap analysis runs entirely in-process (scapy); no external tools.
 PCAP_REQUIRED_TOOLS: list[str] = []
 
@@ -939,6 +930,10 @@ def setup_config(args) -> tuple[dict | None, str | None]:
 
     # ensure channel is an integer and not a bool
     ch = config.get("GENERAL").get("channel")
+    if ch is None or ch == "":
+        error_msg = "Invalid channel: no channel configured. Must be an integer."
+        log.error(error_msg)
+        return None, error_msg
     if ch:
         try:
             ch = int(ch)
@@ -1210,7 +1205,12 @@ def update_manuf2() -> bool:
             ctime(os.path.getmtime(flat_file)),
         )
         log.info("running 'sudo manuf2 --update'")
-        out = run_command(["sudo", manuf2_location, "--update"])
+        try:
+            out = run_command(["sudo", manuf2_location, "--update"], check=True)
+        except subprocess.CalledProcessError as e:
+            log.error("manuf2 update failed (rc=%s): %s", e.returncode, e.output)
+            print("Failed to update manuf2 OUI database")
+            return False
         log.info("%s", str(out))
         if "URLError" in out:
             log.error("manuf2 update failed: %s", str(out))
