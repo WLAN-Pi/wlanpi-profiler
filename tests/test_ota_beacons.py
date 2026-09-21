@@ -114,11 +114,16 @@ class BeaconCapture:
             return False
 
         # Capture packets. The capture interface and the profiler's interface
-        # are on the same host, so the driver can momentarily drop monitor mode
-        # while the profiler stages; retry a couple of times.
+        # are on the same host, so re-assert monitor mode after the profiler
+        # has settled and retry a couple of times.
         channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
         last_error: Exception | None = None
         for attempt in range(3):
+            try:
+                _ensure_monitor(self.interface, channel)
+            except subprocess.CalledProcessError:
+                pass
+            time.sleep(0.5)
             try:
                 sniff(
                     iface=self.interface,
@@ -132,10 +137,6 @@ class BeaconCapture:
                 last_error = e
                 self.beacons = []
                 if attempt < 2:
-                    try:
-                        _ensure_monitor(self.interface, channel)
-                    except subprocess.CalledProcessError:
-                        pass
                     time.sleep(1)
 
         pytest.fail(f"Failed to capture on {self.interface}: {last_error}")
@@ -592,6 +593,29 @@ class RemoteProfilerRunner:
                 f"Profiler stopped unexpectedly on remote.\nLog output:\n{log_output}"
             )
 
+        # Wait until the profiler has actually finished staging its interface
+        # and is beaconing. On a single host the capture card and the profiler
+        # card are both reconfigured, so the capture must not start until the
+        # profiler has settled.
+        self._wait_for_ready()
+
+    def _wait_for_ready(self, timeout: float = 30.0) -> None:
+        """Poll the remote profiler log until it is done staging and beaconing."""
+        markers = (
+            "Hostapd started successfully",
+            "beginning beacon transmission",
+            "AP-ENABLED",
+        )
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                log = self._get_remote_log()
+            except subprocess.TimeoutExpired:
+                continue
+            if any(marker in log for marker in markers):
+                return
+            time.sleep(1)
+
     def _get_remote_log(self) -> str:
         """Retrieve profiler log from remote"""
         log_cmd = [
@@ -716,18 +740,41 @@ def ota_interface(request):
     return iface
 
 
+def _monitor_filter_ok(iface: str) -> bool:
+    """True if the 802.11 BPF filter used by the capture compiles on ``iface``."""
+    try:
+        from scapy.all import conf
+
+        sock = conf.L2listen(iface=iface, filter="type mgt subtype beacon")
+        sock.close()
+        return True
+    except Exception:
+        return False
+
+
 def _ensure_monitor(iface: str, channel: int) -> None:
     """Put ``iface`` into monitor mode on ``channel``.
 
-    Retries once and verifies the resulting type, since a driver may need a
-    moment to settle after a previous test reconfigures the interface.
+    Verifies not only the reported type but that the 802.11 capture filter
+    compiles (a monitor interface whose DLT is not 802.11 fails later), with a
+    full managed->monitor reset between attempts.
     Raises subprocess.CalledProcessError if it cannot be staged.
     """
     last_error: subprocess.CalledProcessError | None = None
-    for _ in range(2):
+    for _ in range(3):
         try:
             subprocess.run(
                 ["sudo", "ip", "link", "set", iface, "down"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "type", "managed"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "ip", "link", "set", iface, "up"],
                 check=True,
                 capture_output=True,
             )
@@ -748,17 +795,12 @@ def _ensure_monitor(iface: str, channel: int) -> None:
             )
         except subprocess.CalledProcessError as e:
             last_error = e
-            time.sleep(0.5)
+            time.sleep(1)
             continue
 
-        info = subprocess.run(
-            ["sudo", "iw", "dev", iface, "info"],
-            capture_output=True,
-            text=True,
-        )
-        if "type monitor" in info.stdout:
+        if _monitor_filter_ok(iface):
             return
-        time.sleep(0.5)
+        time.sleep(1)
 
     if last_error is not None:
         raise last_error
