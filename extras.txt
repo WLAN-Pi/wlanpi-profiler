@@ -60,7 +60,7 @@ pytest-cov==7.0.0
     # via -r extras.in
 pytest-mock==3.15.1
     # via -r extras.in
-ruff==0.14.14
+ruff==0.16.8
     # via -r extras.in
 tox==4.34.1
     # via -r extras.in
