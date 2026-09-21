@@ -522,3 +522,63 @@ class TestRunStagingCommand:
 
         with pytest.raises(InterfaceError):
             _run_staging_command(["false"])
+
+    def test_missing_binary_raises_interface_error(self):
+        from profiler.interface import InterfaceError, _run_staging_command
+
+        with pytest.raises(InterfaceError):
+            _run_staging_command(["profiler-definitely-missing-binary-xyz"])
+
+
+class TestMonIsPrimary:
+    """A provided <iface>profiler is treated as the monitor, not staged over."""
+
+    def test_mon_is_primary_detected(self):
+        iface = Interface()
+        iface.name = "wlan0profiler"
+        iface.mon = "wlan0profiler"
+        iface.requires_vif = True
+        assert iface.mon_is_primary is True
+
+    def test_separate_mon_not_primary(self):
+        iface = Interface()
+        iface.name = "wlan0"
+        iface.mon = "wlan0profiler"
+        iface.requires_vif = True
+        assert iface.mon_is_primary is False
+
+    def test_remove_mon_vif_skips_primary(self, monkeypatch):
+        import subprocess
+
+        calls = []
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a) or None)
+
+        iface = Interface()
+        iface.name = "wlan0profiler"
+        iface.mon = "wlan0profiler"
+        iface.requires_vif = True
+        iface._remove_mon_vif()
+        assert calls == []
+
+    def test_reset_interface_skips_primary(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda *a, **k: calls.append(a)
+        )
+
+        iface = Interface()
+        iface.name = "wlan0profiler"
+        iface.mon = "wlan0profiler"
+        iface.requires_vif = True
+        iface.reset_interface()
+        assert calls == []
+
+    def test_stage_fakeap_rejects_primary(self):
+        from profiler.interface import InterfaceError
+
+        iface = Interface()
+        iface.name = "wlan0profiler"
+        iface.mon = "wlan0profiler"
+        iface.requires_vif = True
+        with pytest.raises(InterfaceError):
+            iface.stage_interface_fakeap()

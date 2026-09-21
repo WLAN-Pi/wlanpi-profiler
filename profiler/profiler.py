@@ -802,6 +802,31 @@ class Profiler:
         return [dot11n, dot11n_nss]
 
     @staticmethod
+    def _parse_mcs_nss(octets, mcs_9_label: str, mcs_11_label: str) -> tuple:
+        """Parse MCS/NSS bit-pairs into (nss, sorted unique MCS labels).
+
+        Each 2-bit pair encodes: 0b11 not supported, 0b00 MCS 0-7, 0b10 MCS 0-9,
+        0b01 MCS 0-11. Callers pass the label for the 0b10 and 0b01 cases because
+        VHT and HE use different ranges.
+        """
+        nss = 0
+        mcs = []
+        for octet in octets:
+            for bit_position in (0, 2, 4, 6):
+                bit1 = get_bit(octet, bit_position)
+                bit2 = get_bit(octet, bit_position + 1)
+                if bit1 and bit2:
+                    continue
+                if not bit1 and not bit2:
+                    mcs.append("0-7")
+                elif bit1 and not bit2:
+                    mcs.append(mcs_9_label)
+                else:
+                    mcs.append(mcs_11_label)
+                nss += 1
+        return nss, sorted(set(mcs))
+
+    @staticmethod
     def analyze_vht_capabilities_ie(dot11_elt_dict) -> list:
         """Parse VHT Capabilities Information Element from 802.11ac association request.
 
@@ -868,30 +893,7 @@ class Profiler:
                 ]
 
             # determine number of spatial streams (NSS) supported
-            mcs_upper_octet = vht_caps[5]
-            mcs_lower_octet = vht_caps[4]
-            nss = 0
-            mcs = []
-            for octet in [mcs_lower_octet, mcs_upper_octet]:
-                for bit_position in [0, 2, 4, 6]:
-                    bit1 = get_bit(octet, bit_position)
-                    bit2 = get_bit(octet, bit_position + 1)
-                    if (bit1 == 1) and (bit2 == 1):  # (0x3) Not supported
-                        continue
-                    if (bit1 == 0) and (bit2 == 0):  # (0x0) MCS 0-7
-                        nss += 1
-                        mcs.append("0-7")
-                        continue
-                    if (bit1 == 1) and (bit2 == 0):  # (0x1) MCS 0-8
-                        nss += 1
-                        mcs.append("0-8")
-                        continue
-                    if (bit1 == 0) and (bit2 == 1):  # (0x2) MCS 0-9
-                        nss += 1
-                        mcs.append("0-9")
-                        continue
-
-            mcs = sorted(set(mcs))
+            nss, mcs = Profiler._parse_mcs_nss([vht_caps[4], vht_caps[5]], "0-8", "0-9")
             mcs_list = ", ".join(mcs) if len(mcs) > 1 else (mcs[0] if mcs else "")
             dot11ac.value = "Supported"
             dot11ac_nss.value = str(nss)
@@ -1576,30 +1578,9 @@ class Profiler:
                         dot11ax.db_value = 1
 
                         # determine number of spatial streams (NSS) supported
-                        mcs_upper_octet = element_data[19]
-                        mcs_lower_octet = element_data[18]
-                        nss = 0
-                        mcs = []
-                        for octet in [mcs_lower_octet, mcs_upper_octet]:
-                            for bit_position in [0, 2, 4, 6]:
-                                bit1 = get_bit(octet, bit_position)
-                                bit2 = get_bit(octet, bit_position + 1)
-                                if (bit1 == 1) and (bit2 == 1):  # (0x3) Not supported
-                                    continue
-                                if (bit1 == 0) and (bit2 == 0):  # (0x0) MCS 0-7
-                                    nss += 1
-                                    mcs.append("0-7")
-                                    continue
-                                if (bit1 == 1) and (bit2 == 0):  # (0x1) MCS 0-9
-                                    nss += 1
-                                    mcs.append("0-9")
-                                    continue
-                                if (bit1 == 0) and (bit2 == 1):  # (0x2) MCS 0-11
-                                    nss += 1
-                                    mcs.append("0-11")
-                                    continue
-
-                        mcs_sorted = sorted(set(mcs))
+                        nss, mcs_sorted = Profiler._parse_mcs_nss(
+                            [element_data[18], element_data[19]], "0-9", "0-11"
+                        )
                         mcs_str = (
                             ", ".join(mcs_sorted)
                             if len(mcs_sorted) > 1
@@ -1627,16 +1608,10 @@ class Profiler:
                             dot11ax_twt.value = "Not supported"
                             dot11ax_twt.db_value = 0
 
-                        punctured_preamble_octet = element_data[8]
-                        punctured_preamble_octet_binary_string = ""
-                        for bit_position in range(8):
-                            punctured_preamble_octet_binary_string += f"{int(get_bit(punctured_preamble_octet, bit_position))}"
-                        punctured_bit_booleans = [
-                            bool(int(bit))
-                            for bit in punctured_preamble_octet_binary_string[0:4]
-                        ]
-                        puncture_preamble_support = any(punctured_bit_booleans)
-
+                        puncture_preamble_support = any(
+                            get_bit(element_data[8], bit_position)
+                            for bit_position in range(4)
+                        )
                         if puncture_preamble_support:
                             dot11ax_punctured_preamble.value = "Supported"
                             dot11ax_punctured_preamble.db_value = 1
@@ -1644,23 +1619,7 @@ class Profiler:
                             dot11ax_punctured_preamble.value = "Not supported"
                             dot11ax_punctured_preamble.db_value = 0
 
-                        su_beamformer_octet = element_data[10]
-                        su_beamformer_octet_binary_string = ""
-                        for bit_position in range(8):
-                            su_beamformer_octet_binary_string += (
-                                f"{int(get_bit(su_beamformer_octet, bit_position))}"
-                            )
-
-                        su_beamformee_octet = element_data[11]
-                        su_beamformee_octet_binary_string = ""
-                        for bit_position in range(8):
-                            su_beamformee_octet_binary_string += (
-                                f"{int(get_bit(su_beamformee_octet, bit_position))}"
-                            )
-                        if int(su_beamformee_octet_binary_string[0]):
-                            su_beamformee_support = True
-                        else:
-                            su_beamformee_support = False
+                        su_beamformee_support = get_bit(element_data[11], 0)
                         if su_beamformee_support:
                             dot11ax_he_su_beamformee.value = "Supported"
                             dot11ax_he_su_beamformee.db_value = 1
@@ -1670,25 +1629,14 @@ class Profiler:
 
                         # BF STS - bits 2,3,4 of PHY byte 4 (bit 4 is MSB)
                         he_bf_sts_octet = element_data[11]
-
-                        he_bf_sts_binary_string = (
-                            f"{int(get_bit(he_bf_sts_octet, 4))}"  # MSB
-                            f"{int(get_bit(he_bf_sts_octet, 3))}"
-                            f"{int(get_bit(he_bf_sts_octet, 2))}"  # LSB
+                        he_bf_sts_value = (
+                            (int(get_bit(he_bf_sts_octet, 4)) << 2)
+                            | (int(get_bit(he_bf_sts_octet, 3)) << 1)
+                            | int(get_bit(he_bf_sts_octet, 2))
                         )
-                        he_bf_sts_value = int(he_bf_sts_binary_string, base=2)
                         dot11ax_he_beamformee_sts.db_value = he_bf_sts_value
 
-                        he_er_su_ppdu_octet = element_data[15]
-                        he_er_su_ppdu_octet_binary_string = ""
-                        for bit_position in range(8):
-                            he_er_su_ppdu_octet_binary_string += (
-                                f"{int(get_bit(he_er_su_ppdu_octet, bit_position))}"
-                            )
-                        if int(he_er_su_ppdu_octet_binary_string[0]):
-                            he_er_su_ppdu_support = True
-                        else:
-                            he_er_su_ppdu_support = False
+                        he_er_su_ppdu_support = get_bit(element_data[15], 0)
                         if he_er_su_ppdu_support:
                             dot11ax_he_er_su_ppdu.value = "Supported"
                             dot11ax_he_er_su_ppdu.db_value = 1
@@ -1696,17 +1644,7 @@ class Profiler:
                             dot11ax_he_er_su_ppdu.value = "Not supported"
                             dot11ax_he_er_su_ppdu.db_value = 0
 
-                        uora_octet = element_data[4]
-                        uora_octet_binary_string = ""
-                        for bit_position in range(8):
-                            uora_octet_binary_string += (
-                                f"{int(get_bit(uora_octet, bit_position))}"
-                            )
-
-                        if int(uora_octet_binary_string[2]):
-                            uora_support = True
-                        else:
-                            uora_support = False
+                        uora_support = get_bit(element_data[4], 2)
                         if uora_support:
                             dot11ax_uora.value = "Supported"
                             dot11ax_uora.db_value = 1
@@ -1714,17 +1652,7 @@ class Profiler:
                             dot11ax_uora.value = "Not supported"
                             dot11ax_uora.db_value = 0
 
-                        bsr_octet = element_data[3]
-                        bsr_octet_binary_string = ""
-                        for bit_position in range(8):
-                            bsr_octet_binary_string += (
-                                f"{int(get_bit(bsr_octet, bit_position))}"
-                            )
-
-                        if int(bsr_octet_binary_string[3]):
-                            bsr_support = True
-                        else:
-                            bsr_support = False
+                        bsr_support = get_bit(element_data[3], 3)
                         if bsr_support:
                             dot11ax_bsr.value = "Supported"
                             dot11ax_bsr.db_value = 1

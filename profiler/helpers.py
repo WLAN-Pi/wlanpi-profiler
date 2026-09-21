@@ -64,15 +64,6 @@ LIVE_OPTIONAL_TOOLS = [
     "wpa_cli",  # wpa_supplicant
 ]
 
-# Tools used to enumerate interface information (--list-interfaces).
-INTERFACE_INFO_TOOLS = [
-    "iw",
-    "ip",  # iproute2
-    "ethtool",
-    "lspci",  # usbutils
-    "lsusb",  # pciutils
-]
-
 # Offline pcap analysis runs entirely in-process (scapy); no external tools.
 PCAP_REQUIRED_TOOLS: list[str] = []
 
@@ -939,6 +930,10 @@ def setup_config(args) -> tuple[dict | None, str | None]:
 
     # ensure channel is an integer and not a bool
     ch = config.get("GENERAL").get("channel")
+    if ch is None or ch == "":
+        error_msg = "Invalid channel: no channel configured. Must be an integer."
+        log.error(error_msg)
+        return None, error_msg
     if ch:
         try:
             ch = int(ch)
@@ -1210,7 +1205,12 @@ def update_manuf2() -> bool:
             ctime(os.path.getmtime(flat_file)),
         )
         log.info("running 'sudo manuf2 --update'")
-        out = run_command(["sudo", manuf2_location, "--update"])
+        try:
+            out = run_command(["sudo", manuf2_location, "--update"], check=True)
+        except subprocess.CalledProcessError as e:
+            log.error("manuf2 update failed (rc=%s): %s", e.returncode, e.output)
+            print("Failed to update manuf2 OUI database")
+            return False
         log.info("%s", str(out))
         if "URLError" in out:
             log.error("manuf2 update failed: %s", str(out))
@@ -1565,6 +1565,31 @@ def flag_last_object(seq):
     yield _a, True
 
 
+def _print_banner(lines: list[str]) -> None:
+    """Print lines framed with a tilde border"""
+    header_len = len(max(lines, key=len))
+    print(f"\n{'~' * header_len}")
+    for line in lines:
+        print(line)
+    print(f"{'~' * header_len}\n")
+
+
+def _security_phy_state(config: dict) -> dict:
+    """Derive the security/PHY summary fields shared by the AP banners"""
+    from profiler.constants import SECURITY_MODES
+
+    security_mode = config["GENERAL"].get("security_mode", "unknown")
+    wpa_key_mgmt = SECURITY_MODES.get(security_mode, "unknown")
+    return {
+        "security_mode": security_mode,
+        "wpa_key_mgmt": wpa_key_mgmt,
+        "ft_enabled": "FT-" in wpa_key_mgmt,
+        "wpa3_enabled": "SAE" in wpa_key_mgmt,
+        "he_disabled": config["GENERAL"].get("he_disabled", False),
+        "be_disabled": config["GENERAL"].get("be_disabled", False),
+    }
+
+
 def generate_run_message(config: dict) -> None:
     """Create message to display to users screen"""
     interface = config["GENERAL"]["interface"]
@@ -1576,105 +1601,64 @@ def generate_run_message(config: dict) -> None:
     # Check listen_only FIRST - it takes priority over ap_mode
     # (ap_mode=True is the default, but --listen-only should override)
     if listen_only and not ap_mode:
-        # True listen-only mode (no AP, just passive sniffing)
-        out = []
-        out.append(
-            f"Starting profiler in listen-only mode on {interface} (channel {channel} / {frequency} MHz)"
+        _print_banner(
+            [
+                f"Starting profiler in listen-only mode on {interface} (channel {channel} / {frequency} MHz)",
+                " ",
+                "Getting started:",
+                f" - Connect your client to any AP broadcasting on channel {channel}",
+                " - The profiler will capture association requests from nearby clients",
+                " - Reported capabilities may vary based on AP configuration",
+                " - Results are saved locally and printed to the console",
+            ]
         )
-        out.append(" ")
-        out.append("Getting started:")
-        out.append(
-            f" - Connect your client to any AP broadcasting on channel {channel}"
+        return
+
+    ssid = config["GENERAL"]["ssid"]
+    state = _security_phy_state(config)
+
+    if ap_mode:
+        _print_banner(
+            [
+                f"Starting hostapd AP using {interface} on channel {channel} ({frequency})",
+                " ",
+                "Getting started:",
+                f" - Associate your Wi-Fi client to SSID: {ssid}",
+                f" - Passphrase: {config['GENERAL']['passphrase']}",
+                f" - AP BSSID: {config['GENERAL']['mac']}",
+                " - Results are saved locally and printed on the shell",
+                " ",
+                "Security Configuration:",
+                f"  Mode: {state['security_mode']}",
+                f"    WPA Key Management: {state['wpa_key_mgmt']}",
+                "    WPA2: enabled",
+                f"    WPA3: {'enabled' if state['wpa3_enabled'] else 'disabled'}",
+                f"    802.11r (FT): {'enabled' if state['ft_enabled'] else 'disabled'}",
+                " ",
+                "PHY Features:",
+                f"  802.11ax (Wi-Fi 6): {'disabled' if state['he_disabled'] else 'enabled'}",
+                f"  802.11be (Wi-Fi 7): {'disabled' if state['be_disabled'] else 'enabled'}",
+            ]
         )
-        out.append(
-            " - The profiler will capture association requests from nearby clients"
-        )
-        out.append(" - Reported capabilities may vary based on AP configuration")
-        out.append(" - Results are saved locally and printed to the console")
-        header_len = len(max(out, key=len))
+        return
 
-        print(f"\n{'~' * header_len}")
-        for line in out:
-            print(line)
-        print(f"{'~' * header_len}\n")
-    elif ap_mode:
-        from profiler.constants import SECURITY_MODES
-
-        out = []
-        ssid = config["GENERAL"]["ssid"]
-        security_mode = config["GENERAL"].get("security_mode", "unknown")
-        wpa_key_mgmt = SECURITY_MODES.get(security_mode, "unknown")
-        ft_enabled = "FT-" in wpa_key_mgmt
-        wpa3_enabled = "SAE" in wpa_key_mgmt
-        he_disabled = config["GENERAL"].get("he_disabled", False)
-        be_disabled = config["GENERAL"].get("be_disabled", False)
-
-        out.append(
-            f"Starting hostapd AP using {interface} on channel {channel} ({frequency})"
-        )
-        out.append(" ")
-        out.append("Getting started:")
-        out.append(f" - Associate your Wi-Fi client to SSID: {ssid}")
-        out.append(f" - Passphrase: {config['GENERAL']['passphrase']}")
-        out.append(f" - AP BSSID: {config['GENERAL']['mac']}")
-        out.append(" - Results are saved locally and printed on the shell")
-        out.append(" ")
-        out.append("Security Configuration:")
-        out.append(f"  Mode: {security_mode}")
-        out.append(f"    WPA Key Management: {wpa_key_mgmt}")
-        out.append("    WPA2: enabled")
-        out.append(f"    WPA3: {'enabled' if wpa3_enabled else 'disabled'}")
-        out.append(f"    802.11r (FT): {'enabled' if ft_enabled else 'disabled'}")
-        out.append(" ")
-        out.append("PHY Features:")
-        out.append(f"  802.11ax (Wi-Fi 6): {'disabled' if he_disabled else 'enabled'}")
-        out.append(f"  802.11be (Wi-Fi 7): {'disabled' if be_disabled else 'enabled'}")
-
-        header_len = len(max(out, key=len))
-        print(f"\n{'~' * header_len}")
-        for line in out:
-            print(line)
-        print(f"{'~' * header_len}\n")
-    else:
-        # Legacy fakeAP mode
-        from profiler.constants import SECURITY_MODES
-
-        out = []
-        ssid = config["GENERAL"]["ssid"]
-        security_mode = config["GENERAL"].get("security_mode", "unknown")
-        wpa_key_mgmt = SECURITY_MODES.get(security_mode, "unknown")
-        ft_enabled = "FT-" in wpa_key_mgmt
-        wpa3_enabled = "SAE" in wpa_key_mgmt
-        he_disabled = config["GENERAL"].get("he_disabled", False)
-        be_disabled = config["GENERAL"].get("be_disabled", False)
-
-        out.append(
-            f"Starting a fake AP using {interface} on channel {channel} ({frequency})"
-        )
-        out.append(" ")
-        out.append("Getting started:")
-        out.append(f" - Associate your Wi-Fi client to SSID: {ssid}")
-        out.append(" - Enter any random password to connect")
-        out.append(" - Authentication will fail, which is OK")
-        out.append(
-            f" - We will receive association request to {config['GENERAL']['mac']}"
-        )
-        out.append(" - Results are then saved locally and printed on the shell")
-        out.append(" ")
-        out.append("Security Configuration:")
-        out.append(
-            f"  Mode: {security_mode} | WPA2: yes | WPA3: {'yes' if wpa3_enabled else 'no'} | FT: {'yes' if ft_enabled else 'no'}"
-        )
-        out.append(
-            f"  PHY: Wi-Fi 6: {'no' if he_disabled else 'yes'} | Wi-Fi 7: {'no' if be_disabled else 'yes'}"
-        )
-
-        header_len = len(max(out, key=len))
-
-        print(f"\n{'~' * header_len}")
-        for line in out:
-            print(line)
-        print(f"{'~' * header_len}\n")
+    # Legacy fakeAP mode
+    _print_banner(
+        [
+            f"Starting a fake AP using {interface} on channel {channel} ({frequency})",
+            " ",
+            "Getting started:",
+            f" - Associate your Wi-Fi client to SSID: {ssid}",
+            " - Enter any random password to connect",
+            " - Authentication will fail, which is OK",
+            f" - We will receive association request to {config['GENERAL']['mac']}",
+            " - Results are then saved locally and printed on the shell",
+            " ",
+            "Security Configuration:",
+            f"  Mode: {state['security_mode']} | WPA2: yes | WPA3: {'yes' if state['wpa3_enabled'] else 'no'} | FT: {'yes' if state['ft_enabled'] else 'no'}",
+            f"  PHY: Wi-Fi 6: {'no' if state['he_disabled'] else 'yes'} | Wi-Fi 7: {'no' if state['be_disabled'] else 'yes'}",
+        ]
+    )
 
 
 @dataclass

@@ -65,13 +65,83 @@ def removeVif() -> None:
         __IFACE.removed = True
 
 
-def receiveSignal(signum: int, _frame) -> None:
-    """Handle noisy keyboardinterrupt"""
-    # Stop hostapd watchdog immediately to prevent race condition
-    # (watchdog might see AP-DISABLED and trigger failure before we finish cleanup)
+def _shutdown(
+    exit_code: int,
+    exit_status: str,
+    keep_status: bool = False,
+    error_message: str | None = None,
+) -> None:
+    """Terminate children, stop hostapd, restore the interface, then exit.
+
+    Shared by the SIGINT/SIGTERM and hostapd-watchdog handlers.
+    """
+    # Stop the hostapd watchdog first so it cannot re-trigger during cleanup
     if __HOSTAPD_MGR is not None:
         __HOSTAPD_MGR._watchdog_stop.set()
 
+    log = logging.getLogger("manager")
+    for process in __RUNNING_PROCESSES[:]:
+        try:
+            log.debug(f"Terminating process {process.name} (PID: {process.pid})")
+            process.terminate()
+            process.join(timeout=2)
+            if process.is_alive():
+                log.debug(f"Force killing process {process.name} (PID: {process.pid})")
+                process.kill()
+                process.join(timeout=1)
+        except (OSError, ProcessLookupError) as e:
+            with contextlib.suppress(BrokenPipeError, ValueError):
+                log.debug(f"Error terminating process {process.name}: {e}")
+        except (BrokenPipeError, ValueError):
+            pass
+
+    # Stop hostapd before restoring the primary interface, so the type change
+    # is not attempted while hostapd still owns the AP vif.
+    if __HOSTAPD_MGR is not None:
+        with contextlib.suppress(BrokenPipeError, ValueError):
+            __HOSTAPD_MGR.cleanup()
+
+    if __IFACE and __IFACE.name:
+        with contextlib.suppress(BrokenPipeError, ValueError):
+            removeVif()
+
+    with contextlib.suppress(OSError):
+        os.remove(SSID_TMP_FILE)
+
+    from profiler.status import (
+        delete_info,
+        delete_status,
+        get_status,
+        write_last_session,
+    )
+
+    exit_reason = None
+    if exit_status == "failed":
+        current_status = get_status()
+        if current_status:
+            exit_reason = current_status.get("reason")
+            error_message = error_message or current_status.get("error")
+
+    if _session_start_time:
+        write_last_session(
+            exit_status=exit_status,
+            exit_code=0 if exit_status == "success" else 1,
+            start_time=_session_start_time,
+            exit_reason=exit_reason,
+            error_message=error_message,
+        )
+
+    # Keep FAILED status observable after a failure; only clear state files on
+    # a clean shutdown.
+    if not keep_status:
+        delete_status()
+        delete_info()
+
+    sys.exit(exit_code)
+
+
+def receiveSignal(signum: int, _frame) -> None:
+    """Handle noisy keyboardinterrupt"""
     for name, pid in __PIDS:
         # We only want to print exit messages once as multiple processes close
         if name == "main" and os.getpid() == pid:
@@ -83,66 +153,11 @@ def receiveSignal(signum: int, _frame) -> None:
             except BrokenPipeError:
                 pass  # stdout closed, ignore
 
-            # Terminate all child processes
-            log = logging.getLogger("manager")
-            for process in __RUNNING_PROCESSES[
-                :
-            ]:  # Use slice to avoid modification during iteration
-                try:
-                    log.debug(
-                        f"Terminating process {process.name} (PID: {process.pid})"
-                    )
-                    process.terminate()
-                    process.join(timeout=2)
-                    if process.is_alive():
-                        log.debug(
-                            f"Force killing process {process.name} (PID: {process.pid})"
-                        )
-                        process.kill()
-                        process.join(timeout=1)
-                except (OSError, ProcessLookupError) as e:
-                    # Expected when process already terminated
-                    with contextlib.suppress(BrokenPipeError, ValueError):
-                        log.debug(f"Error terminating process {process.name}: {e}")
-                except (BrokenPipeError, ValueError):
-                    # Logger closed during cleanup, ignore
-                    pass
-
-            with contextlib.suppress(OSError):
-                os.remove(SSID_TMP_FILE)
-
-            # Write last-session file BEFORE deleting runtime files
-            from profiler.status import delete_info, delete_status, write_last_session
-
-            if _session_start_time:
-                write_last_session(
-                    exit_status="success",
-                    exit_code=0,
-                    start_time=_session_start_time,
-                )
-
-            delete_status()
-            delete_info()
-
-            # Cleanup interface (suppress logging errors)
-            if __IFACE and __IFACE.name:
-                with contextlib.suppress(BrokenPipeError, ValueError):
-                    removeVif()
-
-            # Cleanup hostapd if running (suppress logging errors)
-            if __HOSTAPD_MGR is not None:
-                with contextlib.suppress(BrokenPipeError, ValueError):
-                    __HOSTAPD_MGR.cleanup()
-
-            if signum in (2, 15):
-                sys.exit(0)
-            else:
-                sys.exit(1)
+            _shutdown(0 if signum in (2, 15) else 1, "success")
 
 
 def receiveWatchdogSignal(_signum: int, _frame) -> None:
-    """
-    Handle SIGUSR1 from hostapd watchdog indicating hostapd failure.
+    """Handle SIGUSR1 from hostapd watchdog indicating hostapd failure.
 
     This is only triggered by the watchdog thread when hostapd dies unexpectedly
     or fails during startup. Always exits with code 1 indicating error.
@@ -155,67 +170,8 @@ def receiveWatchdogSignal(_signum: int, _frame) -> None:
         if name == "main" and os.getpid() == pid:
             with contextlib.suppress(BrokenPipeError):
                 print("Hostapd watchdog detected failure, shutting down...")
-
-            # terminate all child processes
-            log = logging.getLogger("manager")
-            for process in __RUNNING_PROCESSES[:]:
-                try:
-                    log.debug(
-                        f"Terminating process {process.name} (PID: {process.pid})"
-                    )
-                    process.terminate()
-                    process.join(timeout=2)
-                    if process.is_alive():
-                        log.debug(
-                            f"Force killing process {process.name} (PID: {process.pid})"
-                        )
-                        process.kill()
-                        process.join(timeout=1)
-                except (OSError, ProcessLookupError) as e:
-                    with contextlib.suppress(BrokenPipeError, ValueError):
-                        log.debug(f"Error terminating process {process.name}: {e}")
-                except (BrokenPipeError, ValueError):
-                    pass
-
-            with contextlib.suppress(OSError):
-                os.remove(SSID_TMP_FILE)
-
-            # Read status for error details, write state file, then cleanup
-            from profiler.status import (
-                delete_info,
-                delete_status,
-                get_status,
-                write_last_session,
-            )
-
-            exit_reason = None
-            error_message = None
-            current_status = get_status()
-            if current_status:
-                exit_reason = current_status.get("reason")
-                error_message = current_status.get("error")
-
-            if _session_start_time:
-                write_last_session(
-                    exit_status="failed",
-                    exit_code=1,
-                    start_time=_session_start_time,
-                    exit_reason=exit_reason,
-                    error_message=error_message,
-                )
-
-            delete_status()
-            delete_info()
-
-            if __IFACE and __IFACE.name:
-                with contextlib.suppress(BrokenPipeError, ValueError):
-                    removeVif()
-
-            if __HOSTAPD_MGR is not None:
-                with contextlib.suppress(BrokenPipeError, ValueError):
-                    __HOSTAPD_MGR.cleanup()
-
-            sys.exit(1)
+            # Keep the FAILED status written by the watchdog observable
+            _shutdown(1, "failed", keep_status=True)
 
 
 signal.signal(signal.SIGINT, receiveSignal)
@@ -301,11 +257,12 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
         write_status(state=ProfilerState.STARTING, pid=os.getpid())
 
     # Check only the tools the selected mode actually uses, so utility commands
-    # and offline analysis respond quickly.
-    if args.pcap_analysis or args.clean or args.oui_update:
-        helpers.check_required_tools(required=[], optional=[])
-    elif args.list_interfaces:
-        helpers.check_required_tools(required=helpers.INTERFACE_INFO_TOOLS, optional=[])
+    # and offline analysis respond quickly. --list-interfaces runs first at
+    # runtime, so it takes precedence when combined with other flags.
+    if args.list_interfaces:
+        helpers.check_required_tools(required=helpers.LIVE_REQUIRED_TOOLS, optional=[])
+    elif args.pcap_analysis or args.clean or args.oui_update:
+        helpers.check_required_tools(required=helpers.PCAP_REQUIRED_TOOLS, optional=[])
     else:
         helpers.check_required_tools()
 
@@ -714,6 +671,8 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                 reason=StatusReason.INTERFACE_VALIDATION,
                 error=str(e),
             )
+            # Restore any interface we partially staged before exiting
+            removeVif()
             sys.exit(-1)
 
         # Detect country code AFTER interface staging (LAR for iwlwifi requires interface up)
@@ -727,6 +686,8 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                 reason=StatusReason.COUNTRY_CODE_DETECTION,
                 error=str(e),
             )
+            # Restore any interface we staged before exiting
+            removeVif()
             sys.exit(-1)
 
         # Validate channel for AP modes (hostapd and fakeAP) after LAR scan
@@ -741,9 +702,8 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                     reason=StatusReason.INTERFACE_VALIDATION,
                     error=str(e),
                 )
-                # Clean up VIF if it was created
-                if __IFACE.requires_vif and hasattr(__IFACE, "mon"):
-                    removeVif()
+                # Restore the interface we staged before exiting
+                removeVif()
                 sys.exit(-1)
 
         # ap_mode already determined earlier (before interface staging)
@@ -967,14 +927,15 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                             error_message=error_detail,
                         )
 
+                # Stop hostapd before restoring the primary interface
+                if __HOSTAPD_MGR is not None:
+                    __HOSTAPD_MGR.cleanup()
+
                 if __IFACE and __IFACE.name and not __IFACE.removed:
                     removeVif()
 
                 with contextlib.suppress(OSError):
                     os.remove(SSID_TMP_FILE)
-
-                if __HOSTAPD_MGR is not None:
-                    __HOSTAPD_MGR.cleanup()
 
                 from profiler.status import delete_info, delete_status
 
@@ -991,3 +952,6 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             if shutdown:
                 process.kill()
                 process.join()
+
+    if session_failed:
+        sys.exit(1)

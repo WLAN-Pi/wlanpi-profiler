@@ -35,7 +35,7 @@ def _run_staging_command(cmd: list) -> str:
     """
     try:
         return run_command(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
+    except (subprocess.CalledProcessError, OSError) as exc:
         raise InterfaceError(
             f"staging command failed: {' '.join(str(part) for part in cmd)} ({exc})"
         ) from exc
@@ -69,12 +69,24 @@ class Interface:
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__.lower())
         self.name = ""
+        self.mon = ""
         self.channel = None
         self.frequency = None
         self.requires_vif = False
         self.phys = []
         self.no_interface_prep = False
         self.removed = False
+
+    @property
+    def mon_is_primary(self) -> bool:
+        """True when the provided interface is itself the monitor interface"""
+        return bool(self.mon) and self.mon == self.name
+
+    def _remove_mon_vif(self) -> None:
+        """Delete a pre-existing monitor vif, unless it is the primary interface"""
+        if self.requires_vif and not self.mon_is_primary:
+            with contextlib.suppress(Exception):
+                subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
 
     def setup(self):
         """Perform setup for the interface"""
@@ -252,6 +264,9 @@ class Interface:
 
     def reset_interface(self) -> None:
         """Delete monitor interface and restore the primary interface to managed mode"""
+        if self.mon_is_primary:
+            # The provided interface is the monitor interface; leave it as-is
+            return
         commands = []
         if self.requires_vif:
             commands += [
@@ -307,6 +322,12 @@ class Interface:
     def stage_interface_fakeap(self) -> None:
         """Prepare the interface for fakeAP monitor mode and injection"""
         import shutil
+
+        if self.mon_is_primary:
+            raise InterfaceError(
+                f"AP modes require a separate monitor interface; {self.name} was "
+                "provided as the monitor interface. Stage it yourself and use --noprep."
+            )
 
         # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
@@ -369,6 +390,10 @@ class Interface:
                 ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
 
+        # Remove a stale monitor vif left behind by a previous crash before
+        # recreating it
+        self._remove_mon_vif()
+
         # run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
@@ -415,6 +440,12 @@ class Interface:
         """Prepare the interface for hostapd AP mode"""
         self.log.debug("start stage_interface_hostapd")
 
+        if self.mon_is_primary:
+            raise InterfaceError(
+                f"AP modes require a separate monitor interface; {self.name} was "
+                "provided as the monitor interface. Stage it yourself and use --noprep."
+            )
+
         # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
         # We need to scan to unlock channels and remove NO IR flags
         # The scan must NOT specify a frequency - we need a blanket scan
@@ -440,9 +471,8 @@ class Interface:
             ["ip", "link", "set", f"{self.name}", "up"],
         ]
 
-        # Explicitly remove existing monitor vif if it already exists
-        with contextlib.suppress(Exception):
-            subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
+        # Remove a stale monitor vif before recreating it
+        self._remove_mon_vif()
 
         # Create monitor interface on same phy if needed
         if self.requires_vif:
@@ -507,50 +537,56 @@ class Interface:
 
         # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
         # We need to scan to unlock channels and remove NO IR flags
-        scan_cmds = [
-            ["ip", "link", "set", f"{self.name}", "down"],
-            ["iw", "dev", f"{self.name}", "set", "type", "managed"],
-            ["ip", "link", "set", f"{self.name}", "up"],
-            ["iw", f"{self.name}", "scan"],  # Triggers LAR update
-        ]
-
-        # Run LAR scan
-        for cmd in scan_cmds:
-            self.log.debug("run: %s", " ".join(cmd))
-            if "scan" in cmd:
-                run_command(cmd, suppress_output=True)
-            else:
-                _run_staging_command(cmd)
-
-        # Explicitly remove existing monitor vif if it already exists
-        with contextlib.suppress(Exception):
-            subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
-
-        # Create monitor interface for passive sniffing
-        if self.requires_vif:
+        if self.mon_is_primary:
+            # Provided interface is already the monitor interface; tune it and
+            # use it as-is (no scan/type changes, no vif creation).
             cmds = [
-                ["ip", "link", "set", f"{self.name}", "down"],
-                [
-                    "iw",
-                    "phy",
-                    f"{self.phy}",
-                    "interface",
-                    "add",
-                    f"{self.mon}",
-                    "type",
-                    "monitor",
-                ],
-                ["ip", "link", "set", f"{self.mon}", "up"],
-                ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
+                ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         else:
-            # Driver doesn't support VIF (e.g., 88XXau) - put main interface in monitor mode
-            cmds = [
+            scan_cmds = [
                 ["ip", "link", "set", f"{self.name}", "down"],
-                ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                ["iw", "dev", f"{self.name}", "set", "type", "managed"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+                ["iw", f"{self.name}", "scan"],  # Triggers LAR update
             ]
+
+            # Run LAR scan
+            for cmd in scan_cmds:
+                self.log.debug("run: %s", " ".join(cmd))
+                if "scan" in cmd:
+                    run_command(cmd, suppress_output=True)
+                else:
+                    _run_staging_command(cmd)
+
+            # Remove a stale monitor vif before recreating it
+            self._remove_mon_vif()
+
+            # Create monitor interface for passive sniffing
+            if self.requires_vif:
+                cmds = [
+                    ["ip", "link", "set", f"{self.name}", "down"],
+                    [
+                        "iw",
+                        "phy",
+                        f"{self.phy}",
+                        "interface",
+                        "add",
+                        f"{self.mon}",
+                        "type",
+                        "monitor",
+                    ],
+                    ["ip", "link", "set", f"{self.mon}", "up"],
+                    ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
+                ]
+            else:
+                # Driver doesn't support VIF (e.g., 88XXau) - put main interface in monitor mode
+                cmds = [
+                    ["ip", "link", "set", f"{self.name}", "down"],
+                    ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
+                    ["ip", "link", "set", f"{self.name}", "up"],
+                    ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+                ]
 
         # Run the staging commands
         for cmd in cmds:
