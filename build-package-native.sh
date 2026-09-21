@@ -38,6 +38,7 @@ podman run --rm \
 set -e
 
 echo "Installing package build dependencies..."
+apt-get update
 mk-build-deps --install --remove --tool "apt-get -y --no-install-recommends" debian/control || true
 
 echo ""

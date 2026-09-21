@@ -9,6 +9,7 @@ RUN apt-get update && \
     build-essential \
     debhelper \
     dh-python \
+    pybuild-plugin-pyproject \
     dh-virtualenv \
     python3 \
     python3-dev \
