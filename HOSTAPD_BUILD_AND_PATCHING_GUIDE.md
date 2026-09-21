@@ -1,7 +1,9 @@
 # Hostapd build and patching guide
 
-**Last Updated:** 2026-02-01 
-**Hostapd version:** 2.11 (pinned)  
+**Last Updated:** 2026-09-21
+**Hostapd version:** 2.12 (pinned)  
+
+> **Source of truth:** the version comes from `hostapd/VERSION` and the applied patch set is `hostapd/patches/*.patch`, applied in order by `hostapd/build.sh`. Some sections below are historical notes from earlier development; where they disagree with `build.sh`/`patches/`, the scripts win.
 
 ## Table of contents
 
@@ -15,7 +17,7 @@
 
 ## Overview
 
-The profiler uses a **heavily patched version of hostapd 2.11** to:
+The profiler uses a **heavily patched version of hostapd 2.12** to:
 
 1. **Bypass hardware capability validation** - Advertise capabilities beyond what Wi-Fi hardware supports
 3. **Add config options** - Support EHT/MLD/EML parameters for Wi-Fi 7 profiling
@@ -23,8 +25,8 @@ The profiler uses a **heavily patched version of hostapd 2.11** to:
 
 **Critical note:**
 
-The hostapd source (`hostapd-2.11/`) is **NOT tracked by git** (it's in `.gitignore`).  
-Rather the source is extracted fresh on every build from `hostapd-2.11.tar.gz` and patched automatically.
+The hostapd source (`hostapd-2.12/`) is **NOT tracked by git** (it's in `.gitignore`).  
+Rather the source is extracted fresh on every build from `hostapd-2.12.tar.gz` and patched automatically.
 
 ---
 
@@ -84,7 +86,7 @@ eht_nss_override=4
 interworking=1
 ```
 
-**Hostapd 2.11 doesn't parse these by default!**
+**Hostapd 2.12 doesn't parse these by default!**
 
 We add config parsing + struct members + capability override logic.
 
@@ -96,22 +98,34 @@ We add config parsing + struct members + capability override logic.
 
 ### Applied patches (in order)
 
-| Patch File | Purpose | Target File | Method |
-|------------|---------|-------------|---------|
-| `profiler_version_string.patch` | Add "TESTING ONLY" warning to `-v` output | `hostapd/main.c` | `patch -p1` |
-| `disable_dfs_checks.patch` | Bypass DFS validation for 160 MHz testing | `src/ap/dfs.c` | `patch -p1` |
-| **(sed script)** | Add MLD/EML struct members | `src/ap/ap_config.h` | `sed -i` |
-| **(sed script)** | Add config parsing for MLD/EML/EHT options | `hostapd/config_file.c` | `sed -i` |
-| **(sed script)** | Override driver MLD capabilities | `src/ap/ap_drv_ops.c` | `sed -i` |
-| `hostapd_eht_mac_caps.patch` | Force maximum EHT MAC capabilities | `src/ap/ieee802_11_eht.c` | `patch -p1` |
-| `hostapd_ext_cap_scs.patch` | Override SCS extended capability | `src/ap/ieee802_11_shared.c` | `patch -p1` |
-| `hostapd_ext_cap_twt.patch` | Override TWT extended capability | `src/ap/ieee802_11_shared.c` | `patch -p1` |
-| `hostapd_ht_txbf.patch` | Override HT beamforming capabilities | `src/ap/ieee802_11_ht.c` | `patch -p1` |
-| `hostapd_mld_caps.patch` | Override MLD capabilities from driver | `src/ap/ap_drv_ops.c` | `patch -p1` |
+| Patch File | Purpose | Target File |
+|------------|---------|-------------|
+| `profiler_version_string.patch` | Add "TESTING ONLY" warning to `-v` output | `hostapd/main.c` |
+| `hw_features_profiler.patch` | Bypass HT/VHT/HE/EHT capability validation; NO-IR bypass | `src/ap/hw_features.c` |
+| `vht_advertise_4ss.patch` | Advertise 4 SS in the VHT MCS map | `src/ap/ieee802_11_vht.c` |
+| `vht_operation_override.patch` | Advertise 160 MHz while operating at 20 MHz | `src/ap/ieee802_11_vht.c` |
+| `add_mld_config_struct.patch` | Add MLD/EML/EHT override struct members | `src/ap/ap_config.h` |
+| `add_mld_config_parsing.patch` | Parse profiler MLD/EML/EHT config keywords | `hostapd/config_file.c` |
+| `add_mld_caps_override.patch` | Override driver MLD capabilities from config | `src/ap/ap_drv_ops.c` |
+| `hostapd_eht_mac_caps.patch` | Force EHT MAC capabilities | `src/ap/ieee802_11_eht.c` |
+| `hostapd_eht_mcs_nss.patch` | Force EHT MCS/NSS maps | `src/ap/ieee802_11_eht.c` |
+| `hostapd_handle_dfs_bypass.patch` | Bypass DFS validation | `src/ap/dfs.c` |
+| `hostapd_he_caps.patch` | Force HE 160 MHz and MCS maps | `src/ap/ieee802_11_he.c` |
+| `hostapd_ht_txbf.patch` | Override HT beamforming capabilities | `src/ap/ieee802_11_ht.c` |
+| `eht_operation_basic_mcs_nss.patch` | Force EHT Operation basic MCS/NSS | `src/ap/ieee802_11_eht.c` |
+| `mld_add_synthetic_per_sta_profile.patch` | Add synthetic Per-STA profile for link-id override | `src/ap/ieee802_11_eht.c` |
+| `mld_override_link_id.patch` | Override advertised MLD link id | `src/ap/ieee802_11_eht.c` |
+| `mld_preserve_max_simul_links.patch` | Preserve configured max simultaneous links | `src/ap/ieee802_11_eht.c` |
+| `mld_preserve_t2lm.patch` | Preserve configured T2LM bits | `src/ap/ieee802_11_eht.c` |
+| `ds_params_5ghz.patch` | Add DS Parameter Set on 5 GHz | `src/ap/beacon.c` |
+| `ext_cap_profiler.patch` | Force SCS/TWT/FILS extended capabilities | `src/ap/ieee802_11_shared.c` |
 
-### Why some use `sed` instead of patches
+All patches are applied with `patch -p1` by `build.sh`, in the order listed above.
 
-**Problem:** Patch files with complex indentation/whitespace fail with "malformed patch" errors.
+### Patch hygiene
+
+Keep patch context minimal and rebase against the pinned source when it changes. Do not keep `.old`, `.backup`, `.broken`, or `.disabled` copies in `patches/`; they are not applied by `build.sh` and rot silently.
+
 
 **Solution:** Use `sed -i` for inline code insertions:
 
@@ -143,7 +157,7 @@ YOLO.
 build-package-native.sh
   └─> Builds Debian Bookworm container
       └─> hostapd/build.sh
-          ├─> Extract hostapd-2.11.tar.gz
+          ├─> Extract hostapd-2.12.tar.gz
           ├─> Apply patches (2 files + 3 sed scripts)
           ├─> Configure (.config with 13 features)
           └─> Compile (make -j)
@@ -179,8 +193,8 @@ EOF
 
 ```bash
 cd hostapd/
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11/
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12/
 ```
 
 #### 3. Apply patches
@@ -251,13 +265,13 @@ EOF
 make -j$(nproc)
 ```
 
-**Output:** `hostapd-2.11/hostapd/hostapd` (1.5 MB)
+**Output:** `hostapd-2.12/hostapd/hostapd` (1.5 MB)
 
 #### 6. Package integration
 
 ```bash
 # debian/rules copies binary into package
-install -D -m 755 hostapd/hostapd-2.11/hostapd/hostapd \
+install -D -m 755 hostapd/hostapd-2.12/hostapd/hostapd \
     debian/wlanpi-profiler/opt/wlanpi-profiler/bin/hostapd
 ```
 
@@ -329,7 +343,7 @@ config_file.c:5097:29: error: 'struct hostapd_config' has no member named 'mld_e
 **Solution:** Check that sed script for `ap_config.h` ran successfully:
 
 ```bash
-grep "mld_eml_capa_override" hostapd/hostapd-2.11/src/ap/ap_config.h
+grep "mld_eml_capa_override" hostapd/hostapd-2.12/src/ap/ap_config.h
 # Should show: u16 mld_eml_capa_override;
 ```
 
@@ -359,7 +373,7 @@ Line 80: unknown configuration item 'emlsr_support'
 
 ```bash
 # Verify patch applied
-grep "PROFILER: DFS validation disabled" hostapd/hostapd-2.11/src/ap/dfs.c
+grep "PROFILER: DFS validation disabled" hostapd/hostapd-2.12/src/ap/dfs.c
 
 # If missing, check patch was applied during build
 grep "Applying disable_dfs_checks.patch" /tmp/build.log
@@ -444,7 +458,7 @@ hostapd_eht_mcs_nss.patch   # MCS/NSS map override
 **How to split:**
 
 ```bash
-cd hostapd/hostapd-2.11
+cd hostapd/hostapd-2.12
 
 # 1. Extract and apply first patch manually
 cp src/ap/ieee802_11_eht.c src/ap/ieee802_11_eht.c.orig
@@ -456,8 +470,8 @@ vim src/ap/ieee802_11_eht.c  # Edit MAC capabilities section
 diff -u src/ap/ieee802_11_eht.c.orig src/ap/ieee802_11_eht.c > ../patches/hostapd_eht_mac_caps.patch
 
 # 4. Apply this patch to verify
-rm -rf hostapd-2.11 && tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11 && patch -p1 < ../patches/hostapd_eht_mac_caps.patch
+rm -rf hostapd-2.12 && tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12 && patch -p1 < ../patches/hostapd_eht_mac_caps.patch
 
 # 5. Repeat for second set of changes (PHY capabilities)
 cp src/ap/ieee802_11_eht.c src/ap/ieee802_11_eht.c.orig
@@ -603,10 +617,10 @@ cap->phy_cap[2] |= (1 << 3);  /* Bit 19: EHT MU PPDU With 4 EHT-LTF And 0.8us GI
 
 ```bash
 # Find the function you're modifying
-grep -n "function_name" /tmp/hostapd-2.11/src/ap/file.c
+grep -n "function_name" /tmp/hostapd-2.12/src/ap/file.c
 
 # View context around insertion point
-sed -n '160,170p' /tmp/hostapd-2.11/src/ap/file.c
+sed -n '160,170p' /tmp/hostapd-2.12/src/ap/file.c
 ```
 
 #### Step 2: Count lines carefully
@@ -657,9 +671,9 @@ printf ' \toriginal_line_2\n' >> hostapd/patches/new_patch.patch
 
 ```bash
 cd /tmp
-rm -rf hostapd-2.11
-tar -xzf /path/to/hostapd-2.11.tar.gz
-cd hostapd-2.11
+rm -rf hostapd-2.12
+tar -xzf /path/to/hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # Apply any prerequisite patches first
 patch -p1 < /path/to/earlier_patch.patch
@@ -747,15 +761,15 @@ When creating patches from an already-modified file, the line numbers reference 
 
 ```bash
 # WRONG: Creating patch from already-modified file
-cd hostapd-2.11
+cd hostapd-2.12
 patch -p1 < ../patches/patch1.patch  # Applies successfully
 vim src/ap/file.c  # Make more changes
 diff -u original/src/ap/file.c src/ap/file.c > patch2.patch  # LINE NUMBERS WRONG!
 
 # RIGHT: Start fresh for each patch
-cd hostapd && rm -rf hostapd-2.11
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+cd hostapd && rm -rf hostapd-2.12
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # Apply existing patches FIRST
 patch -p1 < ../patches/patch1.patch
@@ -772,8 +786,8 @@ diff -u src/ap/file.c.backup src/ap/file.c > ../patches/patch2.patch
 
 ```bash
 # Extract fresh source
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # Apply patches in sequence
 patch -p1 < ../patches/patch1.patch && echo "Patch 1 OK"
@@ -867,18 +881,18 @@ You modified a file using `sed`, now you want to create a patch for it.
 
 ```bash
 # 1. Extract fresh source
-cd hostapd && tar -xzf hostapd-2.11.tar.gz
+cd hostapd && tar -xzf hostapd-2.12.tar.gz
 
 # 2. Copy to backup
-cp hostapd-2.11/src/ap/file.c hostapd-2.11/src/ap/file.c.orig
+cp hostapd-2.12/src/ap/file.c hostapd-2.12/src/ap/file.c.orig
 
 # 3. Apply your sed modification
 sed -i '192 a\
 \	/* My new code */\
-\	cap->phy_cap[0] |= (1 << 3);' hostapd-2.11/src/ap/file.c
+\	cap->phy_cap[0] |= (1 << 3);' hostapd-2.12/src/ap/file.c
 
 # 4. Generate patch
-cd hostapd-2.11
+cd hostapd-2.12
 diff -u src/ap/file.c.orig src/ap/file.c > ../patches/my_feature.patch
 
 # 5. Fix paths
@@ -888,8 +902,8 @@ sed -i '1s|\.orig||' my_feature.patch
 sed -i '1s/\t.*//; 2s/\t.*//' my_feature.patch
 
 # 6. Test application
-cd ../hostapd && rm -rf hostapd-2.11 && tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11 && patch -p1 < ../patches/my_feature.patch
+cd ../hostapd && rm -rf hostapd-2.12 && tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12 && patch -p1 < ../patches/my_feature.patch
 ```
 
 ### Recommended patch creation workflow
@@ -899,9 +913,9 @@ cd hostapd-2.11 && patch -p1 < ../patches/my_feature.patch
 ```bash
 # 1. Start with clean source
 cd hostapd
-rm -rf hostapd-2.11
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+rm -rf hostapd-2.12
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # 2. Apply any prerequisite patches
 patch -p1 < ../patches/prerequisite.patch
@@ -932,8 +946,8 @@ head -20 /tmp/my_patch.patch
 # @@ -X,Y +X,Z @@
 
 # 9. Test application on fresh source
-cd .. && rm -rf hostapd-2.11 && tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+cd .. && rm -rf hostapd-2.12 && tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 patch -p1 --dry-run < /tmp/my_patch.patch  # Dry run first
 patch -p1 < /tmp/my_patch.patch             # Real application
 
@@ -969,12 +983,12 @@ vim ../build.sh
 **Process:**
 
 ```bash
-cd hostapd/hostapd-2.11/
+cd hostapd/hostapd-2.12/
 
 # Make changes
 vim src/ap/some_file.c
 
-# Create patch (from hostapd-2.11/ directory)
+# Create patch (from hostapd-2.12/ directory)
 git diff --no-index /dev/null src/ap/some_file.c > ../patches/my_feature.patch
 
 # Or if comparing to original:
@@ -1034,14 +1048,14 @@ sed -i 's/#CONFIG_FEATURE=y/CONFIG_FEATURE=y/' .config
 
 ```bash
 cd hostapd/
-tar -xzf hostapd-2.11.tar.gz
-cp -r hostapd-2.11 hostapd-2.11-clean
+tar -xzf hostapd-2.12.tar.gz
+cp -r hostapd-2.12 hostapd-2.12-clean
 ```
 
 ### 2. Make changes
 
 ```bash
-cd hostapd-2.11/
+cd hostapd-2.12/
 vim src/ap/file.c
 # Make your changes
 ```
@@ -1060,18 +1074,18 @@ make -j$(nproc)
 
 ```bash
 # If using git diff:
-git diff hostapd-2.11-clean/ hostapd-2.11/ > patches/my_change.patch
+git diff hostapd-2.12-clean/ hostapd-2.12/ > patches/my_change.patch
 
 # If using diff:
-diff -Naur hostapd-2.11-clean/src/ap/file.c hostapd-2.11/src/ap/file.c > patches/my_change.patch
+diff -Naur hostapd-2.12-clean/src/ap/file.c hostapd-2.12/src/ap/file.c > patches/my_change.patch
 ```
 
 ### 5. Test patch application
 
 ```bash
-rm -rf hostapd-2.11/
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11/
+rm -rf hostapd-2.12/
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12/
 patch -p1 < ../patches/my_change.patch
 # Check for "patch applied successfully"
 ```
@@ -1083,7 +1097,7 @@ patch -p1 < ../patches/my_change.patch
 vim build.sh
 
 # Test full build
-rm -rf hostapd-2.11/
+rm -rf hostapd-2.12/
 ./build.sh
 ```
 
@@ -1094,15 +1108,15 @@ rm -rf hostapd-2.11/
 - **Host OS:** Any (Fedora, Debian, macOS via Docker)
 - **Container:** Debian Bookworm (`debian:bookworm`)
 - **Target:** WLAN Pi (Debian Bookworm, glibc 2.36, ARM64)
-- **Hostapd Version:** 2.11 (locked)
-- **Source:** `hostapd-2.11.tar.gz` (SHA256 verified)
+- **Hostapd Version:** 2.12 (locked)
+- **Source:** `hostapd-2.12.tar.gz` (SHA256 verified)
 
 ### Key files
 
 | File | Purpose |
 |------|---------|
 | `hostapd/build.sh` | Main build orchestration script |
-| `hostapd/hostapd-2.11.tar.gz` | Locked source tarball (2.11) |
+| `hostapd/hostapd-2.12.tar.gz` | Locked source tarball (2.12) |
 | `hostapd/patches/*.patch` | Patch files for source modifications |
 | `build-package-native.sh` | Top-level package build (calls hostapd/build.sh) |
 | `debian/rules` | Debian package rules (copies hostapd binary) |
@@ -1225,8 +1239,8 @@ sed -i 'Ns/^/ /' hostapd/patches/problematic.patch
 cat -A hostapd/patches/problematic.patch | tail -10
 
 # 6. Test the patch applies
-cd hostapd && rm -rf hostapd-2.11 && tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11 && patch -p1 --dry-run < ../patches/problematic.patch
+cd hostapd && rm -rf hostapd-2.12 && tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12 && patch -p1 --dry-run < ../patches/problematic.patch
 ```
 
 ### Issue 7: Wrong hunk header line counts
@@ -1313,9 +1327,9 @@ The ONLY reliable way to fix this is to:
 ```bash
 # 1. Start with clean source
 cd hostapd
-rm -rf hostapd-2.11
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+rm -rf hostapd-2.12
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # 2. Apply ALL patches that come before your failing patch
 for patch in \
@@ -1360,9 +1374,9 @@ sed -i '1s|^--- src/|--- a/src/|; 2s|^+++ src/|+++ b/src/|' ../../patches/your_p
 
 # 8. Test the patch
 cd ..
-rm -rf hostapd-2.11
-tar -xzf hostapd-2.11.tar.gz
-cd hostapd-2.11
+rm -rf hostapd-2.12
+tar -xzf hostapd-2.12.tar.gz
+cd hostapd-2.12
 
 # Apply all patches including your fixed one
 for patch in ../patches/*.patch; do

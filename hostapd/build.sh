@@ -3,16 +3,18 @@
 # Deterministic build script for patched hostapd
 #
 # This script is called by debian/rules during package build.
-# It produces a binary at hostapd-2.11/hostapd/hostapd
+# It produces binaries at hostapd/build/{hostapd,hostapd_cli}
 #
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-TARBALL="hostapd-2.11.tar.gz"
-PATCH="hostapd_profiler.patch"
-EXPECTED_SHA256="2b3facb632fd4f65e32f4bf82a76b4b72c501f995a4f62e330219fe7aed1747a"
+HOSTAPD_VERSION="$(cat VERSION)"
+TARBALL="hostapd-${HOSTAPD_VERSION}.tar.gz"
+SRCDIR="hostapd-${HOSTAPD_VERSION}"
+EXPECTED_SHA256="f43502561c28ba47ab77e18e1a973d07361c68cc8b14178e619bd5796b70eabd"
+BUILD_OUT="$SCRIPT_DIR/build"
 
 echo "========================================="
 echo "Building Patched Hostapd for wlanpi-profiler"
@@ -29,9 +31,9 @@ echo "$EXPECTED_SHA256  $TARBALL" | sha256sum -c - || {
 echo "✓ Checksum verified"
 
 # Clean previous build if exists
-if [ -d "hostapd-2.11" ]; then
+if [ -d "$SRCDIR" ]; then
     echo "Cleaning previous build..."
-    rm -rf hostapd-2.11
+    rm -rf "$SRCDIR"
 fi
 
 # Extract
@@ -41,7 +43,7 @@ echo "✓ Source extracted"
 
 # Apply patches
 echo "Applying profiler patches..."
-cd hostapd-2.11
+cd "$SRCDIR"
 
 # Apply all patches in order
 echo "Applying profiler patches..."
@@ -219,9 +221,14 @@ echo ""
 echo "========================================="
 echo "Build Complete!"
 echo "========================================="
-echo "Binary location: $(pwd)/hostapd"
-ls -lh hostapd
+
+mkdir -p "$BUILD_OUT"
+install -m 755 hostapd "$BUILD_OUT/hostapd"
+install -m 755 hostapd_cli "$BUILD_OUT/hostapd_cli"
+
+echo "Binary location: $BUILD_OUT/hostapd"
+ls -lh "$BUILD_OUT/hostapd" "$BUILD_OUT/hostapd_cli"
 echo ""
-echo "Binary size: $(du -h hostapd | awk '{print $1}')"
-echo "Strip to reduce size: strip hostapd"
+echo "Binary size: $(du -h "$BUILD_OUT/hostapd" | awk '{print $1}')"
+echo "Strip to reduce size: strip $BUILD_OUT/hostapd"
 echo "========================================="

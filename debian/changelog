@@ -1,3 +1,14 @@
+wlanpi-profiler (2.1.0-1) unstable; urgency=medium
+
+  * Update bundled hostapd from 2.11 to 2.12
+    - Fixes CVE-2026-58374 (Wi-Fi 7 MLO out-of-bounds write) and the
+      upstream 2026-1 multi-link parsing vulnerabilities
+  * Rebase the profiler hostapd patch set onto 2.12
+  * Parameterize the hostapd version via hostapd/VERSION and build to a
+    stable hostapd/build/ path so debian/rules no longer hardcodes it
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Mon, 21 Sep 2026 13:25:41 -0400
+
 wlanpi-profiler (2.0.2-1) unstable; urgency=medium
 
   * Dependency security updates (requests, urllib3, idna, Pygments, pytest)

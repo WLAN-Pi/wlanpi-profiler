@@ -1,31 +1,19 @@
---- a/src/ap/hw_features.c	2026-01-25 18:04:11.294640740 -0500
-+++ b/src/ap/hw_features.c	2026-01-25 18:04:20.628657064 -0500
-@@ -139,15 +139,15 @@
- 			if ((feature->channels[j].flag &
- 			     HOSTAPD_CHAN_RADAR) && dfs_enabled) {
- 				dfs = 1;
--			} else if (((feature->channels[j].flag &
--				     HOSTAPD_CHAN_RADAR) &&
--				    !(iface->drv_flags &
--				      WPA_DRIVER_FLAGS_DFS_OFFLOAD)) ||
+--- a/src/ap/hw_features.c
++++ b/src/ap/hw_features.c
+@@ -186,9 +186,9 @@
+ 				     HOSTAPD_CHAN_RADAR) &&
+ 				    !(iface->drv_flags &
+ 				      WPA_DRIVER_FLAGS_DFS_OFFLOAD) &&
+-				    !iface->assisted_dfs) ||
 -				   (feature->channels[j].flag &
 -				    HOSTAPD_CHAN_NO_IR)) {
--				feature->channels[j].flag |=
--					HOSTAPD_CHAN_DISABLED;
--			}
-+		} else if (((feature->channels[j].flag &
-+			     HOSTAPD_CHAN_RADAR) &&
-+			    !(iface->drv_flags &
-+			      WPA_DRIVER_FLAGS_DFS_OFFLOAD))
-+			   /* PROFILER: NO-IR bypass for testing - allows restricted channels */
-+			   ) {
-+			feature->channels[j].flag |=
-+				HOSTAPD_CHAN_DISABLED;
-+		}
- 
- 			if (feature->channels[j].flag & HOSTAPD_CHAN_DISABLED)
- 				continue;
-@@ -733,6 +733,16 @@
++				    !iface->assisted_dfs)
++				   /* PROFILER: NO-IR bypass for testing - allows restricted channels */
++				   ) {
+ 				feature->channels[j].flag |=
+ 					HOSTAPD_CHAN_DISABLED;
+ 			}
+@@ -806,6 +806,16 @@
  	if (!iface->conf->ieee80211n)
  		return 0;
  

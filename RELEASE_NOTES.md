@@ -1,3 +1,14 @@
+Release 2.1.0
+
+**hostapd 2.12**
+
+- Bundled hostapd updated from 2.11 to 2.12
+- Fixes CVE-2026-58374 (Wi-Fi 7 MLO/EHT out-of-bounds write during
+  association) and the upstream 2026-1 multi-link parsing vulnerabilities
+- Profiler hostapd patch set rebased onto 2.12
+- hostapd version is now parameterized via `hostapd/VERSION`; the build
+  emits binaries to `hostapd/build/`
+
 Release 2.0.0
 
 **Breaking changes**

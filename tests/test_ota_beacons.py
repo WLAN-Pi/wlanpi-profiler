@@ -40,6 +40,7 @@ Environment Variables:
 """
 
 import os
+import shlex
 import subprocess
 import time
 
@@ -488,6 +489,7 @@ class RemoteProfilerRunner:
                 "--security-mode",
                 security_mode,
                 "--debug",
+                "--expert",
             ]
         )
 
@@ -498,7 +500,7 @@ class RemoteProfilerRunner:
         if extra_args:
             cmd_parts.extend(extra_args)
 
-        profiler_cmd = " ".join(cmd_parts)
+        profiler_cmd = shlex.join(cmd_parts)
 
         # SSH command to run profiler in background and capture PID
         # We use nohup and redirect to capture output
