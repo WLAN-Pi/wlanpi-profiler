@@ -4,35 +4,33 @@
 #
 #    pip-compile requirements.in
 #
-certifi==2026.1.4
+certifi==2026.7.22
     # via
     #   manuf2
     #   requests
-charset-normalizer==3.4.4
+charset-normalizer==3.5.1
     # via requests
-idna==3.11
+idna==3.20
     # via requests
-iniconfig==2.1.0
-    # via
-    #   -r requirements.in
-    #   pytest
+iniconfig==2.3.0
+    # via pytest
 jinja2==3.1.6
     # via -r requirements.in
 manuf2==2.0.2
     # via -r requirements.in
 markupsafe==3.0.3
     # via jinja2
-packaging==26.0
+packaging==26.3
     # via pytest
 pluggy==1.6.0
     # via pytest
-pygments==2.19.2
+pygments==2.21.0
     # via pytest
-pytest==8.4.2
+pytest==9.1.1
     # via -r requirements.in
-requests==2.32.5
+requests==2.34.2
     # via manuf2
 scapy==2.7.0
     # via -r requirements.in
-urllib3==2.6.3
+urllib3==2.8.0
     # via requests
