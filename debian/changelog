@@ -1,3 +1,11 @@
+wlanpi-profiler (2.0.2-1) unstable; urgency=medium
+
+  * Dependency security updates (requests, urllib3, idna, Pygments, pytest)
+  * Declare shared-library runtime dependencies (shlibs:Depends)
+  * Build against Debian trixie (Python 3.13); ship the trixie build image
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Mon, 21 Sep 2026 12:48:05 -0400
+
 wlanpi-profiler (2.0.1-2) unstable; urgency=medium
 
   * Rebuild to publish packages for Debian trixie to packagecloud

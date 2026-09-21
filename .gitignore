@@ -12,7 +12,9 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+debian/debhelper-build-stamp
 *.build
+!Dockerfile.build
 .Python
 build/
 develop-eggs/
