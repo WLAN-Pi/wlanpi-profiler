@@ -34,6 +34,7 @@ Environment Variables:
 """
 
 import os
+import shlex
 import subprocess
 import time
 
@@ -414,9 +415,9 @@ class RemoteProfilerController:
 
         # Build profiler command
         cmd = (
-            f"sudo profiler --ap-mode -c {channel} -s {ssid} "
-            f"--security-mode {security_mode} --passphrase {passphrase} "
-            f"--debug > /tmp/profiler_test_wifi7.log 2>&1 &"
+            f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
+            f"--security-mode {security_mode} --passphrase {shlex.quote(passphrase)} "
+            f"--debug --expert > /tmp/profiler_test_wifi7.log 2>&1 &"
         )
 
         # Start profiler

@@ -32,14 +32,14 @@ override_dh_auto_install:
 	@echo "~~~~~~~~~~~~~~~~~~~~"
 	@echo "Installing hostapd and hostapd_cli binaries..."
 	@echo "PACKAGE=$(PACKAGE)"
-	@echo "Source hostapd: hostapd/hostapd-2.11/hostapd/hostapd"
-	@echo "Source hostapd_cli: hostapd/hostapd-2.11/hostapd/hostapd_cli"
+	@echo "Source hostapd: hostapd/build/hostapd"
+	@echo "Source hostapd_cli: hostapd/build/hostapd_cli"
 	@echo "Target dir: debian/$(PACKAGE)/opt/wlanpi-profiler/bin/"
-	@ls -lh hostapd/hostapd-2.11/hostapd/hostapd || echo "ERROR: hostapd binary not found!"
-	@ls -lh hostapd/hostapd-2.11/hostapd/hostapd_cli || echo "ERROR: hostapd_cli binary not found!"
+	@ls -lh hostapd/build/hostapd || echo "ERROR: hostapd binary not found!"
+	@ls -lh hostapd/build/hostapd_cli || echo "ERROR: hostapd_cli binary not found!"
 	mkdir -p debian/$(PACKAGE)/opt/wlanpi-profiler/bin
-	install -m 755 hostapd/hostapd-2.11/hostapd/hostapd debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
-	install -m 755 hostapd/hostapd-2.11/hostapd/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
+	install -m 755 hostapd/build/hostapd debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
+	install -m 755 hostapd/build/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
 	@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd || echo "ERROR: hostapd install failed!"
 	@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli || echo "ERROR: hostapd_cli install failed!"
 	@echo "Hostapd binaries installed"
@@ -100,14 +100,14 @@ override_dh_virtualenv:
 		@echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 		@echo "Installing hostapd and hostapd_cli binaries"
 		@echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-		@echo "Source hostapd: hostapd/hostapd-2.11/hostapd/hostapd"
-		@echo "Source hostapd_cli: hostapd/hostapd-2.11/hostapd/hostapd_cli"
+		@echo "Source hostapd: hostapd/build/hostapd"
+		@echo "Source hostapd_cli: hostapd/build/hostapd_cli"
 		@echo "Target dir: debian/$(PACKAGE)/opt/wlanpi-profiler/bin/"
-		@ls -lh hostapd/hostapd-2.11/hostapd/hostapd
-		@ls -lh hostapd/hostapd-2.11/hostapd/hostapd_cli
+		@ls -lh hostapd/build/hostapd
+		@ls -lh hostapd/build/hostapd_cli
 		mkdir -p debian/$(PACKAGE)/opt/wlanpi-profiler/bin
-		install -m 755 hostapd/hostapd-2.11/hostapd/hostapd debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
-		install -m 755 hostapd/hostapd-2.11/hostapd/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
+		install -m 755 hostapd/build/hostapd debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
+		install -m 755 hostapd/build/hostapd_cli debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
 		@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd
 		@ls -lh debian/$(PACKAGE)/opt/wlanpi-profiler/bin/hostapd_cli
 		@echo "Hostapd binaries installed successfully"

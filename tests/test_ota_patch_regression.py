@@ -26,6 +26,7 @@ Usage:
 """
 
 import os
+import shlex
 import subprocess
 import time
 
@@ -283,9 +284,9 @@ def start_profiler_and_capture(
 
     # Start profiler
     cmd = (
-        f"sudo profiler --ap-mode -c {channel} -s {ssid} "
-        f"--security-mode ft-wpa3-mixed --passphrase WLAN PiProfiler "
-        f"--debug > /tmp/profiler_regression_{channel}.log 2>&1 &"
+        f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
+        f"--security-mode ft-wpa3-mixed --passphrase {shlex.quote('WLAN PiProfiler')} "
+        f"--debug --expert > /tmp/profiler_regression_{channel}.log 2>&1 &"
     )
 
     result = subprocess.run(
@@ -370,9 +371,9 @@ def profiler_log_5ghz(remote_host):
 
     # Start profiler
     cmd = (
-        f"sudo profiler --ap-mode -c {channel} -s {ssid} "
-        f"--security-mode ft-wpa3-mixed --passphrase WLAN PiProfiler "
-        f"--debug > /tmp/profiler_regression_{channel}.log 2>&1 &"
+        f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
+        f"--security-mode ft-wpa3-mixed --passphrase {shlex.quote('WLAN PiProfiler')} "
+        f"--debug --expert > /tmp/profiler_regression_{channel}.log 2>&1 &"
     )
 
     result = subprocess.run(

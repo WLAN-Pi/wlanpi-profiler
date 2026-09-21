@@ -1,17 +1,8 @@
 --- a/src/ap/ieee802_11_he.c
 +++ b/src/ap/ieee802_11_he.c
-@@ -93,7 +93,7 @@
- 	struct hostapd_hw_modes *mode = hapd->iface->current_mode;
- 	u8 he_oper_chwidth = ~HE_PHYCAP_CHANNEL_WIDTH_MASK;
- 	u8 *pos = eid;
--	u8 ie_size = 0, mcs_nss_size = 4, ppet_size = 0;
-+	u8 ie_size = 0, mcs_nss_size = 4, ppet_size = 0, profiler_override = 0;
- 
- 	if (!mode)
- 		return eid;
-@@ -121,6 +121,21 @@
- 		break;
- 	}
+@@ -107,6 +107,17 @@
+ 	ppet_size = ieee80211_he_ppet_size(he_capab->ppet[0],
+ 					   he_capab->phy_cap);
  
 +	/* WLAN Pi Profiler: Force 160 MHz support with proper MCS maps */
 +	if (hapd->iface->conf->he_oper_chwidth == CONF_OPER_CHWIDTH_160MHZ) {
@@ -22,12 +13,26 @@
 +		}
 +		mcs_nss_size = 8;  /* 4 bytes for <=80 MHz + 4 bytes for 160 MHz */
 +		ppet_size = 0;      /* Disable PPE thresholds */
-+		he_oper_chwidth = HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_IN_2G |
-+				  HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G |
-+				  HE_PHYCAP_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
-+		profiler_override = 1;
 +	}
 +
- 	ie_size += mcs_nss_size + ppet_size;
+ 	ie_size = IEEE80211_HE_CAPAB_MIN_LEN + mcs_nss_size + ppet_size;
  
  	*pos++ = WLAN_EID_EXTENSION;
+@@ -120,6 +131,17 @@
+ 		  HE_MAX_MAC_CAPAB_SIZE);
+ 	os_memcpy(cap->he_phy_capab_info, he_capab->phy_cap,
+ 		  HE_MAX_PHY_CAPAB_SIZE);
++
++	/* WLAN Pi Profiler: advertise 160 MHz channel width support */
++	if (hapd->iface->conf->he_oper_chwidth == CONF_OPER_CHWIDTH_160MHZ) {
++		cap->he_phy_capab_info[HE_PHYCAP_CHANNEL_WIDTH_SET_IDX] &=
++			~HE_PHYCAP_CHANNEL_WIDTH_MASK;
++		cap->he_phy_capab_info[HE_PHYCAP_CHANNEL_WIDTH_SET_IDX] |=
++			HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_IN_2G |
++			HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G |
++			HE_PHYCAP_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
++	}
++
+ 	epos = (u8 *) &cap->he_basic_supported_mcs_set;
+ 	os_memcpy(epos, he_capab->mcs, mcs_nss_size);
+ 	epos += mcs_nss_size;

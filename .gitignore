@@ -136,6 +136,7 @@ venv.bak/
 .idea/workspace.xml
 
 # Hostapd build artifacts (extracted source, modified by patches)
-hostapd/hostapd-2.11/
-hostapd/hostapd-2.11-backup/
+hostapd/hostapd-2.*/
+hostapd/hostapd-2.*-backup/
+hostapd/build/
 hostapd/*.tar.gz
