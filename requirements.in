@@ -1,4 +1,5 @@
 scapy
 manuf2
 jinja2
+argcomplete  # tab-completion for the profiler CLI
 pytest>=9.0.3  # Required for on-device hardware tests (profiler test)

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 python3 -m pybadges \
     --left-text="python" \
     --right-text="3.9" \

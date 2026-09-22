@@ -34,6 +34,9 @@ from pathlib import Path
 from time import ctime
 from typing import Any
 
+import argcomplete
+from argcomplete.completers import FilesCompleter
+
 try:
     import grp
     import pwd
@@ -418,6 +421,20 @@ def frequency(freq: Any) -> int:
 
 def setup_parser() -> argparse.ArgumentParser:
     """Set default values and handle arg parser"""
+
+    def _interface_completer(**kwargs: Any) -> list[str]:
+        """Complete -i/--interface with 802.11 interface names"""
+        try:
+            ifaces = [iface for _, iface in socket.if_nameindex()]
+        except OSError:
+            return []
+        wifi_ifaces = [
+            iface
+            for iface in ifaces
+            if os.path.exists(f"/sys/class/net/{iface}/phy80211")
+        ]
+        return wifi_ifaces or ifaces
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="wlanpi-profiler is an 802.11 client capabilities profiler. If installed via package manager, read the manual with: man wlanpi-profiler",
@@ -458,7 +475,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-i",
         dest="interface",
         help="set network interface for profiler",
-    )
+    ).completer = _interface_completer  # type: ignore[attr-defined]
     ssid_group = parser.add_mutually_exclusive_group()
     ssid_group.add_argument("-s", dest="ssid", type=ssid, help="set profiler SSID name")
     parser.add_argument(
@@ -472,7 +489,7 @@ def setup_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         default=CONFIG_FILE,
         help="customize path for configuration file (default: %(default)s)",
-    )
+    ).completer = FilesCompleter()  # type: ignore[attr-defined]
     parser.add_argument(
         "--files_path",
         metavar="PATH",
@@ -480,7 +497,7 @@ def setup_parser() -> argparse.ArgumentParser:
         action="append",
         type=Path,
         help="customize directories where analysis is saved (can be specified multiple times, default: /var/www/html/profiler and /root/.local/share/wlanpi-profiler)",
-    )
+    ).completer = FilesCompleter(directories=True)  # type: ignore[attr-defined]
     ssid_group.add_argument(
         "--hostname_ssid",
         dest="hostname_ssid",
@@ -608,7 +625,7 @@ def setup_parser() -> argparse.ArgumentParser:
         metavar="PCAP",
         dest="pcap_analysis",
         help="analyze association request frames from pcap",
-    )
+    ).completer = FilesCompleter()  # type: ignore[attr-defined]
     parser.add_argument(
         "--no_bpf_filters",
         dest="no_bpf_filters",
@@ -646,9 +663,10 @@ def setup_parser() -> argparse.ArgumentParser:
         dest="hostapd_config",
         help=argparse.SUPPRESS,
         # help="path to custom hostapd.conf (expert mode, requires --ap-mode)",
-    )
+    ).completer = FilesCompleter()  # type: ignore[attr-defined]
 
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
+    argcomplete.autocomplete(parser)
     return parser
 
 
