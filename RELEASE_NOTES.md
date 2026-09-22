@@ -8,6 +8,16 @@ Release 2.1.1
   MU-MIMO); `PPE_THRESHOLD_PRESENT` is deliberately left unset so the EHT
   Capabilities IE stays well-formed
 
+**fakeAP fixes**
+
+- Fix fakeAP crashing the iwlwifi firmware: injecting beacons from a monitor
+  vif while the primary interface was down tripped a firmware assert
+  (`IML/ROM error/state 0x00000B03` -> `Device error - reprobe!`), which removed
+  the interfaces. fakeAP now stages the primary interface itself as the monitor,
+  keeps it up, and runs the LAR scan so the operating channel is unlocked before
+  injecting
+- Allow fakeAP to run on a different interface than AP mode
+
 **OTA test fixes**
 
 - EHT-MCS nibbles are the max NSS directly (removed an off-by-one in the
