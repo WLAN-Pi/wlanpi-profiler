@@ -1,8 +1,12 @@
 # Dockerfile for building wlanpi-profiler Debian package
-# Usage: podman build -f Dockerfile.build -t wlanpi-profiler-builder .
-#        podman run --rm -v $(pwd):/work -w /work wlanpi-profiler-builder
+#
+# Build for a specific Debian release via SUITE:
+#   podman build -f Dockerfile.build --build-arg SUITE=trixie -t wlanpi-profiler-builder:trixie .
+#   podman run --rm -v $(pwd):/work -w /work wlanpi-profiler-builder:trixie
 
-FROM debian:trixie
+ARG SUITE=trixie
+
+FROM debian:${SUITE}
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
