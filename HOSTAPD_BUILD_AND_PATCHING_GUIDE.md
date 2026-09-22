@@ -109,6 +109,7 @@ We add config parsing + struct members + capability override logic.
 | `add_mld_caps_override.patch` | Override driver MLD capabilities from config | `src/ap/ap_drv_ops.c` |
 | `hostapd_eht_mac_caps.patch` | Force EHT MAC capabilities | `src/ap/ieee802_11_eht.c` |
 | `hostapd_eht_mcs_nss.patch` | Force EHT MCS/NSS maps | `src/ap/ieee802_11_eht.c` |
+| `hostapd_eht_phy_caps.patch` | Force advanced EHT PHY caps (MCS 15, MU beamformer) | `src/ap/ieee802_11_eht.c` |
 | `hostapd_handle_dfs_bypass.patch` | Bypass DFS validation | `src/ap/dfs.c` |
 | `hostapd_he_caps.patch` | Force HE 160 MHz and MCS maps | `src/ap/ieee802_11_he.c` |
 | `hostapd_ht_txbf.patch` | Override HT beamforming capabilities | `src/ap/ieee802_11_ht.c` |

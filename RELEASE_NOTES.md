@@ -1,3 +1,31 @@
+Release 2.1.1
+
+**Capability advertising fixes**
+
+- Advertise 4 spatial streams in the HE-MCS maps (was driver NSS only)
+- Fix the EHT Operation Basic MCS/NSS Set encoding (`0xff` -> `0x44`)
+- Re-enable advanced EHT PHY capabilities (MCS 15, MU beamformer, partial-BW
+  MU-MIMO); `PPE_THRESHOLD_PRESENT` is deliberately left unset so the EHT
+  Capabilities IE stays well-formed
+
+**fakeAP fixes**
+
+- Fix fakeAP crashing the iwlwifi firmware: injecting beacons from a monitor
+  vif while the primary interface was down tripped a firmware assert
+  (`IML/ROM error/state 0x00000B03` -> `Device error - reprobe!`), which removed
+  the interfaces. fakeAP now stages the primary interface itself as the monitor,
+  keeps it up, and runs the LAR scan so the operating channel is unlocked before
+  injecting
+- Allow fakeAP to run on a different interface than AP mode
+
+**OTA test fixes**
+
+- EHT-MCS nibbles are the max NSS directly (removed an off-by-one in the
+  test decoders)
+- MLD max-simultaneous-links test read the wrong MLE common-info offset
+- EHT MAC expectation updated to `0xb7` (Triggered TXOP Sharing Mode 1)
+- Patch log-message expectations aligned with the current patch set
+
 Release 2.1.0
 
 **hostapd 2.12**

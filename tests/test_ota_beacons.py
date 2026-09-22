@@ -113,19 +113,33 @@ class BeaconCapture:
                     pass
             return False
 
-        # Capture packets
-        try:
-            sniff(
-                iface=self.interface,
-                prn=ssid_filter,
-                filter=filter_str,
-                timeout=self.timeout,
-                store=False,
-            )
-        except Scapy_Exception as e:
-            pytest.fail(f"Failed to capture on {self.interface}: {e}")
+        # Capture packets. The capture interface and the profiler's interface
+        # are on the same host, so re-assert monitor mode after the profiler
+        # has settled and retry a couple of times.
+        channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                _ensure_monitor(self.interface, channel)
+            except subprocess.CalledProcessError:
+                pass
+            time.sleep(0.5)
+            try:
+                sniff(
+                    iface=self.interface,
+                    prn=ssid_filter,
+                    filter=filter_str,
+                    timeout=self.timeout,
+                    store=False,
+                )
+                return self.beacons
+            except Scapy_Exception as e:
+                last_error = e
+                self.beacons = []
+                if attempt < 2:
+                    time.sleep(1)
 
-        return self.beacons
+        pytest.fail(f"Failed to capture on {self.interface}: {last_error}")
 
     @staticmethod
     def get_ie(beacon: Dot11Beacon, ie_id: int) -> Dot11Elt | None:
@@ -431,7 +445,7 @@ class RemoteProfilerRunner:
     def __init__(
         self,
         remote_host: str = "wlanpi@198.18.42.1",
-        interface: str = "wlan0",
+        interface: str | None = None,
         channel: int = 36,
         ssid: str = "OTA-Test",
     ):
@@ -451,6 +465,24 @@ class RemoteProfilerRunner:
         self.ssh_process: subprocess.Popen | None = None
         self.pid: int | None = None
 
+    def _cleanup_remote(self) -> None:
+        """Kill leftover profiler/hostapd and remove stale monitor vifs."""
+        ap_iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
+        fakeap_iface = os.getenv("PROFILER_OTA_FAKEAP_INTERFACE") or ap_iface
+        vifs = sorted({f"{ap_iface}profiler", f"{fakeap_iface}profiler"})
+        del_vifs = " ".join(f"sudo iw dev {v} del 2>/dev/null || true;" for v in vifs)
+        cmd = (
+            "sudo pkill -9 profiler 2>/dev/null || true; "
+            "sudo pkill -9 hostapd 2>/dev/null || true; "
+            f"{del_vifs}"
+        )
+        subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", self.remote_host, cmd],
+            capture_output=True,
+            timeout=15,
+        )
+        time.sleep(1)
+
     def start(
         self,
         security_mode: str = "ft-wpa3-mixed",
@@ -469,6 +501,23 @@ class RemoteProfilerRunner:
             fakeap: Use fakeap mode (Scapy-based) instead of AP mode (hostapd-based)
             extra_args: Additional CLI arguments
         """
+        # Resolve the profiler interface. fakeAP injects frames, which some
+        # drivers (e.g. iwlwifi/iwlmld) do not support, so allow a separate
+        # injection-capable interface via PROFILER_OTA_FAKEAP_INTERFACE.
+        iface = self.interface
+        if iface is None:
+            if fakeap:
+                iface = os.getenv("PROFILER_OTA_FAKEAP_INTERFACE") or os.getenv(
+                    "PROFILER_OTA_AP_INTERFACE", "wlan0"
+                )
+            else:
+                iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
+
+        # Kill any leftover profiler/hostapd and remove stale monitor vifs
+        # before starting; on a single host a previous run's cleanup can race
+        # with this one and break staging.
+        self._cleanup_remote()
+
         # Build profiler command
         cmd_parts = [
             "sudo",
@@ -485,11 +534,10 @@ class RemoteProfilerRunner:
         cmd_parts.extend(
             [
                 "-i",
-                self.interface,
+                iface,
                 "--security-mode",
                 security_mode,
                 "--debug",
-                "--expert",
             ]
         )
 
@@ -567,6 +615,29 @@ class RemoteProfilerRunner:
             pytest.fail(
                 f"Profiler stopped unexpectedly on remote.\nLog output:\n{log_output}"
             )
+
+        # Wait until the profiler has actually finished staging its interface
+        # and is beaconing. On a single host the capture card and the profiler
+        # card are both reconfigured, so the capture must not start until the
+        # profiler has settled.
+        self._wait_for_ready()
+
+    def _wait_for_ready(self, timeout: float = 30.0) -> None:
+        """Poll the remote profiler log until it is done staging and beaconing."""
+        markers = (
+            "Hostapd started successfully",
+            "beginning beacon transmission",
+            "AP-ENABLED",
+        )
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                log = self._get_remote_log()
+            except subprocess.TimeoutExpired:
+                continue
+            if any(marker in log for marker in markers):
+                return
+            time.sleep(1)
 
     def _get_remote_log(self) -> str:
         """Retrieve profiler log from remote"""
@@ -659,9 +730,17 @@ class RemoteProfilerRunner:
 
 
 @pytest.fixture
-def ota_interface():
-    """Get local OTA test interface (monitor mode) from environment"""
+def ota_interface(request):
+    """Get the local OTA capture interface in monitor mode.
+
+    AP-mode tests capture on ``PROFILER_OTA_INTERFACE``. fakeAP tests capture
+    on ``PROFILER_OTA_FAKEAP_CAPTURE_INTERFACE`` (defaults to
+    ``PROFILER_OTA_INTERFACE``) because fakeAP injects from a different
+    interface (``PROFILER_OTA_FAKEAP_INTERFACE``).
+    """
     iface = os.getenv("PROFILER_OTA_INTERFACE", "wlu1u3")
+    if "fakeap" in request.node.name.lower():
+        iface = os.getenv("PROFILER_OTA_FAKEAP_CAPTURE_INTERFACE", iface)
     channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
 
     # Verify interface exists
@@ -677,31 +756,82 @@ def ota_interface():
 
     # Put interface in monitor mode if not already
     try:
-        subprocess.run(
-            ["sudo", "ip", "link", "set", iface, "down"],
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["sudo", "iw", "dev", iface, "set", "type", "monitor"],
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["sudo", "ip", "link", "set", iface, "up"],
-            check=True,
-            capture_output=True,
-        )
-        # Set channel to match remote profiler
-        subprocess.run(
-            ["sudo", "iw", "dev", iface, "set", "channel", str(channel)],
-            check=True,
-            capture_output=True,
-        )
+        _ensure_monitor(iface, channel)
     except subprocess.CalledProcessError as e:
         pytest.skip(f"Failed to configure {iface} for monitor mode: {e}")
 
     return iface
+
+
+def _monitor_filter_ok(iface: str) -> bool:
+    """True if the 802.11 BPF filter used by the capture compiles on ``iface``."""
+    try:
+        from scapy.all import conf
+
+        sock = conf.L2listen(iface=iface, filter="type mgt subtype beacon")
+        sock.close()
+        return True
+    except Exception:
+        return False
+
+
+def _ensure_monitor(iface: str, channel: int) -> None:
+    """Put ``iface`` into monitor mode on ``channel``.
+
+    Verifies not only the reported type but that the 802.11 capture filter
+    compiles (a monitor interface whose DLT is not 802.11 fails later), with a
+    full managed->monitor reset between attempts.
+    Raises subprocess.CalledProcessError if it cannot be staged.
+    """
+    # Remove a stale monitor vif left behind by a previous profiler run; it
+    # blocks re-staging the primary interface as monitor (and the capture DLT).
+    subprocess.run(
+        ["sudo", "iw", "dev", f"{iface}profiler", "del"],
+        capture_output=True,
+    )
+
+    last_error: subprocess.CalledProcessError | None = None
+    for _ in range(3):
+        try:
+            subprocess.run(
+                ["sudo", "ip", "link", "set", iface, "down"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "type", "managed"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "type", "monitor"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "ip", "link", "set", iface, "up"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "iw", "dev", iface, "set", "channel", str(channel)],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            last_error = e
+            time.sleep(1)
+            continue
+
+        if _monitor_filter_ok(iface):
+            return
+        time.sleep(1)
+
+    if last_error is not None:
+        raise last_error
+    raise subprocess.CalledProcessError(
+        1, ["iw", "dev", iface, "set", "type", "monitor"]
+    )
 
 
 def setup_ssh_key_auth(host: str) -> bool:
@@ -2309,7 +2439,7 @@ class TestOTAPassphrase:
         """
         Test that passphrase < 8 characters fails (WPA2 requirement)
 
-        Expected: Profiler should fail to start or log error
+        Expected: Profiler exits and reports the invalid passphrase
         """
         ssid = "OTA-Pass-TooShort"
         runner = RemoteProfilerRunner(
@@ -2322,28 +2452,22 @@ class TestOTAPassphrase:
                 fakeap=False,  # Test with AP mode
                 extra_args=["--passphrase", "short"],  # Only 5 chars
             )
-
-            # If we get here, profiler started (might accept and fail later)
-            # Check log for error
-            runner.stop()
-
-            # Should have error about passphrase length
-            # Note: This might fail if hostapd validates later
-            # In that case, beacon capture would fail
-
-        except Exception:
-            # Expected: profiler failed to start or beacons not captured
-            # This is acceptable behavior
+        except pytest.fail.Exception:
+            # Expected: profiler exits because argparse rejects the value
+            pass
+        finally:
             try:
                 runner.stop()
             except Exception:
                 pass
 
+        assert "invalid passphrase value" in runner._get_remote_log()
+
     def test_passphrase_too_long_fails(self, ota_interface, remote_host, test_channel):
         """
         Test that passphrase > 63 characters fails (WPA2 requirement)
 
-        Expected: Profiler should fail to start or log error
+        Expected: Profiler exits and reports the invalid passphrase
         """
         ssid = "OTA-Pass-TooLong"
         runner = RemoteProfilerRunner(
@@ -2356,16 +2480,16 @@ class TestOTAPassphrase:
                 fakeap=False,
                 extra_args=["--passphrase", "a" * 64],  # 64 chars (too long)
             )
-
-            # Check log for error
-            runner.stop()
-
-        except Exception:
-            # Expected: profiler failed to start
+        except pytest.fail.Exception:
+            # Expected: profiler exits because argparse rejects the value
+            pass
+        finally:
             try:
                 runner.stop()
             except Exception:
                 pass
+
+        assert "invalid passphrase value" in runner._get_remote_log()
 
 
 class TestOTAIEStructureValidation:
@@ -2390,7 +2514,7 @@ class TestOTAIEStructureValidation:
         3. IE length matches actual data length
         4. No parsing exceptions occur
         """
-        ssid = f"OTA-IE-Parse-{mode}-{security_mode}"
+        ssid = f"OTA-IEP-{mode}-{security_mode}"
         runner = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid
         )

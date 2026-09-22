@@ -659,11 +659,11 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                     __IFACE.stage_interface_hostapd()
                     log.debug("finish interface setup and staging for hostapd...")
                 else:
-                    # FakeAP mode: create monitor interface and stage for injection
-                    if __IFACE.requires_vif:
-                        # we require using a mon interface, update config so our subprocesses find it
-                        config["GENERAL"]["interface"] = __IFACE.mon
+                    # FakeAP mode: stage the interface for monitor injection.
+                    # stage_interface_fakeap may switch the primary interface to
+                    # monitor mode (e.g. iwlwifi), so read mon after staging.
                     __IFACE.stage_interface_fakeap()
+                    config["GENERAL"]["interface"] = __IFACE.mon or __IFACE.name
                     log.debug("finish interface setup and staging ...")
         except InterfaceError as e:
             log.exception("problem interface staging ... exiting ...", exc_info=True)

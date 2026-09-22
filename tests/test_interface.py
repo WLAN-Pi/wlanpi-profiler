@@ -558,12 +558,30 @@ class TestMonIsPrimary:
         iface.reset_interface()
         assert calls == []
 
-    def test_stage_fakeap_rejects_primary(self):
-        from profiler.interface import InterfaceError
+    def test_stage_fakeap_uses_primary_as_monitor_for_iwlwifi(self, monkeypatch):
+        # iwlwifi cannot inject from a monitor vif (it crashes the firmware),
+        # so fakeAP stages the primary interface itself as the monitor.
+        monkeypatch.setattr("profiler.interface._run_staging_command", lambda cmd: "")
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda *a, **k: "wpa_cli v2.10\n"
+        )
+        monkeypatch.setattr(Interface, "get_mode", lambda self, iface="": "monitor")
+        monkeypatch.setattr(
+            Interface,
+            "check_for_disabled_or_noir_channels",
+            lambda self, *a, **k: False,
+        )
 
         iface = Interface()
-        iface.name = "wlan0profiler"
+        iface.name = "wlan0"
         iface.mon = "wlan0profiler"
         iface.requires_vif = True
-        with pytest.raises(InterfaceError):
-            iface.stage_interface_fakeap()
+        iface.driver = "iwlwifi"
+        iface.phy = "phy0"
+        iface.channel = 36
+        iface.frequency = 5180
+        iface.stage_interface_fakeap()
+
+        assert iface.mon == "wlan0"
+        assert iface.requires_vif is False
+        assert iface.primary_staged_as_monitor is True

@@ -1,16 +1,11 @@
 --- a/src/ap/ieee802_11_he.c
 +++ b/src/ap/ieee802_11_he.c
-@@ -107,6 +107,17 @@
+@@ -107,6 +107,12 @@
  	ppet_size = ieee80211_he_ppet_size(he_capab->ppet[0],
  					   he_capab->phy_cap);
  
 +	/* WLAN Pi Profiler: Force 160 MHz support with proper MCS maps */
 +	if (hapd->iface->conf->he_oper_chwidth == CONF_OPER_CHWIDTH_160MHZ) {
-+		static int profiler_he_logged = 0;
-+		if (!profiler_he_logged) {
-+			wpa_printf(MSG_DEBUG, "PROFILER: HE 5GHz 160MHz: forcing mcs_nss_size=8, ppet_size=0");
-+			profiler_he_logged = 1;
-+		}
 +		mcs_nss_size = 8;  /* 4 bytes for <=80 MHz + 4 bytes for 160 MHz */
 +		ppet_size = 0;      /* Disable PPE thresholds */
 +	}
@@ -18,7 +13,7 @@
  	ie_size = IEEE80211_HE_CAPAB_MIN_LEN + mcs_nss_size + ppet_size;
  
  	*pos++ = WLAN_EID_EXTENSION;
-@@ -120,6 +131,17 @@
+@@ -120,6 +126,17 @@
  		  HE_MAX_MAC_CAPAB_SIZE);
  	os_memcpy(cap->he_phy_capab_info, he_capab->phy_cap,
  		  HE_MAX_PHY_CAPAB_SIZE);
@@ -36,3 +31,39 @@
  	epos = (u8 *) &cap->he_basic_supported_mcs_set;
  	os_memcpy(epos, he_capab->mcs, mcs_nss_size);
  	epos += mcs_nss_size;
+@@ -127,6 +144,35 @@
+ 	if (ppet_size)
+ 		os_memcpy(epos, he_capab->ppet, ppet_size);
+ 
++	/* WLAN Pi Profiler: advertise 4 spatial streams in the HE-MCS maps.
++	 * Each 4-bit field is the max NSS (0xf = not supported); the maps are
++	 * 4 bytes per bandwidth: Rx<=80/Tx<=80, Rx160/Tx160, Rx80+80/Tx80+80.
++	 */
++	{
++		u8 *mcs = (u8 *) &cap->he_basic_supported_mcs_set;
++		u8 i;
++
++		for (i = 0; i + 3 < mcs_nss_size; i += 4) {
++			mcs[i + 0] = 0xaa;  /* Rx SS 1-4: MCS 0-9 */
++			mcs[i + 1] = 0xff;  /* Rx SS 5-8: not supported */
++			mcs[i + 2] = 0xaa;  /* Tx SS 1-4: MCS 0-9 */
++			mcs[i + 3] = 0xff;  /* Tx SS 5-8: not supported */
++		}
++
++		static int profiler_he_4ss_logged = 0;
++		if (!profiler_he_4ss_logged) {
++			wpa_printf(MSG_DEBUG, "PROFILER: Advertising HE 4 SS support");
++			profiler_he_4ss_logged = 1;
++		}
++		if (mcs_nss_size >= 8) {
++			static int profiler_he_160_logged = 0;
++			if (!profiler_he_160_logged) {
++				wpa_printf(MSG_DEBUG, "PROFILER: Advertising HE 160 MHz capability");
++				profiler_he_160_logged = 1;
++			}
++		}
++	}
++
+ 	if (hapd->iface->conf->he_phy_capab.he_su_beamformer)
+ 		cap->he_phy_capab_info[HE_PHYCAP_SU_BEAMFORMER_CAPAB_IDX] |=
+ 			HE_PHYCAP_SU_BEAMFORMER_CAPAB;

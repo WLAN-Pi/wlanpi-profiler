@@ -190,16 +190,12 @@ def parse_eht_nss(eht_cap: bytes) -> dict:
     # MCS Map BW <= 80 MHz at offset 12 (3 bytes)
     mcs_map_80 = int.from_bytes(eht_cap[12:15], "little")
 
-    # Extract NSS values (each 4 bits, value is NSS-1)
-    rx_nss_0_9 = (mcs_map_80 & 0xF) + 1 if (mcs_map_80 & 0xF) != 0xF else 0
-    tx_nss_0_9 = (
-        ((mcs_map_80 >> 4) & 0xF) + 1 if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
-    )
-    rx_nss_10_11 = (
-        ((mcs_map_80 >> 8) & 0xF) + 1 if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
-    )
+    # Extract NSS values (each 4-bit field is the max NSS directly; 0xF = unsupported)
+    rx_nss_0_9 = (mcs_map_80 & 0xF) if (mcs_map_80 & 0xF) != 0xF else 0
+    tx_nss_0_9 = ((mcs_map_80 >> 4) & 0xF) if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
+    rx_nss_10_11 = ((mcs_map_80 >> 8) & 0xF) if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
     tx_nss_10_11 = (
-        ((mcs_map_80 >> 12) & 0xF) + 1 if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
+        ((mcs_map_80 >> 12) & 0xF) if ((mcs_map_80 >> 12) & 0xF) != 0xF else 0
     )
 
     return {
@@ -592,7 +588,7 @@ class Test5GHzPatches:
 
     def test_5ghz_eht_mac_capabilities(self, beacon_5ghz):
         """
-        Test: Verify EHT MAC capabilities set to 0x00b3
+        Test: Verify EHT MAC capabilities set to 0x00b7
 
         Patch: hostapd_eht_mac_caps.patch
         """
@@ -600,8 +596,8 @@ class Test5GHzPatches:
         eht = parse_eht_nss(get_extension_ie(beacon, 0x6C))
 
         assert eht.get("present"), "EHT Capabilities missing"
-        assert eht["mac_cap"] == 0x00B3, (
-            f"EHT MAC capabilities incorrect. Got: 0x{eht['mac_cap']:04x}, Expected: 0x00b3"
+        assert eht["mac_cap"] == 0x00B7, (
+            f"EHT MAC capabilities incorrect. Got: 0x{eht['mac_cap']:04x}, Expected: 0x00b7"
         )
 
     def test_5ghz_eht_phy_capabilities(self, beacon_5ghz):
@@ -657,7 +653,7 @@ class Test5GHzPatches:
             "PROFILER: Advertising HE 160 MHz capability",
             "PROFILER: Advertising HE 4 SS support",
             "PROFILER: Advertising EHT 4 SS support",
-            "PROFILER: Override EHT MAC caps to 0x00b3",
+            "PROFILER: Override EHT MAC caps to 0x00b7",
             "PROFILER: Enhanced EHT PHY caps",
             "PROFILER: Enabled Extended Capability - SCS (Stream Classification Service)",
             "PROFILER: Enabled Extended Capability - TWT Responder",
@@ -806,7 +802,7 @@ class Test24GHzPatches:
         Test: Verify EHT MAC capabilities in 2.4 GHz
 
         Requirements:
-        - EHT MAC: 0x00b3 (EPCS, OM, R-TWT, SCS)
+        - EHT MAC: 0x00b7 (EPCS, OM, R-TWT, SCS)
         - Same as 5 GHz
         """
         beacon = beacon_2ghz["beacon"]
@@ -818,11 +814,11 @@ class Test24GHzPatches:
 
         if not eht.get("present"):
             failures.append("EHT Capabilities missing")
-        elif eht.get("mac_cap") != 0x00B3:
-            failures.append(f"EHT MAC: 0x{eht.get('mac_cap'):04x} (expected 0x00b3)")
+        elif eht.get("mac_cap") != 0x00B7:
+            failures.append(f"EHT MAC: 0x{eht.get('mac_cap'):04x} (expected 0x00b7)")
 
         # Verify log message
-        if "PROFILER: Override EHT MAC caps to 0x00b3" not in log:
+        if "PROFILER: Override EHT MAC caps to 0x00b7" not in log:
             failures.append("EHT MAC caps log message missing")
 
         if failures:

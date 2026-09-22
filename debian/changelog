@@ -1,3 +1,17 @@
+wlanpi-profiler (2.1.1-1) unstable; urgency=medium
+
+  * Fix EHT Operation Basic MCS/NSS Set encoding (0xff -> 0x44)
+  * Advertise 4 spatial streams in the HE-MCS maps
+  * Re-enable advanced EHT PHY capabilities (MCS 15, MU beamformer)
+  * Fix fakeAP crashing the iwlwifi firmware: stage the primary interface as
+    the monitor (keep it up and run the LAR scan) instead of injecting from a
+    monitor vif while the primary is down
+  * Allow fakeAP to run on a different interface than AP mode
+  * OTA test fixes: EHT NSS decode, MLD max-simul-links offset, EHT MAC
+    expectation (0xb7), patch log-message expectations, and passphrase tests
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Mon, 21 Sep 2026 23:40:25 -0400
+
 wlanpi-profiler (2.1.0-1) unstable; urgency=medium
 
   * Update bundled hostapd from 2.11 to 2.12
