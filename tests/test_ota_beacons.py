@@ -465,6 +465,24 @@ class RemoteProfilerRunner:
         self.ssh_process: subprocess.Popen | None = None
         self.pid: int | None = None
 
+    def _cleanup_remote(self) -> None:
+        """Kill leftover profiler/hostapd and remove stale monitor vifs."""
+        ap_iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
+        fakeap_iface = os.getenv("PROFILER_OTA_FAKEAP_INTERFACE") or ap_iface
+        vifs = sorted({f"{ap_iface}profiler", f"{fakeap_iface}profiler"})
+        del_vifs = " ".join(f"sudo iw dev {v} del 2>/dev/null || true;" for v in vifs)
+        cmd = (
+            "sudo pkill -9 profiler 2>/dev/null || true; "
+            "sudo pkill -9 hostapd 2>/dev/null || true; "
+            f"{del_vifs}"
+        )
+        subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", self.remote_host, cmd],
+            capture_output=True,
+            timeout=15,
+        )
+        time.sleep(1)
+
     def start(
         self,
         security_mode: str = "ft-wpa3-mixed",
@@ -494,6 +512,11 @@ class RemoteProfilerRunner:
                 )
             else:
                 iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
+
+        # Kill any leftover profiler/hostapd and remove stale monitor vifs
+        # before starting; on a single host a previous run's cleanup can race
+        # with this one and break staging.
+        self._cleanup_remote()
 
         # Build profiler command
         cmd_parts = [
@@ -760,6 +783,13 @@ def _ensure_monitor(iface: str, channel: int) -> None:
     full managed->monitor reset between attempts.
     Raises subprocess.CalledProcessError if it cannot be staged.
     """
+    # Remove a stale monitor vif left behind by a previous profiler run; it
+    # blocks re-staging the primary interface as monitor (and the capture DLT).
+    subprocess.run(
+        ["sudo", "iw", "dev", f"{iface}profiler", "del"],
+        capture_output=True,
+    )
+
     last_error: subprocess.CalledProcessError | None = None
     for _ in range(3):
         try:
@@ -770,11 +800,6 @@ def _ensure_monitor(iface: str, channel: int) -> None:
             )
             subprocess.run(
                 ["sudo", "iw", "dev", iface, "set", "type", "managed"],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["sudo", "ip", "link", "set", iface, "up"],
                 check=True,
                 capture_output=True,
             )
@@ -2414,7 +2439,7 @@ class TestOTAPassphrase:
         """
         Test that passphrase < 8 characters fails (WPA2 requirement)
 
-        Expected: Profiler should fail to start or log error
+        Expected: Profiler exits and reports the invalid passphrase
         """
         ssid = "OTA-Pass-TooShort"
         runner = RemoteProfilerRunner(
@@ -2427,28 +2452,22 @@ class TestOTAPassphrase:
                 fakeap=False,  # Test with AP mode
                 extra_args=["--passphrase", "short"],  # Only 5 chars
             )
-
-            # If we get here, profiler started (might accept and fail later)
-            # Check log for error
-            runner.stop()
-
-            # Should have error about passphrase length
-            # Note: This might fail if hostapd validates later
-            # In that case, beacon capture would fail
-
-        except Exception:
-            # Expected: profiler failed to start or beacons not captured
-            # This is acceptable behavior
+        except pytest.fail.Exception:
+            # Expected: profiler exits because argparse rejects the value
+            pass
+        finally:
             try:
                 runner.stop()
             except Exception:
                 pass
 
+        assert "invalid passphrase value" in runner._get_remote_log()
+
     def test_passphrase_too_long_fails(self, ota_interface, remote_host, test_channel):
         """
         Test that passphrase > 63 characters fails (WPA2 requirement)
 
-        Expected: Profiler should fail to start or log error
+        Expected: Profiler exits and reports the invalid passphrase
         """
         ssid = "OTA-Pass-TooLong"
         runner = RemoteProfilerRunner(
@@ -2461,16 +2480,16 @@ class TestOTAPassphrase:
                 fakeap=False,
                 extra_args=["--passphrase", "a" * 64],  # 64 chars (too long)
             )
-
-            # Check log for error
-            runner.stop()
-
-        except Exception:
-            # Expected: profiler failed to start
+        except pytest.fail.Exception:
+            # Expected: profiler exits because argparse rejects the value
+            pass
+        finally:
             try:
                 runner.stop()
             except Exception:
                 pass
+
+        assert "invalid passphrase value" in runner._get_remote_log()
 
 
 class TestOTAIEStructureValidation:
