@@ -1,3 +1,14 @@
+Release 2.1.3
+
+**CLI**
+
+- Add shell tab-completion for `profiler` (via `argcomplete`). Installed to
+  `/usr/share/bash-completion/completions/profiler` on the Debian package
+  (`Recommends: bash-completion`). `-i <TAB>` completes local interface
+  names; `--config`, `--pcap`, `--files_path`, `--hostapd-config` complete
+  paths. Other install methods can run
+  `eval "$(register-python-argcomplete profiler)"`.
+
 Release 2.1.2
 
 **Packaging fix**

@@ -88,6 +88,7 @@ esac
 
 CONFIG_FILE="/tmp/hostapd_test_${BANDWIDTH}mhz.conf"
 
+# shellcheck disable=SC2087 # expand vars locally before sending; server has no values for them
 ssh "${WLANPI_USER}@${WLANPI_IP}" "cat > ${CONFIG_FILE}" <<EOF
 interface=${WLANPI_IFACE}
 driver=nl80211
@@ -135,11 +136,10 @@ sleep 2
 
 # Start hostapd in background
 ssh "${WLANPI_USER}@${WLANPI_IP}" "sudo /opt/wlanpi-profiler/bin/hostapd ${CONFIG_FILE} > /tmp/hostapd.log 2>&1 &"
-HOSTAPD_PID=$!
 
 # Wait for hostapd to start
 echo -n "Waiting for hostapd to start."
-for i in {1..10}; do
+for _ in {1..10}; do
     sleep 1
     echo -n "."
     if ssh "${WLANPI_USER}@${WLANPI_IP}" "pgrep hostapd > /dev/null"; then

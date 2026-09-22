@@ -1,1 +1,2 @@
 /etc/wlanpi-profiler/config.ini /etc/wlanpi-profiler
+completions/profiler /usr/share/bash-completion/completions

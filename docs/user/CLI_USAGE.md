@@ -10,6 +10,25 @@ sudo profiler
 
 Stop with `CTRL + C`.
 
+## Shell tab-completion
+
+The Debian package installs bash tab-completion for `profiler` to
+`/usr/share/bash-completion/completions/profiler` (requires the
+`bash-completion` package, which is a `Recommends` dependency). Open a new
+shell and `profiler --<TAB>` will complete flags, `-i <TAB>` will complete
+local interface names, and file-based options (`--config`, `--pcap`,
+`--files_path`, `--hostapd-config`) complete paths.
+
+If you installed `profiler` another way (e.g. `pipx`, a virtualenv) and want
+completion, register it manually for your shell:
+
+```bash
+eval "$(register-python-argcomplete profiler)"   # bash
+```
+
+Add that line to your shell rc file (`~/.bashrc`) to make it persistent. See
+the [argcomplete docs](https://kislyuk.github.io/argcomplete/) for zsh/fish/tcsh.
+
 ## Global options
 
 ```
