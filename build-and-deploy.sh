@@ -8,9 +8,10 @@ set -e
 # Configuration - Edit these values as needed
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 PACKAGE_NAME="wlanpi-profiler"
-WLANPI_IP="198.18.42.1"
-WLANPI_USER="wlanpi"
+WLANPI_IP="${WLANPI_IP:-198.18.42.1}"
+WLANPI_USER="${WLANPI_USER:-wlanpi}"
 DEPLOY_PATH="/tmp"
+SUITE="${1:-trixie}"
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Script logic - No need to edit below
@@ -18,8 +19,17 @@ DEPLOY_PATH="/tmp"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Use sshpass for non-interactive auth when SSHPASS is set, e.g.:
+#   WLANPI_IP=192.168.6.63 SSHPASS=wlanpi ./build-and-deploy.sh trixie
+SSH="ssh"
+SCP="scp"
+if [ -n "${SSHPASS:-}" ]; then
+    SSH="sshpass -e ssh"
+    SCP="sshpass -e scp"
+fi
+
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-echo "Build and Deploy $PACKAGE_NAME"
+echo "Build and Deploy $PACKAGE_NAME ($SUITE)"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 # Step 1: Check if target is reachable
@@ -34,8 +44,7 @@ echo "Target is reachable."
 # Step 2: Build the package
 echo ""
 echo "Step 2: Building package..."
-echo "Step 1: Building package..."
-if ! bash build-package-native.sh; then
+if ! bash build-package-native.sh "$SUITE"; then
     echo ""
     echo "ERROR: Build failed!"
     echo "Deployment aborted."
@@ -64,7 +73,7 @@ for f in $DEB_FILES; do echo "  $(basename $f)"; done
 echo ""
 echo "Step 4: Copying to WLAN Pi at $WLANPI_IP..."
 for DEB_FILE in $DEB_FILES; do
-    if ! scp "$DEB_FILE" "$WLANPI_USER@$WLANPI_IP:$DEPLOY_PATH/"; then
+    if ! $SCP "$DEB_FILE" "$WLANPI_USER@$WLANPI_IP:$DEPLOY_PATH/"; then
         echo "ERROR: Failed to copy $(basename $DEB_FILE)"
         exit 1
     fi
@@ -75,7 +84,7 @@ echo ""
 echo "Step 5: Installing on WLAN Pi..."
 for DEB_FILE in $DEB_FILES; do
     REMOTE_DEB="$DEPLOY_PATH/$(basename "$DEB_FILE")"
-    if ! ssh "$WLANPI_USER@$WLANPI_IP" "sudo dpkg -i $REMOTE_DEB"; then
+    if ! $SSH "$WLANPI_USER@$WLANPI_IP" "sudo dpkg -i $REMOTE_DEB"; then
         echo ""
         echo "WARNING: Installation may have issues."
         echo "You may need to run: ssh $WLANPI_USER@$WLANPI_IP 'sudo apt-get install -f'"

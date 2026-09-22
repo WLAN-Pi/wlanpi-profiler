@@ -2,16 +2,30 @@
 #
 # Build wlanpi-profiler Debian package in podman container
 #
+# Usage: ./build-package-native.sh [SUITE]
+#   SUITE   Debian release to build for (default: trixie)
+#
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Clean up old build manifest
+# Debian release to build for
+SUITE="${1:-trixie}"
+
+IMAGE="wlanpi-profiler-builder:${SUITE}"
+
+# Clean up old build manifest, stale build trees, and previously built
+# packages. Without this, setuptools reuses build/lib and repackages files that
+# were deleted or renamed in the source tree, and stale .deb files in the repo
+# root get picked up by the manifest and deployed.
 rm -f .build-manifest.txt
+rm -rf build .pybuild
+rm -f wlanpi-profiler*.deb
 
 echo "========================================="
 echo "Building wlanpi-profiler Debian Package"
+echo "  suite:  $SUITE"
 echo "========================================="
 
 # Check for podman
@@ -21,8 +35,8 @@ if ! command -v podman &> /dev/null; then
     exit 1
 fi
 
-echo "Step 1: Building Docker image..."
-podman build -f Dockerfile.build -t wlanpi-profiler-builder .
+echo "Step 1: Building container image..."
+podman build -f Dockerfile.build --build-arg SUITE="$SUITE" -t "$IMAGE" .
 
 echo ""
 echo "Step 2: Building Debian package in container..."
@@ -33,7 +47,7 @@ echo ""
 podman run --rm \
     -v "$(pwd)":/work:Z \
     -w /work \
-    wlanpi-profiler-builder \
+    "$IMAGE" \
     bash -c '
 set -e
 
@@ -51,7 +65,10 @@ cp -v /*.deb /work/ 2>/dev/null || echo "No .deb files found in container root"
 
 echo ""
 echo "Creating build manifest..."
-cd /work && ls -1 wlanpi-profiler_*.deb 2>/dev/null | grep -v dbgsym > .build-manifest.txt || true
+# List only the packages built in this run. The container root holds just the
+# output of this build; globbing /work would also match stale .deb files from
+# earlier builds and deploy the wrong version.
+ls -1 /*.deb 2>/dev/null | grep -v dbgsym | xargs -r -n1 basename > /work/.build-manifest.txt || true
 
 echo ""
 echo "Build complete!"
