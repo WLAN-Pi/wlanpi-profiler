@@ -1,3 +1,13 @@
+Release 2.1.2
+
+**Packaging fix**
+
+- `wlanpi-profiler.service` is no longer enabled or started automatically on
+  package install/upgrade. debhelper defaults previously enabled and started
+  the unit as soon as the package was installed, which unconditionally
+  started an AP on a guessed wireless interface with no user interaction.
+  Run `systemctl enable --now wlanpi-profiler` to run it as a service.
+
 Release 2.1.1
 
 **Capability advertising fixes**

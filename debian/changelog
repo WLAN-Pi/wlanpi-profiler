@@ -1,3 +1,13 @@
+wlanpi-profiler (2.1.2-1) unstable; urgency=medium
+
+  * Don't enable or start wlanpi-profiler.service automatically on install/
+    upgrade. Previously debhelper defaults enabled and started the unit as
+    soon as the package was installed, unconditionally starting an AP on a
+    guessed interface. Use `systemctl enable --now wlanpi-profiler` to run
+    it as a service (closes #279).
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 22 Sep 2026 18:00:00 -0400
+
 wlanpi-profiler (2.1.1-1) unstable; urgency=medium
 
   * Fix EHT Operation Basic MCS/NSS Set encoding (0xff -> 0x44)
