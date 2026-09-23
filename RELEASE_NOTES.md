@@ -1,4 +1,4 @@
-Unreleased
+Release 2.1.4
 
 **hostapd mode fixes (#283)**
 
@@ -13,7 +13,7 @@ Unreleased
 - Auto-disable 802.11ax/802.11be for AP mode when the phy does not advertise
   HE/EHT AP support (`iw phy info` `HE Iftypes`/`EHT Iftypes`). hostapd 2.12
   exits with `MLD: Not supported by the driver` when asked for `ieee80211be`
-  on a Wi-Fi 6E (MT7921) or Wi-Fi 5 (MT7612U) phy
+  on a Wi-Fi 6E (MT7921) or Wi-Fi 5 (MT7612U) phy (#243)
 - Country-code detection now reads the regulatory domain that applies to the
   selected phy: a self-managed phy (iwlwifi, ath12k) that has resolved a
   country uses it, otherwise the global domain applies. It no longer borrows

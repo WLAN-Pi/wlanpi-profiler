@@ -1,3 +1,20 @@
+wlanpi-profiler (2.1.4-1) unstable; urgency=medium
+
+  * Fix hostapd AP mode failing on every non-Intel adapter (ath12k,
+    mt76, mt79xx) with 'iw dev wlanX set type __ap' rc 240 (-EBUSY);
+    hostapd performs the managed->AP switch itself (#283)
+  * Auto-disable 802.11ax/802.11be in AP mode when the phy does not
+    advertise HE/EHT AP support, instead of hostapd exiting with 'MLD:
+    Not supported by the driver' (#243)
+  * Read the regulatory domain of the selected phy rather than the first
+    country in 'iw reg get'
+  * Remove a stale wlanXprofiler vif in every staging mode, only when
+    present
+  * Allow 'profiler --list-interfaces' (also --list_interfaces) without
+    root; it never writes session state
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 23 Sep 2026 11:01:02 -0400
+
 wlanpi-profiler (2.1.3-1) unstable; urgency=medium
 
   * Add shell tab-completion for the profiler CLI (argcomplete), installed

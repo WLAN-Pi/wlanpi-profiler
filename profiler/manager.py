@@ -77,11 +77,6 @@ def _shutdown(
 
     Shared by the SIGINT/SIGTERM and hostapd-watchdog handlers.
     """
-    if _read_only_mode:
-        # No interface staged, no hostapd, no session: never touch the status,
-        # info or last-session files of a profiler service that may be running.
-        os._exit(exit_code)
-
     # Stop the hostapd watchdog first so it cannot re-trigger during cleanup
     if __HOSTAPD_MGR is not None:
         __HOSTAPD_MGR._watchdog_stop.set()
@@ -101,6 +96,12 @@ def _shutdown(
                 log.debug(f"Error terminating process {process.name}: {e}")
         except (BrokenPipeError, ValueError):
             pass
+
+    if _read_only_mode:
+        # Children (the --pcap profiler) are stopped above. No interface staged,
+        # no hostapd, no session: never touch the status, info or last-session
+        # files of a profiler service that may be running.
+        os._exit(exit_code)
 
     # Stop hostapd before restoring the primary interface, so the type change
     # is not attempted while hostapd still owns the AP vif.

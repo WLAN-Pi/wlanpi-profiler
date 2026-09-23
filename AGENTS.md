@@ -23,8 +23,11 @@ Find the ledger with: `rg -n "shortcut:" profiler tests`
 - `python -m pytest tests/ -q -m "not ondevice"` (CI equivalent)
 - `ruff check profiler tests && ruff format --check profiler tests`
 - Interface staging changes must be verified on hardware across driver
-  families (iwlwifi, ath12k, mt76/mt79xx, rtl88XXau). Unit tests assert command
+  families (iwlwifi, ath12k, mt76/mt79xx). Unit tests assert command
   ordering (see `tests/test_interface.py`), not driver behaviour.
+- rtl88XXau is explicitly out of scope for hardware verification: it is not
+  tested, and missing rtl88XXau hardware results never block a change or a
+  review. Keep its unit tests passing; do not request or wait for device runs.
 
 ## Interface staging rules
 

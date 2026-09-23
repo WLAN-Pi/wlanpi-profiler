@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 
 from profiler import helpers
@@ -228,10 +230,15 @@ class TestReadOnlyMode:
             manager.os, "_exit", lambda code: (_ for _ in ()).throw(SystemExit(code))
         )
         monkeypatch.setattr(manager, "_read_only_mode", True)
+        # --pcap runs a profiler child; SIGTERM to the parent must still stop it.
+        child = mock.Mock(name="profiler", pid=1)
+        child.is_alive.return_value = False
+        monkeypatch.setattr(manager, "__RUNNING_PROCESSES", [child])
         with pytest.raises(SystemExit) as exc:
             manager._shutdown(3, "interrupted")
         assert exc.value.code == 3
         assert touched == []
+        child.terminate.assert_called_once()
 
 
 def test_check_required_tools_record_status_false_skips_write_status(monkeypatch):
