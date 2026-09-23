@@ -533,10 +533,16 @@ class TestMonIsPrimary:
         assert iface.mon_is_primary is False
 
     def test_remove_mon_vif_skips_primary(self, monkeypatch):
-        import subprocess
-
+        """Only a real /sys/class/net/<name>profiler is deleted; the provided
+        wlan0profiler itself is never a candidate."""
         calls = []
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a) or None)
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda cmd, *a, **k: calls.append(cmd)
+        )
+        monkeypatch.setattr(
+            "profiler.interface.os.path.isdir",
+            lambda p: p == "/sys/class/net/wlan0profiler",
+        )
 
         iface = Interface()
         iface.name = "wlan0profiler"
@@ -585,3 +591,209 @@ class TestMonIsPrimary:
         assert iface.mon == "wlan0"
         assert iface.requires_vif is False
         assert iface.primary_staged_as_monitor is True
+
+
+def _record_staging(monkeypatch, iface, get_mode="monitor", real_remove_vif=False):
+    """Capture every command a stage_* method would run; nothing touches the OS."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        "profiler.interface._run_staging_command", lambda cmd: calls.append(cmd) or ""
+    )
+    monkeypatch.setattr(
+        "profiler.interface.run_command",
+        lambda cmd, *a, **k: calls.append(cmd) or "wpa_cli v2.10\n",
+    )
+    if real_remove_vif:
+        monkeypatch.setattr("profiler.interface.os.path.isdir", lambda p: True)
+    else:
+        monkeypatch.setattr(Interface, "_remove_mon_vif", lambda self: None)
+    monkeypatch.setattr(Interface, "get_mode", lambda self, iface="": get_mode)
+    monkeypatch.setattr(Interface, "get_operstate", lambda self, iface="": "unknown")
+    monkeypatch.setattr(
+        Interface, "check_for_disabled_or_noir_channels", lambda self, *a, **k: False
+    )
+    monkeypatch.setattr("profiler.interface.time.sleep", lambda s: None)
+    return calls
+
+
+def _iface(driver):
+    iface = Interface()
+    iface.name = "wlan0"
+    iface.mon = "wlan0profiler"
+    iface.requires_vif = True
+    iface.driver = driver
+    iface.phy = "phy0"
+    iface.channel = 36
+    iface.frequency = 5180
+    return iface
+
+
+def _assert_no_iftype_change_while_up(calls, initially_up=("wlan0",)):
+    """#283: `iw dev X set type ...` -EBUSYs on a running iface for every driver
+    except iwlwifi. Staging must only change iftype while X is admin-down.
+
+    The primary is assumed UP at entry (its usual state), so staging that
+    drops the leading `ip link set X down` fails too."""
+    up = set(initially_up)
+    for cmd in calls:
+        if cmd[:3] == ["ip", "link", "set"]:
+            (up.add if cmd[4] == "up" else up.discard)(cmd[3])
+        elif cmd[:2] == ["iw", "dev"] and "type" in cmd:
+            assert cmd[2] not in up, f"iftype change while {cmd[2]} is up: {cmd}"
+
+
+class TestStagingNeverChangesIftypeWhileUp:
+    @pytest.mark.parametrize(
+        "driver", ["ath12k_wifi7_pci", "mt7925u", "mt76x2u", "iwlwifi"]
+    )
+    def test_hostapd(self, monkeypatch, driver):
+        iface = _iface(driver)
+        calls = _record_staging(monkeypatch, iface)
+        iface.stage_interface_hostapd()
+        _assert_no_iftype_change_while_up(calls)
+        # hostapd owns the managed->AP switch; profiler must not pre-empt it
+        assert not any("__ap" in c for c in calls)
+
+    @pytest.mark.parametrize(
+        "driver", ["ath12k_wifi7_pci", "mt76x2u", "iwlwifi", "88XXau"]
+    )
+    def test_listen_only(self, monkeypatch, driver):
+        iface = _iface(driver)
+        if "88XXau" in driver:
+            iface.requires_vif = False
+        calls = _record_staging(monkeypatch, iface)
+        iface.stage_interface_listen_only()
+        _assert_no_iftype_change_while_up(calls)
+
+    @pytest.mark.parametrize("driver", ["mt76x2u", "iwlwifi", "88XXau"])
+    def test_fakeap(self, monkeypatch, driver):
+        iface = _iface(driver)
+        calls = _record_staging(monkeypatch, iface)
+        iface.stage_interface_fakeap()
+        _assert_no_iftype_change_while_up(calls)
+
+
+def test_stage_hostapd_command_sequence(monkeypatch):
+    """Golden sequence: LAR scan, then a monitor vif. Primary left UP+managed."""
+    iface = _iface("ath12k_wifi7_pci")
+    calls = _record_staging(monkeypatch, iface)
+    iface.stage_interface_hostapd()
+    assert calls == [
+        ["ip", "link", "set", "wlan0", "down"],
+        ["iw", "dev", "wlan0", "set", "type", "managed"],
+        ["ip", "link", "set", "wlan0", "up"],
+        ["iw", "wlan0", "scan"],
+        ["iw", "phy", "phy0", "interface", "add", "wlan0profiler", "type", "monitor"],
+        ["ip", "link", "set", "wlan0profiler", "up"],
+    ]
+
+
+class TestParseApCapabilities:
+    def test_wifi7_phy(self):
+        info = "\tHE Iftypes: managed\n\tHE Iftypes: AP\n\tEHT Iftypes: AP, P2P-GO\n"
+        assert Interface.parse_ap_capabilities(info) == {"he": True, "eht": True}
+
+    def test_wifi6e_phy_mt7921(self):
+        info = "\tHE Iftypes: managed\n\tHE Iftypes: AP\n"
+        assert Interface.parse_ap_capabilities(info) == {"he": True, "eht": False}
+
+    def test_wifi5_phy_mt7612u(self):
+        assert Interface.parse_ap_capabilities("\tBand 1:\n") == {
+            "he": False,
+            "eht": False,
+        }
+
+    def test_he_only_for_sta_does_not_count(self):
+        info = "\tHE Iftypes: managed, P2P-client\n"
+        assert Interface.parse_ap_capabilities(info) == {"he": False, "eht": False}
+
+
+class TestStaleMonVif:
+    def test_deleted_only_when_present(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda cmd, *a, **k: calls.append(cmd)
+        )
+        iface = _iface("mt76x2u")
+        monkeypatch.setattr("profiler.interface.os.path.isdir", lambda p: False)
+        iface._remove_mon_vif()
+        assert calls == []
+        checked = []
+        monkeypatch.setattr(
+            "profiler.interface.os.path.isdir", lambda p: checked.append(p) or True
+        )
+        iface._remove_mon_vif()
+        assert checked == ["/sys/class/net/wlan0profiler"]
+        assert calls == [["iw", "dev", "wlan0profiler", "del"]]
+
+    def test_88xxau_setup_state_still_cleans_stale_vif(self, monkeypatch):
+        """Real setup() leaves mon="" / requires_vif=False for rtl88XXau; the
+        stale <name>profiler from an earlier run must still be removed."""
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda cmd, *a, **k: calls.append(cmd)
+        )
+        monkeypatch.setattr("profiler.interface.os.path.isdir", lambda p: True)
+        iface = Interface()
+        iface.name = "wlan0"
+        iface.driver = "88XXau"
+        iface._remove_mon_vif()
+        assert calls == [["iw", "dev", "wlan0profiler", "del"]]
+
+    @pytest.mark.parametrize("driver", ["iwlwifi", "88XXau"])
+    def test_fakeap_removes_stale_vif_for_primary_as_monitor_drivers(
+        self, monkeypatch, driver
+    ):
+        """A stale wlan0profiler from an earlier hostapd run must be deleted even
+        when fakeAP will not use a vif (regression: requires_vif was cleared
+        before the cleanup ran, so it silently skipped)."""
+        iface = _iface(driver)
+        if "88XXau" in driver:
+            iface.mon, iface.requires_vif = "", False  # as setup() leaves it
+        calls = _record_staging(monkeypatch, iface, real_remove_vif=True)
+        iface.stage_interface_fakeap()
+        assert ["iw", "dev", "wlan0profiler", "del"] in calls
+
+
+def test_get_ap_capabilities_queries_selected_phy(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        "profiler.interface.run_command",
+        lambda cmd, *a, **k: seen.append(cmd) or "\tHE Iftypes: AP\n",
+    )
+    iface = _iface("mt7921e")
+    iface.phy = "phy7"
+    assert iface.get_ap_capabilities() == {"he": True, "eht": False}
+    assert seen == [["iw", "phy", "phy7", "info"]]
+
+
+class TestCheckRegDomain:
+    MIXED = (
+        "global\ncountry 00: DFS-UNSET\n\nphy#1 (self-managed)\ncountry US: DFS-FCC\n"
+    )
+
+    @staticmethod
+    def _run(monkeypatch, caplog, phy, output):
+        import logging
+
+        monkeypatch.setattr("profiler.interface.run_command", lambda *a, **k: output)
+        iface = _iface("x")
+        iface.phy = phy
+        with caplog.at_level(logging.DEBUG, logger="interface"):
+            iface.check_reg_domain()
+        return caplog.text
+
+    def test_selected_self_managed_phy(self, monkeypatch, caplog):
+        text = self._run(monkeypatch, caplog, "phy1", self.MIXED)
+        assert "is US (phy1)" in text
+        assert "appears unset" not in text
+
+    def test_other_phy_does_not_borrow(self, monkeypatch, caplog):
+        text = self._run(monkeypatch, caplog, "phy0", self.MIXED)
+        assert "appears unset" in text
+        assert "wlanpi-reg-domain set" in text
+
+    def test_global_applies_when_phy_unset(self, monkeypatch, caplog):
+        out = "global\ncountry US: DFS-FCC\n\nphy#0 (self-managed)\ncountry 00: DFS-UNSET\n"
+        text = self._run(monkeypatch, caplog, "phy0", out)
+        assert "is US (global)" in text

@@ -1,3 +1,43 @@
+Release 2.1.4
+
+**hostapd mode fixes (#283)**
+
+- Fix hostapd AP mode failing to start on every non-Intel adapter since 2.1.1
+  with `staging command failed: iw dev wlanX set type __ap` (rc 240, `-EBUSY`).
+  Staging ran `set type __ap` while the interface was still up from the LAR
+  scan; mac80211 rejects an iftype change on a running interface unless the
+  driver implements `change_interface`, which only iwlwifi does. The command
+  was redundant (hostapd's nl80211 driver performs the managed->AP switch
+  itself, including the down/retry) and is removed. Verified on ath12k
+  (WCN785x), mt7925u, mt7921e, mt7921u, mt76x2u and iwlwifi (BE200)
+- Auto-disable 802.11ax/802.11be for AP mode when the phy does not advertise
+  HE/EHT AP support (`iw phy info` `HE Iftypes`/`EHT Iftypes`). hostapd 2.12
+  exits with `MLD: Not supported by the driver` when asked for `ieee80211be`
+  on a Wi-Fi 6E (MT7921) or Wi-Fi 5 (MT7612U) phy (#243)
+- Country-code detection now reads the regulatory domain that applies to the
+  selected phy: a self-managed phy (iwlwifi, ath12k) that has resolved a
+  country uses it, otherwise the global domain applies. It no longer borrows
+  the country from a different phy (an unset global domain with a
+  self-managed ath12k on another phy previously started, or failed, at
+  random), and the "unset" error names the fix
+  (`sudo wlanpi-reg-domain set XX`). The "reg domain appears unset" startup
+  warning uses the same logic instead of a driver-name special case
+- Stale `wlanXprofiler` vifs left by an earlier hostapd or listen-only run are
+  now removed by name in every staging mode, including iwlwifi/rtl88XXau
+  fakeAP where no vif is used (the old check depended on `requires_vif`,
+  which those paths clear)
+- Stale-vif removal only runs when the vif exists and is logged, removing the
+  spurious `command failed rc=237: iw dev wlanXprofiler del` warnings
+
+**CLI**
+
+- `profiler --list-interfaces` (and the old `--list_interfaces`) no longer
+  requires root, runs before any config loading or other utility mode, and
+  never writes `/run` status or `last-session.json` (including on Ctrl-C /
+  SIGTERM, which previously ran the full session teardown and could clobber a
+  running service's state; `--pcap` gets the same protection). `/usr/sbin` is
+  added to `PATH` so `iw`/`ethtool` resolve from non-login shells
+
 Release 2.1.3
 
 **CLI**

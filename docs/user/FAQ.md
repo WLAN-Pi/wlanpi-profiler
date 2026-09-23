@@ -117,7 +117,7 @@ sudo profiler
 ### No results are showing
 
 1. Check that your adapter supports monitor mode
-2. Verify the interface is correct: `sudo profiler --list_interfaces`
+2. Verify the interface is correct: `profiler --list-interfaces`
 3. Try a different channel
 4. Check debug output: `sudo profiler --debug`
 5. Verify the service is running: `sudo service wlanpi-profiler status`
@@ -133,7 +133,7 @@ AP mode (default) should discover clients in 1-2 seconds. If it's taking longer:
 
 ### I get "interface not found" errors
 
-1. Check available interfaces: `sudo profiler --list_interfaces`
+1. Check available interfaces: `profiler --list-interfaces`
 2. Verify your adapter is plugged in
 3. Check `iw dev` to see wireless interfaces
 4. Try specifying the interface explicitly: `sudo profiler -i wlan1`

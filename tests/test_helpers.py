@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pytest
 
@@ -696,3 +697,13 @@ class TestUpdateManuf2NonZero:
 
         monkeypatch.setattr(helpers, "run_command", _raise)
         assert helpers.update_manuf2() is False
+
+
+def test_check_required_tools_adds_sbin_to_path(monkeypatch):
+    """Non-login shells omit /usr/sbin, where iw and ethtool live."""
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setattr(helpers.shutil, "which", lambda tool, **k: "/x")
+    helpers.check_required_tools(required=["iw"], optional=[])
+    path = os.environ["PATH"].split(os.pathsep)
+    assert path[:2] == ["/usr/bin", "/bin"]
+    assert "/usr/sbin" in path

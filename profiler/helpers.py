@@ -91,7 +91,9 @@ BOOLEAN_CONFIG_KEYS = {
 
 
 def check_required_tools(
-    required: list[str] | None = None, optional: list[str] | None = None
+    required: list[str] | None = None,
+    optional: list[str] | None = None,
+    record_status: bool = True,
 ) -> None:
     """Check the external tools needed for the current mode.
 
@@ -99,10 +101,27 @@ def check_required_tools(
     warn. Defaults to the live-capture requirements.
 
     Call this after arg parsing so utility modes (``--pcap``, ``--clean``,
-    ``--oui-update``) can skip checks they do not need.
+    ``--oui-update``) can skip checks they do not need. Pass
+    ``record_status=False`` for read-only modes that own no session.
     """
     global is_wpa_cli_present
     logging.getLogger("check_required_tools")
+
+    # iw/ethtool live in /usr/sbin, which non-root, non-login shells often omit
+    # from PATH. Make them resolvable for both shutil.which and subprocess.
+    # Empty entries are dropped: a bare "" would mean the current directory.
+    os.environ["PATH"] = os.pathsep.join(
+        dict.fromkeys(
+            p
+            for p in [
+                *os.environ.get("PATH", "").split(os.pathsep),
+                "/usr/local/sbin",
+                "/usr/sbin",
+                "/sbin",
+            ]
+            if p
+        )
+    )
 
     if required is None:
         required = LIVE_REQUIRED_TOOLS
@@ -114,14 +133,15 @@ def check_required_tools(
             print(f"It looks like you do not have {tool} installed.")
             print("Please install using your distro's package manager.")
 
-            # Write failure status before exiting
-            from profiler.status import ProfilerState, StatusReason, write_status
+            if record_status:
+                # Write failure status before exiting
+                from profiler.status import ProfilerState, StatusReason, write_status
 
-            write_status(
-                state=ProfilerState.FAILED,
-                reason=StatusReason.MISSING_TOOLS,
-                error=f"Required tool '{tool}' not found. Please install using your distro's package manager.",
-            )
+                write_status(
+                    state=ProfilerState.FAILED,
+                    reason=StatusReason.MISSING_TOOLS,
+                    error=f"Required tool '{tool}' not found. Please install using your distro's package manager.",
+                )
             sys.exit(signal.SIGABRT)
 
     for tool in optional:
@@ -634,7 +654,8 @@ def setup_parser() -> argparse.ArgumentParser:
         help="removes BPF filters from sniffer() but may impact profiler performance",
     )
     parser.add_argument(
-        "--list_interfaces",
+        "--list-interfaces",
+        "--list_interfaces",  # Keep old name for backward compatibility
         dest="list_interfaces",
         action="store_true",
         default=False,
