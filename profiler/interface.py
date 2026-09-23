@@ -10,10 +10,10 @@ profiler.interface
 wlan interface data class
 """
 
-import contextlib
 import inspect
 import logging
 import os
+import re
 import subprocess
 import time
 from collections import namedtuple
@@ -21,6 +21,7 @@ from typing import Any
 
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
 from .helpers import flag_last_object, run_command
+from .status import parse_reg_domains
 
 
 class InterfaceError(Exception):
@@ -87,10 +88,16 @@ class Interface:
         return bool(self.mon) and self.mon == self.name
 
     def _remove_mon_vif(self) -> None:
-        """Delete a pre-existing monitor vif, unless it is the primary interface"""
-        if self.requires_vif and not self.mon_is_primary:
-            with contextlib.suppress(Exception):
-                subprocess.run(["iw", "dev", f"{self.mon}", "del"], capture_output=True)
+        """Delete a stale <name>profiler vif left by a previous run, if one exists.
+
+        Checked by name, not by requires_vif: a previous hostapd/listen-only run
+        may have created the vif even if this run (iwlwifi/88XXau fakeAP) will
+        not use one.
+        """
+        stale = f"{self.name}profiler"
+        if stale != self.name and os.path.isdir(f"/sys/class/net/{stale}"):
+            self.log.debug("run: iw dev %s del (stale vif cleanup)", stale)
+            run_command(["iw", "dev", stale, "del"], suppress_output=True)
 
     def setup(self) -> None:
         """Perform setup for the interface"""
@@ -251,20 +258,25 @@ class Interface:
         print(out)
 
     def check_reg_domain(self) -> None:
-        """Check and report the set regulatory domain"""
+        """Check and report the regulatory domain that applies to this phy"""
         regdomain_result = run_command(["iw", "reg", "get"])
-        regdomain = [line for line in regdomain_result.split("\n") if "country" in line]
-        if "UNSET" in "".join(regdomain):
-            if "iwlwifi" not in self.driver:
-                self.log.warning(
-                    "reg domain appears unset. consider setting it with 'iw reg set XX'"
-                )
-                self.log.warning(
-                    "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
-                )
+        domains = parse_reg_domains(regdomain_result)
+        # A self-managed phy (iwlwifi LAR, ath12k) may carry its own domain;
+        # if it is still "00" the global one applies.
+        scope = "global"
+        if domains.get(self.phy):
+            scope = self.phy
+        country = domains.get(scope)
+        if country:
+            self.log.debug("reg domain for %s is %s (%s)", self.name, country, scope)
         else:
-            self.log.debug("reg domain set to %s", " ".join(regdomain))
-            self.log.debug("see 'iw reg get' for details")
+            self.log.warning(
+                "reg domain appears unset. consider setting it with "
+                "'sudo wlanpi-reg-domain set XX' or 'iw reg set XX'"
+            )
+            self.log.warning(
+                "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
+            )
 
     def reset_interface(self) -> None:
         """Delete monitor interface and restore the primary interface to managed mode"""
@@ -356,6 +368,11 @@ class Interface:
         if iw_version:
             self.log.debug("%s", iw_version.strip())
 
+        # Remove a stale monitor vif left behind by a previous crash. Must run
+        # before the driver branches below flip requires_vif to False, or a
+        # stale wlanXprofiler from an earlier hostapd/listen-only run survives.
+        self._remove_mon_vif()
+
         cmds = []
         # Some drivers cannot inject from a monitor vif:
         #  - rtl88XXau does not support vifs at all
@@ -412,10 +429,6 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
-
-        # Remove a stale monitor vif left behind by a previous crash before
-        # recreating it
-        self._remove_mon_vif()
 
         # run the staging commands
         for cmd in cmds:
@@ -488,46 +501,43 @@ class Interface:
             else:
                 _run_staging_command(cmd)
 
-        # Set primary interface to AP mode
-        cmds = [
-            ["iw", "dev", f"{self.name}", "set", "type", "__ap"],
-            ["ip", "link", "set", f"{self.name}", "up"],
-        ]
+        # Do NOT `iw dev X set type __ap` here. mac80211 refuses an iftype
+        # change on a running interface (-EBUSY) unless the driver implements
+        # change_interface; only iwlwifi does among our adapters (ath12k, mt76,
+        # mt79xx all fail). hostapd's nl80211 driver does the managed->AP
+        # switch itself, including the down/retry dance
+        # (driver_nl80211.c: wpa_driver_nl80211_set_mode_impl), so the
+        # primary is left UP in managed mode after the LAR scan.
 
         # Remove a stale monitor vif before recreating it
         self._remove_mon_vif()
 
         # Create monitor interface on same phy if needed
+        cmds: list[list[str]] = []
         if self.requires_vif:
-            cmds.extend(
+            cmds = [
                 [
-                    [
-                        "iw",
-                        "phy",
-                        f"{self.phy}",
-                        "interface",
-                        "add",
-                        f"{self.mon}",
-                        "type",
-                        "monitor",
-                    ],
-                    ["ip", "link", "set", f"{self.mon}", "up"],
-                    # NOTE: We do NOT set monitor vif frequency here for hostapd mode.
-                    # The monitor vif will automatically inherit the channel/bandwidth
-                    # from the primary interface once hostapd starts. Setting it here
-                    # to HT20 conflicts with hostapd's HT80 configuration and causes
-                    # "Beacon set failed: -22 (Invalid argument)" errors.
-                ]
-            )
+                    "iw",
+                    "phy",
+                    f"{self.phy}",
+                    "interface",
+                    "add",
+                    f"{self.mon}",
+                    "type",
+                    "monitor",
+                ],
+                ["ip", "link", "set", f"{self.mon}", "up"],
+                # NOTE: We do NOT set monitor vif frequency here for hostapd mode.
+                # The monitor vif will automatically inherit the channel/bandwidth
+                # from the primary interface once hostapd starts. Setting it here
+                # to HT20 conflicts with hostapd's HT80 configuration and causes
+                # "Beacon set failed: -22 (Invalid argument)" errors.
+            ]
 
         # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
-            stdout = _run_staging_command(cmd).strip()
-            if stdout and "not supported" in stdout:
-                raise InterfaceError(
-                    f"{self.name} does not support required interface types"
-                )
+            _run_staging_command(cmd)
             # Short sleep between commands to allow driver to process
             time.sleep(0.1)
 
@@ -547,10 +557,6 @@ class Interface:
                 self.mon,
                 operstate,
             )
-
-        # NOTE: We do NOT bring the primary interface UP here.
-        # hostapd will manage its state. Bringing it UP manually causes
-        # "Name not unique on network" errors and crashes on some hardware.
 
         self.log.debug("finish stage_interface_hostapd")
 
@@ -614,11 +620,7 @@ class Interface:
         # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
-            stdout = _run_staging_command(cmd).strip()
-            if stdout and "not supported" in stdout:
-                raise InterfaceError(
-                    f"{self.name} does not support required interface types"
-                )
+            _run_staging_command(cmd)
             time.sleep(0.1)
 
         # Verify monitor interface is in monitor mode
@@ -823,6 +825,30 @@ class Interface:
             return "--band 6"
         else:
             return ""
+
+    @staticmethod
+    def parse_ap_capabilities(iw_phy_info: str) -> dict[str, bool]:
+        """Return {"he": bool, "eht": bool}: can this phy run an 11ax / 11be AP?
+
+        Parsed from `iw phy phyX info` lines such as
+        "HE Iftypes: AP, P2P-GO" / "EHT Iftypes: AP". A Wi-Fi 5 phy has none.
+        hostapd 2.12 dies with "MLD: Not supported by the driver" when asked for
+        ieee80211be on a phy without EHT AP support, so callers gate on this.
+        """
+        # shortcut: phy-wide, not per-band; split by "Band N:" if a phy ever
+        # advertises HE/EHT AP on one band only. iw does not expose MLO
+        # support, so an EHT-capable but non-MLO phy is not detectable here.
+        caps = {"he": False, "eht": False}
+        for gen, key in (("HE", "he"), ("EHT", "eht")):
+            for m in re.finditer(rf"^\s*{gen} Iftypes:\s*(.+)$", iw_phy_info, re.M):
+                if "AP" in {t.strip() for t in m.group(1).split(",")}:
+                    caps[key] = True
+                    break
+        return caps
+
+    def get_ap_capabilities(self) -> dict[str, bool]:
+        """Query `iw phy <phy> info` for 11ax/11be AP support"""
+        return self.parse_ap_capabilities(run_command(["iw", "phy", self.phy, "info"]))
 
     @staticmethod
     def get_channels_status(iw_phy_channels: str) -> dict[str, Any]:

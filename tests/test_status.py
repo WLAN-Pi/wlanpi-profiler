@@ -40,7 +40,7 @@ class TestCountryCodeDetection:
 
     def test_detect_country_code_success_us(self):
         """Test successful detection of US country code"""
-        mock_output = "country US: DFS-FCC\n"
+        mock_output = "global\ncountry US: DFS-FCC\n"
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = mock_output
@@ -52,7 +52,7 @@ class TestCountryCodeDetection:
 
     def test_detect_country_code_success_gb(self):
         """Test successful detection of GB country code"""
-        mock_output = "country GB: DFS-ETSI\n"
+        mock_output = "global\ncountry GB: DFS-ETSI\n"
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = mock_output
@@ -62,28 +62,49 @@ class TestCountryCodeDetection:
             country = detect_country_code()
             assert country == "GB"
 
-    def test_detect_country_code_success_first_match(self):
-        """Test that first valid country code is returned when multiple exist"""
-        mock_output = "country DE: DFS-ETSI\ncountry FR: DFS-ETSI\n"
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = mock_output
-        mock_result.stderr = ""
+    # Real `iw reg get` on a WLAN Pi with an unset global domain and a
+    # self-managed ath12k on phy1 (192.168.6.61 boot state).
+    MIXED = (
+        "global\ncountry 00: DFS-UNSET\n\nphy#1 (self-managed)\ncountry US: DFS-FCC\n\n"
+    )
 
+    def test_self_managed_phy_uses_its_own_domain(self):
+        mock_result = MagicMock(returncode=0, stdout=self.MIXED, stderr="")
         with patch("subprocess.run", return_value=mock_result):
-            country = detect_country_code()
-            assert country == "DE"  # First match
+            assert detect_country_code("phy1") == "US"
+
+    def test_other_phy_does_not_borrow_self_managed_domain(self):
+        """phy0 falls back to global (00) and must fail, not inherit phy1's US."""
+        mock_result = MagicMock(returncode=0, stdout=self.MIXED, stderr="")
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(CountryCodeError, match="No regulatory domain set"):
+                detect_country_code("phy0")
+
+    def test_self_managed_phy_still_00_falls_back_to_global(self):
+        """iwlwifi in monitor mode (LAR not settled) shows phy#0 country 00;
+        the global domain applies until LAR overrides it."""
+        out = "global\ncountry US: DFS-FCC\n\nphy#0 (self-managed)\ncountry 00: DFS-UNSET\n"
+        mock_result = MagicMock(returncode=0, stdout=out, stderr="")
+        with patch("subprocess.run", return_value=mock_result):
+            assert detect_country_code("phy0") == "US"
+
+    def test_parse_reg_domains(self):
+        from profiler.status import parse_reg_domains
+
+        assert parse_reg_domains(self.MIXED) == {"global": None, "phy1": "US"}
+        assert parse_reg_domains("global\ncountry 99: DFS-UNSET\n") == {"global": None}
+        assert parse_reg_domains("") == {}
 
     def test_detect_country_code_rejects_numeric(self):
         """Test that numeric codes like '99' are rejected (only alpha codes)"""
-        mock_output = "country 99:\n"  # Invalid numeric code
+        mock_output = "global\ncountry 99: DFS-UNSET\n"  # Invalid numeric code
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = mock_output
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result):
-            with pytest.raises(CountryCodeError, match="No valid country code found"):
+            with pytest.raises(CountryCodeError, match="No regulatory domain set"):
                 detect_country_code()
 
     def test_detect_country_code_no_match(self):
@@ -95,7 +116,7 @@ class TestCountryCodeDetection:
         mock_result.stderr = ""
 
         with patch("subprocess.run", return_value=mock_result):
-            with pytest.raises(CountryCodeError, match="No valid country code found"):
+            with pytest.raises(CountryCodeError, match="No regulatory domain set"):
                 detect_country_code()
 
     def test_detect_country_code_iw_command_fails(self):

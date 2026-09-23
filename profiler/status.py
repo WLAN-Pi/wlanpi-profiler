@@ -82,12 +82,32 @@ class CountryCodeError(Exception):
     """Country code detection failed"""
 
 
-def detect_country_code() -> str:
-    """
-    Detect regulatory country code from system using iw reg get.
+def parse_reg_domains(iw_reg_get: str) -> dict[str, str | None]:
+    """Parse `iw reg get` into {"global": "US", "phy0": None, ...}.
 
-    This should be called EARLY in profiler startup, before expensive operations
-    like interface setup, so we can fail fast if country code cannot be detected.
+    Values are the 2-letter alpha country, or None when unset ("00"/"99").
+    Self-managed phys (iwlwifi LAR, ath12k) carry their own regdomain and
+    ignore the global one, so callers must look at the right block.
+    """
+    domains: dict[str, str | None] = {}
+    block = None
+    for line in iw_reg_get.splitlines():
+        if line.startswith("global"):
+            block = "global"
+        elif m := re.match(r"^phy#(\d+)", line):
+            block = f"phy{m.group(1)}"
+        elif block and (m := re.match(r"^country (\w{2}):", line)):
+            code = m.group(1)
+            domains[block] = code if code.isalpha() else None
+    return domains
+
+
+def detect_country_code(phy: str = "") -> str:
+    """
+    Detect the regulatory country code that applies to ``phy`` via `iw reg get`.
+
+    A self-managed phy (iwlwifi, ath12k) uses its own block; otherwise the
+    global domain. Never borrows the country from a different phy.
 
     Returns:
         str: Two-letter country code (e.g., 'US', 'GB', 'DE')
@@ -111,24 +131,23 @@ def detect_country_code() -> str:
             log.error(error_msg)
             raise CountryCodeError(error_msg)
 
-        # Parse output looking for "country XX:" lines
-        # Example: "country US: DFS-FCC"
-        # We want valid 2-letter alpha codes, not numeric codes like "99"
-        country_pattern = re.compile(r"^country ([A-Z]{2}):", re.MULTILINE)
-        matches = country_pattern.findall(result.stdout)
+        domains = parse_reg_domains(result.stdout)
+        # Prefer the phy's own (self-managed) domain; a self-managed phy that
+        # is still "00" (iwlwifi before LAR settles) falls back to global.
+        country_code = domains.get(phy) or domains.get("global")
 
-        if not matches:
+        if not country_code:
             error_msg = (
-                "No valid country code found in 'iw reg get' output. "
-                "Regulatory domain may not be set."
+                "No regulatory domain set ('iw reg get' shows country 00). "
+                "Set one with: sudo wlanpi-reg-domain set XX  (or: iw reg set XX)"
             )
             log.error(error_msg)
             raise CountryCodeError(error_msg)
 
-        # Return the first valid 2-letter country code found
-        country_code = matches[0]
         return country_code
 
+    except CountryCodeError:
+        raise
     except subprocess.TimeoutExpired as err:
         error_msg = "Timeout while detecting country code (iw reg get)"
         log.error(error_msg)

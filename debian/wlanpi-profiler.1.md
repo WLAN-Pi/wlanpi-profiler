@@ -18,7 +18,7 @@ Note that wlanpi-profiler requires elevated permissions to stage the wireless in
 
 **profiler** [ _OPTIONS_ ]
 
-_OPTIONS_ := { -h | -c | -f | -i | -s | --passphrase | --config | --files_path | --hostname_ssid | --debug | --expert | --no-interface-prep | --listen-only | --security-mode | --no11ax | --11be | --no11be | --noprofilertlv | --oui_update | --pcap | --no_bpf_filters | --list_interfaces | --ap-mode | --fakeap | --version }
+_OPTIONS_ := { -h | -c | -f | -i | -s | --passphrase | --config | --files_path | --hostname_ssid | --debug | --expert | --no-interface-prep | --listen-only | --security-mode | --no11ax | --11be | --no11be | --noprofilertlv | --oui_update | --pcap | --no_bpf_filters | --list-interfaces | --ap-mode | --fakeap | --version }
 
 # OPTIONS
 
@@ -148,9 +148,9 @@ _OPTIONS_ := { -h | -c | -f | -i | -s | --passphrase | --config | --files_path |
 
 : Removes BPF filters from sniffer() but may impact profiler performance.
 
-**--list_interfaces**
+**--list-interfaces**, **--list_interfaces**
 
-: Print out a list of interfaces with an 802.11 stack.
+: Print out a list of interfaces with an 802.11 stack. Does not require root.
 
 **--ap-mode**
 

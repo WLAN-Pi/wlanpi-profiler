@@ -48,8 +48,9 @@ __RUNNING_PROCESSES: list[mp.Process] = []  # Global list of child processes for
 
 # Session start time for state file (set in start(), used by signal handlers)
 _session_start_time: str = ""
-# Track if we're in pcap analysis mode (set in start(), used by exception handlers)
-_pcap_analysis_mode: bool = False
+# True for read-only modes (--pcap, --list-interfaces) that own no session and
+# must never write status/last-session files (set in start()).
+_read_only_mode: bool = False
 
 
 def removeVif() -> None:
@@ -76,6 +77,11 @@ def _shutdown(
 
     Shared by the SIGINT/SIGTERM and hostapd-watchdog handlers.
     """
+    if _read_only_mode:
+        # No interface staged, no hostapd, no session: never touch the status,
+        # info or last-session files of a profiler service that may be running.
+        os._exit(exit_code)
+
     # Stop the hostapd watchdog first so it cannot re-trigger during cleanup
     if __HOSTAPD_MGR is not None:
         __HOSTAPD_MGR._watchdog_stop.set()
@@ -185,12 +191,41 @@ def are_we_root() -> bool:
     return os.geteuid() == 0
 
 
+def apply_ap_capability_gate(
+    general: dict[str, Any], caps: dict[str, bool], iface: Any, log: logging.Logger
+) -> None:
+    """Downgrade 11ax/11be to what the phy can actually do in AP mode.
+
+    hostapd 2.12 exits ("MLD: Not supported by the driver") if asked for
+    ieee80211be on a non-EHT phy (MT7921, MT7612U, ...). Mutates ``general``.
+    """
+    if not general.get("he_disabled") and not caps["he"]:
+        log.warning(
+            "%s (%s) has no 802.11ax AP support; auto-disabling 11ax and 11be",
+            iface.name,
+            iface.driver,
+        )
+        general["he_disabled"] = True
+        general["be_disabled"] = True
+    elif not general.get("be_disabled") and not caps["eht"]:
+        log.warning(
+            "%s (%s) has no 802.11be AP support; auto-disabling 11be",
+            iface.name,
+            iface.driver,
+        )
+        general["be_disabled"] = True
+
+
 def start(args: argparse.Namespace) -> None:
     """Main entry point for the WLAN Pi Profiler application."""
-    global _session_start_time, _pcap_analysis_mode
+    global _session_start_time, _read_only_mode
 
     _session_start_time = datetime.now(UTC).isoformat()
-    _pcap_analysis_mode = getattr(args, "pcap_analysis", False)
+    # pcap analysis and --list-interfaces never own a session; never let them
+    # overwrite the last real session's status.
+    _read_only_mode = bool(
+        getattr(args, "pcap_analysis", False) or getattr(args, "list_interfaces", False)
+    )
     log = logging.getLogger(inspect.stack()[0][3])
 
     try:
@@ -199,8 +234,8 @@ def start(args: argparse.Namespace) -> None:
         pass
     except SystemExit as e:
         # Write state file for non-zero exits in live mode only
-        # Skip for: normal exit (0), pytest, needs root (126), pcap analysis
-        if e.code not in (0, "pytest", 126) and not _pcap_analysis_mode:
+        # Skip for: normal exit (0), pytest, needs root (126), read-only modes
+        if e.code not in (0, "pytest", 126) and not _read_only_mode:
             from profiler.status import (
                 get_status,
                 write_last_session,
@@ -224,7 +259,7 @@ def start(args: argparse.Namespace) -> None:
     except Exception as e:
         log.exception(f"Uncaught exception: {e}")
         # Only write last-session file for live mode
-        if not _pcap_analysis_mode:
+        if not _read_only_mode:
             from profiler.status import write_last_session
 
             write_last_session(
@@ -242,17 +277,22 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     if args.pytest:
         sys.exit("pytest")
 
-    # Only require root for live capture mode, not for pcap analysis
-    if not args.pcap_analysis and not are_we_root():
+    # Read-only utility modes: pcap analysis and --list-interfaces only read
+    # sysfs and run unprivileged tools, so they do not need root.
+    read_only = args.pcap_analysis or args.list_interfaces
+
+    # Only require root for live capture mode
+    if not read_only and not are_we_root():
         log.error("profiler must be run with root permissions... exiting...")
-        log.error("Note: analyzing pcap files with --pcap does not require root")
+        log.error("Note: --pcap and --list-interfaces do not require root")
         # Exit code 126 = "command invoked cannot execute" (standard Unix convention)
         # This is not a real session failure, so we skip writing state files for this code
         sys.exit(126)
 
     # Write initial status as early as possible (after root check, before tool checks)
-    # This allows service monitoring to detect failures
-    if not args.pcap_analysis:
+    # This allows service monitoring to detect failures. Skipped for read-only
+    # utility modes (the status file lives in /run and is not a real session).
+    if not read_only:
         from profiler.status import ProfilerState, write_status
 
         write_status(state=ProfilerState.STARTING, pid=os.getpid())
@@ -261,7 +301,9 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     # and offline analysis respond quickly. --list-interfaces runs first at
     # runtime, so it takes precedence when combined with other flags.
     if args.list_interfaces:
-        helpers.check_required_tools(required=helpers.LIVE_REQUIRED_TOOLS, optional=[])
+        helpers.check_required_tools(
+            required=helpers.LIVE_REQUIRED_TOOLS, optional=[], record_status=False
+        )
     elif args.pcap_analysis or args.clean or args.oui_update:
         helpers.check_required_tools(required=helpers.PCAP_REQUIRED_TOOLS, optional=[])
     else:
@@ -380,6 +422,15 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
     # Arguments (keep separate as it's user-provided)
     log.debug("Arguments: %s", vars(args))
 
+    # Read-only: needs no config, no data dirs, no root. Dispatched before the
+    # mutating utility modes so it really does take precedence over them.
+    if args.list_interfaces:
+        if __IFACE is None:
+            log.error("List interfaces not supported on this platform")
+            sys.exit(-1)
+        __IFACE.print_interface_information()
+        sys.exit(0)
+
     if args.oui_update:
         # run manuf oui update and exit
         from profiler.status import delete_status
@@ -429,21 +480,6 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
         files_path = config["GENERAL"].get("files_path")
         reports_dir = os.path.join(str(files_path[0]), "reports")
         helpers.files_cleanup(reports_dir, args.yes)
-        # Clean up status file before exit (utility command, not a real profiler run)
-        from profiler.status import delete_status
-
-        delete_status()
-        sys.exit(0)
-
-    if args.list_interfaces:
-        if __IFACE is None:
-            log.error("List interfaces not supported on this platform")
-            # Clean up status file before exit (utility command, not a real profiler run)
-            from profiler.status import delete_status
-
-            delete_status()
-            sys.exit(-1)
-        __IFACE.print_interface_information()
         # Clean up status file before exit (utility command, not a real profiler run)
         from profiler.status import delete_status
 
@@ -649,7 +685,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
                     __IFACE.stage_interface_listen_only()
                     log.debug("finish interface setup and staging for listen-only...")
                 elif ap_mode:
-                    # Hostapd mode: set wlan0 to AP mode, create wlan0profiler for sniffing
+                    # Hostapd mode: leave wlan0 managed (hostapd switches it to AP), create wlan0profiler for sniffing
                     log.debug("Staging interface for hostapd AP mode")
                     # Store original interface name for hostapd (wlan0)
                     config["GENERAL"]["ap_interface"] = __IFACE.name
@@ -678,7 +714,7 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
         # Detect country code AFTER interface staging (LAR for iwlwifi requires interface up)
         try:
-            country_code = detect_country_code()
+            country_code = detect_country_code(__IFACE.phy)
             log.info(f"Detected country code: {country_code}")
         except CountryCodeError as e:
             log.error(f"Failed to detect country code: {e}")
@@ -754,6 +790,10 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
             # update ssid record for sharing with other apps like FPMS for QR code generation
             helpers.update_ssid_record((config.get("GENERAL") or {}).get("ssid") or "")
+
+            apply_ap_capability_gate(
+                config["GENERAL"], __IFACE.get_ap_capabilities(), __IFACE, log
+            )
 
             try:
                 __HOSTAPD_MGR = HostapdManager(config["GENERAL"], country_code, log)

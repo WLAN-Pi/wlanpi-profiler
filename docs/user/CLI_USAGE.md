@@ -36,7 +36,7 @@ usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--pas
                 [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug] [--no-interface-prep]
                 [--noAP] [--security-mode {wpa2,ft-wpa2,wpa3-mixed,ft-wpa3-mixed}] [--no11ax] [--11be | --no11be]
                 [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--pcap PCAP]
-                [--no_bpf_filters] [--list_interfaces] [--ap-mode | --fakeap] [--version]
+                [--no_bpf_filters] [--list-interfaces] [--ap-mode | --fakeap] [--version]
 
 wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler
 
@@ -62,7 +62,8 @@ optional arguments:
   --oui_update          initiates update of OUI database (requires Internet connection)
   --read PCAP           read and analyze association request frames from pcap
   --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance
-  --list_interfaces     print out a list of interfaces with an 80211 stack
+  --list-interfaces, --list_interfaces
+                        print out a list of interfaces with an 80211 stack (no root needed)
   --version, -V         show program's version number and exit
 ```
 
@@ -154,7 +155,7 @@ sudo profiler --debug
 See what wireless interfaces are available:
 
 ```bash
-sudo profiler --list_interfaces
+profiler --list-interfaces
 ```
 
 #### Update OUI database
