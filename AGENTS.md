@@ -6,17 +6,17 @@ Guidance for coding agents working in wlanpi-profiler.
 
 Mark any deliberate simplification that cuts a real corner with a known ceiling
 (naive heuristic, phy-wide instead of per-band, global lock, O(n^2) scan) with a
-`shortcut:` comment naming the ceiling and the upgrade path:
+`ponytail:` comment naming the ceiling and the upgrade path:
 
 ```python
-# shortcut: phy-wide, not per-band; split by "Band N:" if a phy ever
+# ponytail: phy-wide, not per-band; split by "Band N:" if a phy ever
 # advertises HE/EHT AP on one band only.
 ```
 
-Do not use any other marker (`ponytail:`, `HACK:`, `XXX:`) for this. `TODO:` is
+Do not use any other marker (`shortcut:`, `HACK:`, `XXX:`) for this. `TODO:` is
 for missing work, not for a working simplification.
 
-Find the ledger with: `rg -n "shortcut:" profiler tests`
+Find the ledger with: `rg -n "ponytail:" profiler tests`
 
 ## Verify
 

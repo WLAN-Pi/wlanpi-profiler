@@ -835,7 +835,7 @@ class Interface:
         hostapd 2.12 dies with "MLD: Not supported by the driver" when asked for
         ieee80211be on a phy without EHT AP support, so callers gate on this.
         """
-        # shortcut: phy-wide, not per-band; split by "Band N:" if a phy ever
+        # ponytail: phy-wide, not per-band; split by "Band N:" if a phy ever
         # advertises HE/EHT AP on one band only. iw does not expose MLO
         # support, so an EHT-capable but non-MLO phy is not detectable here.
         caps = {"he": False, "eht": False}
