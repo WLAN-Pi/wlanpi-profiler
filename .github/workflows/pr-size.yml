@@ -1,0 +1,12 @@
+name: PR size
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-size:
+    uses: WLAN-Pi/gh-workflows/.github/workflows/pr-size.yml@main
