@@ -614,8 +614,9 @@ class Interface:
                     run_command(cmd, suppress_output=True)
                 else:
                     _run_staging_command(cmd)
-
-        self._await_ir_allowed()
+            # Inside the block: its rescans must not run with a same-radio
+            # monitor up (BE200 firmware crash, wlanpi-core#314).
+            self._await_ir_allowed()
 
         # Do NOT `iw dev X set type __ap` here. mac80211 refuses an iftype
         # change on a running interface (-EBUSY) unless the driver implements

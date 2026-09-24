@@ -753,6 +753,35 @@ class TestAwaitIrAllowed:
         assert waited == 0
         assert calls == [["iw", "phy", "phy0", "channels"]]
 
+    def test_disabled_channel_is_not_waited_on(self, monkeypatch):
+        # iw puts "(disabled)" on the channel line; ch36 is not first in the
+        # band here because the parser drops the flag on a band's first channel.
+        output = (
+            "Band 2:\n\t* 5170 MHz [34] \n"
+            "\t* 5180 MHz [36] (disabled)\n\t  No IR\n\t* 5200 MHz [40] \n"
+        )
+        iface = _iface("ath12k_wifi7_pci")
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command",
+            lambda cmd, *a, **k: calls.append(cmd) or output,
+        )
+        assert iface._channel_flags(5180).disabled
+        calls.clear()
+        iface._await_ir_allowed(timeout=20.0, rescan_every=5.0)
+        assert calls == [["iw", "phy", "phy0", "channels"]]
+
+    @pytest.mark.parametrize("output", ["", "command failed", "Band 2:\n"])
+    def test_missing_channel_data_does_not_wait(self, monkeypatch, output):
+        iface = _iface("ath12k_wifi7_pci")
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command",
+            lambda cmd, *a, **k: calls.append(cmd) or output,
+        )
+        iface._await_ir_allowed(timeout=20.0, rescan_every=5.0)
+        assert calls == [["iw", "phy", "phy0", "channels"]]
+
 
 class TestParseApCapabilities:
     def test_wifi7_phy(self):
@@ -907,10 +936,52 @@ class TestLeaveRadioAsFound:
             ["ip", "link", "set", "wlan0", "down"],
         ]
         scan = calls.index(["iw", "wlan0", "scan"])
-        assert calls[scan + 1 : scan + 1 + len(paused)] == [
+        # The No IR check (#299) stays inside the pause, then monitors return.
+        assert calls[scan + 1] == ["iw", "phy", "phy0", "channels"]
+        assert calls[scan + 2 : scan + 2 + len(paused)] == [
             ["ip", "link", "set", m, "up"] for m in paused
         ]
         assert not any(c[3:] == ["wlanpi1", "down"] for c in calls if len(c) > 4)
+
+    def test_no_ir_rescans_run_with_monitors_down_and_primary_up(self, monkeypatch):
+        """#299 rescans must not recreate the #314 scan-with-monitor-up crash."""
+        iface = _iface("iwlwifi")
+        calls = _record_staging(monkeypatch, iface)
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: self._phys())
+        )
+        monkeypatch.setattr("profiler.interface._admin_up", lambda i: i == "wlanpi0")
+        clock, polls = [0.0], [0]
+
+        def fake_run(cmd, *a, **k):
+            calls.append(cmd)
+            if cmd[-1] == "channels":
+                polls[0] += 1
+                return _CH36.format(flags="\t  No IR\n" if polls[0] <= 7 else "")
+            if cmd == ["iw", "reg", "get"]:
+                return TestAwaitIrAllowed.SELF_MANAGED
+            return ""
+
+        def fake_sleep(sec):
+            clock[0] += sec
+
+        monkeypatch.setattr("profiler.interface.run_command", fake_run)
+        monkeypatch.setattr("profiler.interface.time.monotonic", lambda: clock[0])
+        monkeypatch.setattr("profiler.interface.time.sleep", fake_sleep)
+        iface.frequency = 5180
+        iface.stage_interface_hostapd()
+
+        up = {"wlanpi0"}
+        scans = 0
+        for cmd in calls:
+            if cmd[:3] == ["ip", "link", "set"] and len(cmd) == 5:
+                (up.add if cmd[4] == "up" else up.discard)(cmd[3])
+            elif cmd == ["iw", "wlan0", "scan"]:
+                scans += 1
+                assert up == {"wlan0"}, f"scan with {up} up"
+            elif "interface" in cmd and "add" in cmd:
+                assert "wlanpi0" in up  # restored before the vif is added
+        assert scans == 2  # LAR scan plus one rescan at 5 s
 
     @pytest.mark.parametrize(
         "stage", ["stage_interface_fakeap", "stage_interface_listen_only"]
