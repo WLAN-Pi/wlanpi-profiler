@@ -2,9 +2,9 @@
 #
 # Used by build-package-native.sh, which picks the Debian release (SUITE) and
 # the architecture (--platform), and tags the image
-# wlanpi-profiler-builder:<suite>-<arch>, for example:
+# localhost/wlanpi-profiler-builder:<suite>-<arch>, for example:
 #   podman build --platform linux/arm64 -f Dockerfile.build \
-#       --build-arg SUITE=trixie -t wlanpi-profiler-builder:trixie-arm64 .
+#       --build-arg SUITE=trixie -t localhost/wlanpi-profiler-builder:trixie-arm64 .
 
 ARG SUITE=trixie
 

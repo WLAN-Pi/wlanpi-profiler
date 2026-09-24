@@ -61,7 +61,9 @@ if [ "$ARCH" != "$HOST_ARCH" ]; then
     fi
 fi
 
-IMAGE="wlanpi-profiler-builder:${SUITE}-${ARCH}"
+# Fully qualified: with --platform and a terminal attached, podman asks which
+# registry a short name means instead of using the local image.
+IMAGE="localhost/wlanpi-profiler-builder:${SUITE}-${ARCH}"
 
 # Clean up old build manifest, stale build trees, and previously built
 # packages. Without this, setuptools reuses build/lib and repackages files that

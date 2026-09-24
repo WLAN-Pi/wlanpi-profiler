@@ -6,7 +6,7 @@ set -e
 
 PACKAGE_NAME="wlanpi-profiler"
 CONTAINER_NAME="wlanpi-profiler-test"
-IMAGE_NAME="debian:bookworm"
+IMAGE_NAME="docker.io/library/debian:trixie"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
