@@ -1,3 +1,16 @@
+wlanpi-profiler (2.1.4-3) unstable; urgency=medium
+
+  * Never start wlanpi-profiler at boot. The unit no longer has an
+    [Install] section, so it can't be enabled, and upgrading removes the
+    boot-time enable symlink that releases before 2.1.2 created by
+    default; on those devices the profiler kept starting an AP at boot
+    after every upgrade. Start it on demand with 'systemctl start
+    wlanpi-profiler'; Core and the WebUI are unaffected. The front panel
+    profiler menu, which reported a disabled service as "not available",
+    works again (a static unit passes its is-enabled check).
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 23 Sep 2026 21:42:59 -0400
+
 wlanpi-profiler (2.1.4-2) unstable; urgency=medium
 
   * Rebuild with the setuptools >= 84 build requirement from

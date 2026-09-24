@@ -187,12 +187,12 @@ Not all clients support all features. The profiler only reports what the client 
 
 ## Configuration
 
-### How do I make profiler start automatically?
+### Can profiler start automatically at boot?
 
-Enable the systemd service:
+No. The profiler starts an AP on a radio it picks itself, so the service never starts at boot and can't be enabled. Start it when you need it:
 
 ```bash
-sudo systemctl enable wlanpi-profiler
+sudo systemctl start wlanpi-profiler
 ```
 
 ### Where is the configuration file?

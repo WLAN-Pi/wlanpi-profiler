@@ -1,3 +1,17 @@
+Release 2.1.4-3
+
+**The profiler never starts at boot**
+
+- `wlanpi-profiler.service` no longer has an `[Install]` section, so it can't
+  be enabled. Upgrading also removes the boot-time enable symlink that
+  releases before 2.1.2 created by default: on devices first installed with
+  one of those, the 2.1.2 fix never applied and the profiler kept starting an
+  AP at boot after every upgrade. Start it on demand with
+  `systemctl start wlanpi-profiler`, or from Core, the WebUI or the front
+  panel.
+- The front panel profiler menu works again on devices where the service was
+  disabled; it treated `disabled` as "not available".
+
 Release 2.1.4
 
 **hostapd mode fixes (#283)**
