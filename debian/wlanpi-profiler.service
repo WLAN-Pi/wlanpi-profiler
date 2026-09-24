@@ -1,4 +1,8 @@
 # wlanpi-profiler.service
+#
+# No [Install] section on purpose: the profiler starts an AP on a radio it
+# picks itself, so it must never start at boot. A static unit can't be
+# enabled; start it on demand with `systemctl start wlanpi-profiler`.
 
 [Unit]
 Description=Wi-Fi client capabilities analyzer tool
@@ -11,6 +15,3 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
 ProtectHome=yes
-
-[Install]
-WantedBy=multi-user.target

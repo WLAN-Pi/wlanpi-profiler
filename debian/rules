@@ -47,8 +47,10 @@ override_dh_auto_install:
 
 override_dh_installsystemd:
 	# wlanpi-profiler starts an AP and picks a wireless interface on its
-	# own; don't enable or start it automatically on install/upgrade.
-	# It's still installable via `systemctl enable --now wlanpi-profiler`.
+	# own; never enable or start it on install/upgrade. The unit is static
+	# (no [Install]) so it can't start at boot; debian/postinst removes the
+	# enable symlink left by releases before 2.1.2. Start it on demand with
+	# `systemctl start wlanpi-profiler`.
 	dh_installsystemd --no-enable --no-start
 
 override_dh_installexamples:

@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+# The profiler starts an AP on a radio it picks itself, so it must never
+# start at boot. The unit is static (no [Install]), so it can't be enabled
+# again; remove the enable symlink that releases before 2.1.2 created by
+# default. A leftover symlink still starts a static unit at boot.
+if [ "$1" = "configure" ]; then
+    deb-systemd-helper purge wlanpi-profiler.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/multi-user.target.wants/wlanpi-profiler.service
+    # Load the static unit now rather than at the next boot.
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0
