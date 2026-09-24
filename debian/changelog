@@ -1,3 +1,17 @@
+wlanpi-profiler (2.1.5-1) unstable; urgency=medium
+
+  * On Intel BE200 (iwlwifi), the profiler takes the radio's other up
+    monitors (Core's wlanpiN) down for its LAR scan and brings them back
+    up after. With them up, the scan crashed the firmware, No-IR was not
+    cleared and the profiler exited without starting an AP
+    (wlanpi-core#314).
+  * Stopping the profiler leaves the primary interface in the admin
+    state it was found in instead of always up. An idle, up managed
+    interface made channel changes on the radio's monitors fail with
+    EBUSY, so captures after the profiler got few or no frames.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 23 Sep 2026 23:06:47 -0400
+
 wlanpi-profiler (2.1.4-3) unstable; urgency=medium
 
   * Never start wlanpi-profiler at boot. The unit no longer has an
