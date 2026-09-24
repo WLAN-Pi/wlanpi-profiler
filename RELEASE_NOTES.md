@@ -1,3 +1,19 @@
+Release 2.1.5
+
+**The profiler leaves the radio as it found it**
+
+- On Intel BE200 (iwlwifi), the hostapd AP no longer fails to start while
+  Core's monitor on the same radio (`wlanpiN`) is up. The LAR scan that
+  clears No-IR crashed the firmware in that state, so the channel stayed
+  No-IR and the profiler exited. Staging now takes the radio's other up
+  monitors down before the scan and brings them back up afterwards, on their
+  channel. Other drivers are unchanged.
+- After the profiler stops, the primary interface is left down if it was
+  down before (the usual state on a WLAN Pi), instead of always up. An up,
+  idle managed interface made channel changes on the radio's monitors fail
+  with `EBUSY`, so a capture on that radio after the profiler got few or no
+  frames.
+
 Release 2.1.4-3
 
 **The profiler never starts at boot**
