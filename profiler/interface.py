@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, NO_IR_RESCAN_SEC, NO_IR_WAIT_SEC
 from .helpers import flag_last_object, run_command
 from .status import parse_reg_domains
 
@@ -351,6 +351,67 @@ class Interface:
             self.log.debug("run: %s", " ".join(cmd))
             run_command(cmd)
 
+    def _await_ir_allowed(
+        self, timeout: float = NO_IR_WAIT_SEC, rescan_every: float = NO_IR_RESCAN_SEC
+    ) -> None:
+        """Wait for No IR to lift on the AP frequency, with the primary up.
+
+        A self-managed phy (ath12k WCN785x) boots in the world domain with
+        5 GHz No IR and takes the country from beacons it hears (11d) a few
+        seconds after a scan, only while its primary stays up. The single LAR
+        scan is not enough, and adding the monitor vif and starting hostapd
+        right after it leaves the channel No IR (wlanpi-profiler#299). Rescan
+        and poll here, before any vif is added. Returns on timeout too;
+        validate_channel_for_ap reports a channel that stays restricted.
+        Only self-managed phys are waited on: elsewhere No IR under a set
+        country does not change over time. Disabled and radar (DFS) channels
+        are never waited on.
+        """
+
+        def restricted() -> bool:
+            ch = self._channel_flags(self.frequency)
+            return bool(ch and ch.no_ir and not ch.disabled and not ch.radar_detect)
+
+        if not restricted():
+            return
+        if self.phy not in parse_reg_domains(run_command(["iw", "reg", "get"])):
+            return  # not self-managed
+        self.log.info(
+            "%s MHz is No IR on %s; waiting up to %ss for the regulatory update",
+            self.frequency,
+            self.phy,
+            timeout,
+        )
+        start = time.monotonic()
+        next_scan = start + rescan_every
+        while time.monotonic() - start < timeout:
+            if time.monotonic() >= next_scan:
+                run_command(["iw", f"{self.name}", "scan"], suppress_output=True)
+                next_scan = time.monotonic() + rescan_every
+            time.sleep(1)
+            if not restricted():
+                self.log.info(
+                    "No IR lifted on %s MHz for %s after %.0fs",
+                    self.frequency,
+                    self.phy,
+                    time.monotonic() - start,
+                )
+                return
+        self.log.warning(
+            "%s MHz still No IR on %s after %ss", self.frequency, self.phy, timeout
+        )
+
+    def _channel_flags(self, freq: int) -> Any:
+        """Return the parsed `iw phy channels` entry for freq, or None."""
+        channels = self.get_channels_status(
+            run_command(["iw", "phy", f"{self.phy}", "channels"])
+        )
+        for band_channels in channels.values():
+            for ch in band_channels:
+                if ch.freq and int(ch.freq) == int(freq):
+                    return ch
+        return None
+
     def check_for_disabled_or_noir_channels(
         self, freq: int, iw_phy_channels: str, verbose: bool = False
     ) -> bool:
@@ -553,6 +614,9 @@ class Interface:
                     run_command(cmd, suppress_output=True)
                 else:
                     _run_staging_command(cmd)
+            # Inside the block: its rescans must not run with a same-radio
+            # monitor up (BE200 firmware crash, wlanpi-core#314).
+            self._await_ir_allowed()
 
         # Do NOT `iw dev X set type __ap` here. mac80211 refuses an iftype
         # change on a running interface (-EBUSY) unless the driver implements
