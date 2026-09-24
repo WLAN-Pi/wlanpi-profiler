@@ -2,23 +2,23 @@
 #
 # Build wlanpi-profiler Debian package using sbuild (cross-compilation)
 #
-# This script uses sbuild/schroot for cross-architecture builds.
-# Default target: Debian Bookworm (stable) on arm64 architecture
+# This script uses sbuild/schroot for cross-architecture builds. The arm64
+# chroot runs under qemu-user-static emulation on non-arm64 hosts.
+# Default target: Debian trixie on arm64 (what current WLAN Pi OS images run)
 #
 # Usage:
-#   ./build-package-cross.sh                    # Build for bookworm/arm64 (default)
-#   INPUTS_DISTRO=bullseye ./build-package-cross.sh  # Override distro
-#   INPUTS_ARCH=armhf ./build-package-cross.sh       # Override architecture
+#   ./build-package-cross.sh                         # Build for trixie/arm64 (default)
+#   INPUTS_ARCH=amd64 ./build-package-cross.sh       # Override architecture
 #
-# Supported architectures: arm64, armhf, amd64
-# Supported distros: bookworm, bullseye, buster
+# Supported distros: trixie. main needs Python 3.13, so older releases fail;
+# build bullseye packages from the debian/bullseye branch instead.
 #
 # Note: This requires sbuild setup. For simpler native builds, use build-package-native.sh instead.
 #
 
 set -e
 
-distro="${INPUTS_DISTRO:-bookworm}"
+distro="${INPUTS_DISTRO:-trixie}"
 arch="${INPUTS_ARCH:-arm64}"
 
 export DEBIAN_FRONTEND=noninteractive

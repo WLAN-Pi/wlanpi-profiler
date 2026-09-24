@@ -44,7 +44,8 @@ echo "Target is reachable."
 # Step 2: Build the package
 echo ""
 echo "Step 2: Building package..."
-if ! bash build-package-native.sh "$SUITE"; then
+# The WLAN Pi is arm64; build for it even on an x86_64 host (emulated).
+if ! ARCH="${ARCH:-arm64}" bash build-package-native.sh "$SUITE"; then
     echo ""
     echo "ERROR: Build failed!"
     echo "Deployment aborted."
