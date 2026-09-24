@@ -11,8 +11,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#branching-model) for the branching model:
 `main` targets Debian trixie and needs **Python 3.13**, which is what current
 WLAN Pi OS images run. On an older bullseye-based image (WLAN Pi OS v3.x) the
 steps below fail (for example, `pip install -r requirements.txt` needs Python
-3.10 or newer). Upgrade the WLAN Pi to a current image, or work from the
-`debian/bullseye` branch (`git checkout debian/bullseye`).
+3.10 or newer). Upgrade the WLAN Pi to a current image; developing on bullseye
+is not supported (the `debian/bullseye` branch is not maintained for it).
 
 ## Setup
 
