@@ -51,6 +51,7 @@ def test_defaults_to_host_arch_without_probe(tmp_path, uname, arch):
     assert f"--platform linux/{arch} " in calls[0]
     assert f"-t localhost/wlanpi-profiler-builder:trixie-{arch} ." in calls[0]
     assert calls[1].startswith(f"podman run --rm --platform linux/{arch} ")
+    assert f"localhost/wlanpi-profiler-builder:trixie-{arch}" in calls[1].split()
 
 
 def test_foreign_arch_probes_emulation_before_building(tmp_path):

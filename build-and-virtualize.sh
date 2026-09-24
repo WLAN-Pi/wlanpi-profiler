@@ -5,7 +5,9 @@
 set -e
 
 PACKAGE_NAME="wlanpi-profiler"
-CONTAINER_NAME="wlanpi-profiler-test"
+# Suite in the name: an older bookworm-based wlanpi-profiler-test container is
+# never reused for a trixie build.
+CONTAINER_NAME="wlanpi-profiler-test-trixie"
 IMAGE_NAME="docker.io/library/debian:trixie"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
