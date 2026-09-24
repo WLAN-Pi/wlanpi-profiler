@@ -586,6 +586,7 @@ class TestMonIsPrimary:
         iface.phy = "phy0"
         iface.channel = 36
         iface.frequency = 5180
+        monkeypatch.setattr(Interface, "build_iw_phy_list", staticmethod(lambda: []))
         iface.stage_interface_fakeap()
 
         assert iface.mon == "wlan0"
@@ -613,6 +614,7 @@ def _record_staging(monkeypatch, iface, get_mode="monitor", real_remove_vif=Fals
         Interface, "check_for_disabled_or_noir_channels", lambda self, *a, **k: False
     )
     monkeypatch.setattr("profiler.interface.time.sleep", lambda s: None)
+    monkeypatch.setattr(Interface, "build_iw_phy_list", staticmethod(lambda: []))
     return calls
 
 
@@ -797,3 +799,146 @@ class TestCheckRegDomain:
         out = "global\ncountry US: DFS-FCC\n\nphy#0 (self-managed)\ncountry 00: DFS-UNSET\n"
         text = self._run(monkeypatch, caplog, "phy0", out)
         assert "is US (global)" in text
+
+
+class TestLeaveRadioAsFound:
+    def _phys(self):
+        from collections import namedtuple
+
+        iface = namedtuple("iface", ["name", "ifindex", "addr", "type"])
+        phy = namedtuple("phy", ["phy_id", "interfaces"])
+        return [
+            phy(
+                "0",
+                [
+                    iface("wlan0", "3", "", "managed"),
+                    iface("wlanpi0", "4", "", "monitor"),
+                    iface("wlanpi9", "5", "", "monitor"),
+                ],
+            ),
+            phy("1", [iface("wlanpi1", "6", "", "monitor")]),
+        ]
+
+    @pytest.mark.parametrize(
+        "driver,paused", [("iwlwifi", ["wlanpi0"]), ("mt7925u", [])]
+    )
+    def test_lar_scan_pauses_same_radio_monitors_on_iwlwifi(
+        self, monkeypatch, driver, paused
+    ):
+        # wlanpi9 is down, wlanpi1 is on another radio: both left alone.
+        iface = _iface(driver)
+        calls = _record_staging(monkeypatch, iface)
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: self._phys())
+        )
+        monkeypatch.setattr(
+            "profiler.interface._admin_up",
+            lambda i: i in ("wlan0", "wlanpi0", "wlanpi1"),
+        )
+        iface.stage_interface_hostapd()
+        # Down before the primary is even touched (a scan with the monitor
+        # down still crashes if it was up when the primary came up).
+        assert calls[: len(paused) + 1] == [
+            *(["ip", "link", "set", m, "down"] for m in paused),
+            ["ip", "link", "set", "wlan0", "down"],
+        ]
+        scan = calls.index(["iw", "wlan0", "scan"])
+        assert calls[scan + 1 : scan + 1 + len(paused)] == [
+            ["ip", "link", "set", m, "up"] for m in paused
+        ]
+        assert not any(c[3:] == ["wlanpi1", "down"] for c in calls if len(c) > 4)
+
+    @pytest.mark.parametrize(
+        "stage", ["stage_interface_fakeap", "stage_interface_listen_only"]
+    )
+    def test_other_staging_modes_pause_too(self, monkeypatch, stage):
+        iface = _iface("iwlwifi")
+        calls = _record_staging(monkeypatch, iface)
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: self._phys())
+        )
+        monkeypatch.setattr("profiler.interface._admin_up", lambda i: i == "wlanpi0")
+        getattr(iface, stage)()
+        assert calls.index(["ip", "link", "set", "wlanpi0", "down"]) < calls.index(
+            ["ip", "link", "set", "wlan0", "down"]
+        )
+        assert calls.index(["iw", "wlan0", "scan"]) < calls.index(
+            ["ip", "link", "set", "wlanpi0", "up"]
+        )
+
+    def test_monitor_restored_when_staging_fails(self, monkeypatch):
+        from profiler.interface import InterfaceError
+
+        iface = _iface("iwlwifi")
+        calls = _record_staging(monkeypatch, iface)
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: self._phys())
+        )
+        monkeypatch.setattr("profiler.interface._admin_up", lambda i: i == "wlanpi0")
+
+        def fail_on_primary_up(cmd):
+            calls.append(cmd)
+            if cmd == ["ip", "link", "set", "wlan0", "up"]:
+                raise InterfaceError("boom")
+            return ""
+
+        monkeypatch.setattr(
+            "profiler.interface._run_staging_command", fail_on_primary_up
+        )
+        with pytest.raises(InterfaceError):
+            iface.stage_interface_hostapd()
+        assert calls[-1] == ["ip", "link", "set", "wlanpi0", "up"]
+
+    def test_failed_monitor_down_aborts_before_the_scan(self, monkeypatch):
+        from profiler.interface import InterfaceError
+
+        iface = _iface("iwlwifi")
+        calls = _record_staging(monkeypatch, iface)
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: self._phys())
+        )
+        monkeypatch.setattr("profiler.interface._admin_up", lambda i: i == "wlanpi0")
+
+        def fail_down(cmd):
+            calls.append(cmd)
+            raise InterfaceError("busy")
+
+        monkeypatch.setattr("profiler.interface._run_staging_command", fail_down)
+        with pytest.raises(InterfaceError):
+            iface.stage_interface_hostapd()
+        # Never lowered, so never "restored"; the scan never ran.
+        assert calls == [["ip", "link", "set", "wlanpi0", "down"]]
+
+    def test_admin_up_reads_iff_up_and_raises_when_unreadable(
+        self, tmp_path, monkeypatch
+    ):
+        from profiler import interface
+        from profiler.interface import InterfaceError
+
+        real_open = open
+
+        def fake_open(path, *a, **k):
+            return real_open(tmp_path / path.split("/")[-2], *a, **k)
+
+        (tmp_path / "up").write_text("0x1003\n")
+        (tmp_path / "down").write_text("0x1002\n")
+        monkeypatch.setattr("builtins.open", fake_open)
+        assert interface._admin_up("up") is True
+        assert interface._admin_up("down") is False
+        with pytest.raises(InterfaceError):
+            interface._admin_up("gone")
+
+    @pytest.mark.parametrize("was_up", [True, False])
+    def test_reset_restores_primary_admin_state(self, monkeypatch, was_up):
+        calls = []
+        monkeypatch.setattr(
+            "profiler.interface.run_command", lambda cmd, *a, **k: calls.append(cmd)
+        )
+        iface = _iface("mt7925u")
+        iface.primary_was_up = was_up
+        iface.reset_interface()
+        assert calls[-1] == (
+            ["ip", "link", "set", "wlan0", "up"]
+            if was_up
+            else ["iw", "dev", "wlan0", "set", "type", "managed"]
+        )

@@ -17,6 +17,8 @@ import re
 import subprocess
 import time
 from collections import namedtuple
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
@@ -41,6 +43,15 @@ def _run_staging_command(cmd: list[str]) -> str:
         raise InterfaceError(
             f"staging command failed: {' '.join(str(part) for part in cmd)} ({exc})"
         ) from exc
+
+
+def _admin_up(iface: str) -> bool:
+    """Return whether ``iface`` has IFF_UP set, raising if that can't be read."""
+    try:
+        with open(f"/sys/class/net/{iface}/flags") as f:
+            return bool(int(f.read(), 16) & 0x1)
+    except (OSError, ValueError) as exc:
+        raise InterfaceError(f"cannot read the admin state of {iface}: {exc}") from exc
 
 
 class InterfaceInformation:
@@ -81,6 +92,10 @@ class Interface:
         # Set when fakeAP staging switches the primary interface itself to
         # monitor mode (iwlwifi/88XXau); reset_interface must restore it.
         self.primary_staged_as_monitor = False
+        # Admin state of the primary before staging; reset_interface restores
+        # it. Leaving a managed interface up with no supplicant makes later
+        # channel sets on the radio's other monitors fail with EBUSY.
+        self.primary_was_up = True
 
     @property
     def mon_is_primary(self) -> bool:
@@ -104,6 +119,7 @@ class Interface:
         if not self.name:
             raise InterfaceError("interface name not set")
         self.driver = self.get_driver(self.name)
+        self.primary_was_up = _admin_up(self.name)
         eth_tool_info = self.get_ethtool_info(self.name)
         self.driver_version = self.get_driver_version(eth_tool_info)
         self.firmware_revision = self.get_firmware_revision(eth_tool_info)
@@ -278,6 +294,39 @@ class Interface:
                 "https://wireless.wiki.kernel.org/en/users/documentation/iw#updating_your_regulatory_domain"
             )
 
+    @contextmanager
+    def _radio_monitors_down(self) -> Iterator[None]:
+        """Hold the radio's other up monitors down while staging runs the LAR scan.
+
+        Intel iwlwifi firmware (BE200) crashes when an interface scans while a
+        monitor on the same radio is up (wlanpi-core#314), and the scan then
+        fails to clear No-IR. The monitors must be down before the primary
+        comes up, not only for the scan itself. mac80211 keeps each monitor's
+        channel across down/up, so they come back as they were. Other drivers
+        scan with the monitors up.
+        """
+        up: list[str] = []
+        if "iwlwifi" in self.driver:
+            up = [
+                i.name
+                for p in self.build_iw_phy_list()
+                if f"phy{p.phy_id}" == self.phy
+                for i in p.interfaces
+                if i.type == "monitor" and i.name != self.name and _admin_up(i.name)
+            ]
+        paused: list[str] = []
+        try:
+            for mon in up:
+                self.log.debug("taking %s down for the LAR scan (iwlwifi)", mon)
+                # Raises: scanning with it still up would crash the firmware.
+                _run_staging_command(["ip", "link", "set", mon, "down"])
+                paused.append(mon)
+            yield
+        finally:
+            for mon in paused:
+                self.log.debug("bringing %s back up", mon)
+                run_command(["ip", "link", "set", mon, "up"])
+
     def reset_interface(self) -> None:
         """Delete monitor interface and restore the primary interface to managed mode"""
         if self.mon_is_primary and not self.primary_staged_as_monitor:
@@ -290,12 +339,14 @@ class Interface:
                 ["iw", "dev", f"{self.mon}", "del"],
             ]
         # Restore the primary interface to managed so the device is left usable
-        # after hostapd (__ap) or monitor-mode staging.
+        # after hostapd (__ap) or monitor-mode staging, in the admin state it
+        # was found in.
         commands += [
             ["ip", "link", "set", f"{self.name}", "down"],
             ["iw", "dev", f"{self.name}", "set", "type", "managed"],
-            ["ip", "link", "set", f"{self.name}", "up"],
         ]
+        if self.primary_was_up:
+            commands.append(["ip", "link", "set", f"{self.name}", "up"])
         for cmd in commands:
             self.log.debug("run: %s", " ".join(cmd))
             run_command(cmd)
@@ -431,16 +482,17 @@ class Interface:
             ]
 
         # run the staging commands
-        for cmd in cmds:
-            self.log.debug("run: %s", " ".join(cmd))
-            if "monitor" in cmd:
-                stdout = _run_staging_command(cmd).strip()
-                if stdout:
-                    self.log.debug(stdout)
-            elif "scan" in cmd:
-                run_command(cmd, suppress_output=True)
-            else:
-                _run_staging_command(cmd)
+        with self._radio_monitors_down():
+            for cmd in cmds:
+                self.log.debug("run: %s", " ".join(cmd))
+                if "monitor" in cmd:
+                    stdout = _run_staging_command(cmd).strip()
+                    if stdout:
+                        self.log.debug(stdout)
+                elif "scan" in cmd:
+                    run_command(cmd, suppress_output=True)
+                else:
+                    _run_staging_command(cmd)
 
         # check if the interface is in monitor mode and operstate up
         # self.operstate = self.get_operstate(iface=self.mon)
@@ -494,12 +546,13 @@ class Interface:
         ]
 
         # Run LAR scan
-        for cmd in scan_cmds:
-            self.log.debug("run: %s", " ".join(cmd))
-            if "scan" in cmd:
-                run_command(cmd, suppress_output=True)
-            else:
-                _run_staging_command(cmd)
+        with self._radio_monitors_down():
+            for cmd in scan_cmds:
+                self.log.debug("run: %s", " ".join(cmd))
+                if "scan" in cmd:
+                    run_command(cmd, suppress_output=True)
+                else:
+                    _run_staging_command(cmd)
 
         # Do NOT `iw dev X set type __ap` here. mac80211 refuses an iftype
         # change on a running interface (-EBUSY) unless the driver implements
@@ -581,12 +634,13 @@ class Interface:
             ]
 
             # Run LAR scan
-            for cmd in scan_cmds:
-                self.log.debug("run: %s", " ".join(cmd))
-                if "scan" in cmd:
-                    run_command(cmd, suppress_output=True)
-                else:
-                    _run_staging_command(cmd)
+            with self._radio_monitors_down():
+                for cmd in scan_cmds:
+                    self.log.debug("run: %s", " ".join(cmd))
+                    if "scan" in cmd:
+                        run_command(cmd, suppress_output=True)
+                    else:
+                        _run_staging_command(cmd)
 
             # Remove a stale monitor vif before recreating it
             self._remove_mon_vif()
