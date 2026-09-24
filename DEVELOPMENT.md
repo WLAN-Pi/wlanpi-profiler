@@ -6,6 +6,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#branching-model) for the branching model:
 `main` is the only long-lived branch; create short-lived feature branches from
 `main` and open pull requests against `main`.
 
+## Prerequisites
+
+`main` targets Debian trixie and needs **Python 3.13**, which is what current
+WLAN Pi OS images run. On an older bullseye-based image (WLAN Pi OS v3.x) the
+steps below fail (for example, `pip install -r requirements.txt` needs Python
+3.10 or newer). Upgrade the WLAN Pi to a current image, or work from the
+`debian/bullseye` branch (`git checkout debian/bullseye`).
+
+## Setup
+
 1. Clone repo to development host
 
 2. Create and activate virtualenv
@@ -29,79 +39,71 @@ pip install -r requirements.txt
 
 ## Building Debian packages
 
-Two build scripts are available depending on your needs:
+The package contains compiled code (hostapd), so it is built per architecture.
+WLAN Pi devices are **arm64**. Pick the row that matches your machine:
 
-### Local native builds (recommended for development)
+| You have | Use | Notes |
+|----------|-----|-------|
+| An arm64 host (WLAN Pi, Apple Silicon Mac, other arm64 Linux) | `./build-package-native.sh` | Fastest |
+| An x86_64 host (Linux, Intel Mac, Windows) | `ARCH=arm64 ./build-package-native.sh` | Runs under QEMU emulation, much slower |
+| A Debian or Ubuntu host with sudo | `./build-package-cross.sh` | sbuild chroot, closest to CI |
+| Write access to this repository | The **Build and Archive Debian Package** workflow | Run it from the Actions tab (it also runs on pull requests that change `debian/`); download the `.deb` from the run's artifacts |
 
-**`build-package-native.sh`** - Uses Podman/Docker containers for native architecture builds.
+### Container builds: `build-package-native.sh`
+
+Builds the package inside a Debian container (see `Dockerfile.build`).
 
 **Requirements:**
 
-- Podman or Docker installed
-- No additional setup needed
+- Podman or Docker. Podman is used if both are installed; set `ENGINE=docker`
+  to override. On a WLAN Pi or other Debian host: `sudo apt install podman`
+- For `ARCH=arm64` on an x86_64 Linux host: QEMU user emulation registered with
+  binfmt_misc (`sudo apt install qemu-user-static` on Debian/Ubuntu). Docker
+  Desktop and podman machine on macOS and Windows already include it.
 
 **Usage:**
 
 ```bash
-./build-package-native.sh
+./build-package-native.sh              # trixie, host architecture
+ARCH=arm64 ./build-package-native.sh   # trixie, arm64 (for a WLAN Pi)
+ARCH=amd64 ./build-package-native.sh   # trixie, amd64
 ```
 
-**Output:** `wlanpi-profiler_<version>_<arch>.deb` in current directory
+**Output:** `wlanpi-profiler_<version>_<arch>.deb` in the repository root.
 
-**When to use:**
+`build-and-deploy.sh` wraps this script, builds arm64 by default, and installs
+the result on a WLAN Pi over SSH:
 
-- Local development and testing
-- Quick builds on your development machine
-- Works on any OS with Podman/Docker (macOS, Linux, etc.)
-- Builds for the host architecture (arm64 on Apple Silicon, amd64 on x86_64)
+```bash
+WLANPI_IP=198.18.42.1 ./build-and-deploy.sh
+```
 
-### Cross-architecture builds (for multiple targets)
+The install step runs `sudo dpkg -i` over a non-interactive SSH session, so it
+fails if `sudo` on the WLAN Pi asks for a password. In that case, copy the
+`.deb` from the repository root to the WLAN Pi and run `sudo dpkg -i` there.
 
-**`build-package-cross.sh`** - Uses sbuild/schroot for cross-compilation.
+### sbuild builds: `build-package-cross.sh`
+
+Builds the package in an sbuild/schroot chroot, like CI. The arm64 chroot runs
+under `qemu-user-static` emulation on non-arm64 hosts.
 
 **Requirements:**
 
-- Debian or Ubuntu host
-- sbuild, schroot, debootstrap, qemu-user-static (automatically installed by script)
-- First run creates schroot environment (takes several minutes)
+- Debian or Ubuntu host with sudo
+- sbuild, schroot, debootstrap, qemu-user-static (installed by the script)
+- The first run creates the chroot under `/srv/chroot` (takes several minutes)
 
 **Usage:**
 
 ```bash
-# Build for bookworm/arm64 (default)
+# Build for trixie/arm64 (default)
 ./build-package-cross.sh
 
-# Build for different architecture
-INPUTS_ARCH=armhf ./build-package-cross.sh
-
-# Build for different distro
-INPUTS_DISTRO=bullseye ./build-package-cross.sh
-
-# Combine both
-INPUTS_DISTRO=bullseye INPUTS_ARCH=armhf ./build-package-cross.sh
+# Build for a different architecture
+INPUTS_ARCH=amd64 ./build-package-cross.sh
 ```
 
-**Supported architectures:** arm64
-
-**Supported distros:** bookworm (default), bullseye
-
-**When to use:**
-
-- Building for multiple architectures
-- Creating official release packages
-- CI/CD environments (GitHub Actions uses similar sbuild approach)
-
----
-
-### Which script should I use?
-
-| Scenario | Script | Why |
-|----------|--------|-----|
-| Local development on macOS | `build-package-native.sh` | Simple, no setup required |
-| Local development on Linux | `build-package-native.sh` | Fastest for native builds |
-| Testing on different architecture | `build-package-cross.sh` | True cross-compilation |
-| Building for armhf (32-bit) | `build-package-cross.sh` | Requires cross-compilation |
-| CI/CD pipeline | GitHub Actions | Uses shared sbuild workflows |
+**Output:** `wlanpi-profiler_<version>_<arch>.deb` in the repository root.
 
 ---
 

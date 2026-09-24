@@ -1,12 +1,14 @@
 # Dockerfile for building wlanpi-profiler Debian package
 #
-# Build for a specific Debian release via SUITE:
-#   podman build -f Dockerfile.build --build-arg SUITE=trixie -t wlanpi-profiler-builder:trixie .
-#   podman run --rm -v $(pwd):/work -w /work wlanpi-profiler-builder:trixie
+# Used by build-package-native.sh, which picks the Debian release (SUITE) and
+# the architecture (--platform), and tags the image
+# wlanpi-profiler-builder:<suite>-<arch>, for example:
+#   podman build --platform linux/arm64 -f Dockerfile.build \
+#       --build-arg SUITE=trixie -t wlanpi-profiler-builder:trixie-arm64 .
 
 ARG SUITE=trixie
 
-FROM debian:${SUITE}
+FROM docker.io/library/debian:${SUITE}
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

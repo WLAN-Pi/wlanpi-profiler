@@ -191,11 +191,14 @@ Tests include:
 Developers can build Debian packages locally:
 
 ```bash
-# Native architecture build
-./scripts/build-package-native.sh
+# Build for the host architecture (needs podman or docker)
+./build-package-native.sh
 
-# Cross-architecture build
-./scripts/build-package-cross.sh
+# Build for a WLAN Pi (arm64) from an x86_64 host (needs podman or docker)
+ARCH=arm64 ./build-package-native.sh
+
+# sbuild build on a Debian/Ubuntu host (needs sudo)
+./build-package-cross.sh
 ```
 
 [Development guide →](DEVELOPMENT.md)
