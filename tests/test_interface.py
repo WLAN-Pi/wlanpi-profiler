@@ -685,9 +685,73 @@ def test_stage_hostapd_command_sequence(monkeypatch):
         ["iw", "dev", "wlan0", "set", "type", "managed"],
         ["ip", "link", "set", "wlan0", "up"],
         ["iw", "wlan0", "scan"],
+        ["iw", "phy", "phy0", "channels"],  # No IR check before any vif (#299)
         ["iw", "phy", "phy0", "interface", "add", "wlan0profiler", "type", "monitor"],
         ["ip", "link", "set", "wlan0profiler", "up"],
     ]
+
+
+_CH36 = "Band 2:\n\t* 5180 MHz [36] \n\t  Maximum TX power: 20.0 dBm\n{flags}\t* 5200 MHz [40] \n"
+
+
+class TestAwaitIrAllowed:
+    """#299: ath12k clears No IR from 11d only a few seconds after a scan."""
+
+    SELF_MANAGED = (
+        "global\ncountry US: DFS-FCC\n\nphy#0 (self-managed)\ncountry 00: DFS-UNSET\n"
+    )
+
+    def _run(self, monkeypatch, readings, timeout=20.0, reg_get=SELF_MANAGED):
+        iface = _iface("ath12k_wifi7_pci")
+        calls, clock = [], [0.0]
+        answers = iter(readings)
+
+        def fake_run(cmd, *a, **k):
+            calls.append(cmd)
+            if cmd[-1] == "channels":
+                return _CH36.format(flags=next(answers, readings[-1]))
+            if cmd == ["iw", "reg", "get"]:
+                return reg_get
+            return ""
+
+        monkeypatch.setattr("profiler.interface.run_command", fake_run)
+        monkeypatch.setattr("profiler.interface.time.monotonic", lambda: clock[0])
+
+        def fake_sleep(sec):
+            clock[0] += sec
+
+        monkeypatch.setattr("profiler.interface.time.sleep", fake_sleep)
+        iface._await_ir_allowed(timeout=timeout, rescan_every=5.0)
+        return calls, clock[0]
+
+    def test_clear_channel_does_not_wait(self, monkeypatch):
+        calls, waited = self._run(monkeypatch, [""])
+        assert calls == [["iw", "phy", "phy0", "channels"]]
+        assert waited == 0
+
+    def test_waits_and_rescans_until_no_ir_lifts(self, monkeypatch):
+        no_ir = "\t  No IR\n"
+        calls, waited = self._run(monkeypatch, [no_ir] * 7 + [""])
+        assert waited == 7
+        assert calls.count(["iw", "wlan0", "scan"]) == 1  # rescan at 5 s
+        assert calls[-1] == ["iw", "phy", "phy0", "channels"]
+
+    def test_gives_up_after_timeout(self, monkeypatch):
+        calls, waited = self._run(monkeypatch, ["\t  No IR\n"], timeout=12.0)
+        assert waited == 12
+        assert calls.count(["iw", "wlan0", "scan"]) == 2  # at 5 s and 10 s
+
+    def test_not_self_managed_is_not_waited_on(self, monkeypatch):
+        calls, waited = self._run(
+            monkeypatch, ["\t  No IR\n"], reg_get="global\ncountry 00: DFS-UNSET\n"
+        )
+        assert waited == 0
+        assert ["iw", "wlan0", "scan"] not in calls
+
+    def test_radar_channel_is_not_waited_on(self, monkeypatch):
+        calls, waited = self._run(monkeypatch, ["\t  No IR\n\t  Radar detection\n"])
+        assert waited == 0
+        assert calls == [["iw", "phy", "phy0", "channels"]]
 
 
 class TestParseApCapabilities:

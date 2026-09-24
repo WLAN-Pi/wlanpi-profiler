@@ -36,6 +36,13 @@ HOSTAPD_BINARY = os.path.join(_BIN_DIR, "hostapd")
 HOSTAPD_CLI_BINARY = os.path.join(_BIN_DIR, "hostapd_cli")
 HOSTAPD_CONFIG_DIR = "/tmp"
 
+# How long hostapd staging waits for No IR to lift on the AP channel after the
+# LAR scan, rescanning every NO_IR_RESCAN_SEC (ath12k 11d, #299).
+# ponytail: fixed budget, measured once on a WCN785x (lifted within 10 s of two
+# scans); raise it if a slower radio or quieter RF environment needs longer.
+NO_IR_WAIT_SEC = 20.0
+NO_IR_RESCAN_SEC = 5.0
+
 # Profiler's hostapd control interface (NOT system hostapd at /var/run/hostapd)
 # The profiler bundles its own hostapd and should never interact with system hostapd
 PROFILER_CTRL_INTERFACE = "/run/wlanpi-profiler/hostapd"
