@@ -49,22 +49,16 @@ fi
 # with binfmt_misc, e.g. `sudo apt install qemu-user-static` on Debian/Ubuntu.
 # Probe the engine itself rather than the local binfmt_misc table: with a VM or
 # remote engine the host table says nothing about what the engine can run.
-if [ "$ARCH" != "$HOST_ARCH" ] \
-    && ! "$ENGINE" run --rm --platform "linux/$ARCH" "docker.io/library/debian:$SUITE" true; then
-    echo "ERROR: $ENGINE cannot run linux/$ARCH containers on this $HOST_ARCH host."
-    echo "Building $ARCH here needs QEMU user emulation."
-    echo "On Debian/Ubuntu: sudo apt install qemu-user-static"
-    exit 1
-fi
-
-# Rootful docker creates the build output as root in the bind-mounted source
-# tree, which breaks the cleanup below on the next run. Hand the files back to
-# the invoking user. Not needed for podman or rootless docker, where container
-# root already maps to the invoking user.
-HOST_IDS=""
-if [ "$ENGINE" = docker ] && [ "$(id -u)" != 0 ] \
-    && ! docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
-    HOST_IDS="$(id -u):$(id -g)"
+BASE_IMAGE="docker.io/library/debian:$SUITE"
+if [ "$ARCH" != "$HOST_ARCH" ]; then
+    # Pull first so a registry or network error is reported as itself.
+    "$ENGINE" pull --platform "linux/$ARCH" "$BASE_IMAGE"
+    if ! "$ENGINE" run --rm --platform "linux/$ARCH" "$BASE_IMAGE" true; then
+        echo "ERROR: $ENGINE cannot run linux/$ARCH containers on this $HOST_ARCH host."
+        echo "Building $ARCH here needs QEMU user emulation."
+        echo "On Debian/Ubuntu: sudo apt install qemu-user-static"
+        exit 1
+    fi
 fi
 
 IMAGE="wlanpi-profiler-builder:${SUITE}-${ARCH}"
@@ -97,14 +91,14 @@ echo ""
 "$ENGINE" run --rm --platform "linux/$ARCH" \
     -v "$(pwd)":/work:Z \
     -w /work \
-    -e HOST_IDS="$HOST_IDS" \
     "$IMAGE" \
     bash -c '
 set -e
-# Runs on failure too, so a failed build does not leave root-owned files behind.
-if [ -n "$HOST_IDS" ]; then
-    trap "chown -R \"\$HOST_IDS\" /work" EXIT
-fi
+# With rootful docker, files created here are owned by root on the host and
+# break the cleanup on the next run. Give root-owned files to the owner of the
+# source tree, as seen in the container. Under rootless podman/docker that owner
+# is root (0) and this does nothing. The trap also runs when the build fails.
+trap "o=\$(stat -c %u:%g /work); [ \"\${o%%:*}\" = 0 ] || chown -R --from=0 \"\$o\" /work" EXIT
 
 echo "Installing package build dependencies..."
 apt-get update

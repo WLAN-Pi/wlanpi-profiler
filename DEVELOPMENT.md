@@ -71,12 +71,16 @@ ARCH=amd64 ./build-package-native.sh   # trixie, amd64
 
 **Output:** `wlanpi-profiler_<version>_<arch>.deb` in the repository root.
 
-`build-and-deploy.sh` wraps this script, always builds arm64, and installs the
-result on a WLAN Pi:
+`build-and-deploy.sh` wraps this script, builds arm64 by default, and installs
+the result on a WLAN Pi over SSH:
 
 ```bash
 WLANPI_IP=198.18.42.1 ./build-and-deploy.sh
 ```
+
+The install step runs `sudo dpkg -i` over a non-interactive SSH session, so it
+fails if `sudo` on the WLAN Pi asks for a password. In that case, copy the
+`.deb` from the repository root to the WLAN Pi and run `sudo dpkg -i` there.
 
 ### sbuild builds: `build-package-cross.sh`
 
