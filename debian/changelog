@@ -1,3 +1,10 @@
+wlanpi-profiler (2.1.4-2) unstable; urgency=medium
+
+  * Rebuild with the setuptools >= 84 build requirement from
+    pyproject.toml. The installed package is unchanged.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 23 Sep 2026 20:03:22 -0400
+
 wlanpi-profiler (2.1.4-1) unstable; urgency=medium
 
   * Fix hostapd AP mode failing on every non-Intel adapter (ath12k,
