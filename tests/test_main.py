@@ -12,6 +12,20 @@ def test_version(monkeypatch):
         __main__.init()
 
 
+@pytest.mark.parametrize("version,exits", [((3, 10, 12), True), ((3, 11, 2), False)])
+def test_version_boundary(monkeypatch, version, exits):
+    """3.10 is refused and 3.11 (bookworm) is accepted"""
+    from profiler import __main__
+
+    monkeypatch.setattr(__main__.sys, "version_info", version)
+    with patch.object(__main__, "main"):
+        if exits:
+            with pytest.raises(SystemExit):
+                __main__.init()
+        else:
+            __main__.init()
+
+
 def test_platform(monkeypatch):
     """--pcap is allowed off-Linux; live capture is refused"""
     from profiler import __main__, manager

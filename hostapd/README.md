@@ -96,7 +96,8 @@ cd hostapd/
 bash build-in-container.sh
 ```
 
-This runs `build.sh` inside a `debian:trixie` container.
+This runs `build.sh` inside a `debian:bookworm` container, so hostapd links
+bookworm's OpenSSL 3.0.
 
 ## Upgrading hostapd version
 

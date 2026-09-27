@@ -3,8 +3,9 @@
 ## Repository
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#branching-model) for the branching model:
-`main` is the only long-lived branch; create short-lived feature branches from
-`main` and open pull requests against `main`.
+create short-lived feature branches from `main` and open pull requests against
+`main`. The only other long-lived branches are the per-distro packaging branches
+(`debian/bookworm`, this one), which take fixes from `main` by cherry-pick.
 
 ## Prerequisites
 
@@ -20,7 +21,7 @@ first and are cherry-picked here. Build trixie packages from `main`.
 2. Create and activate virtualenv
 
 ```bash
-python3 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 ```
 
