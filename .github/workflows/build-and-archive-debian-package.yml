@@ -22,6 +22,7 @@ jobs:
     with:
       pkg: wlanpi-profiler
       version: ${{ needs.format.outputs.version }} 
+      distros: '["bookworm"]'
   slack-workflow-status:
     if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) }}
     name: Post Workflow Status to Slack

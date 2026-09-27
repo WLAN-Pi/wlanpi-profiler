@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "profiler"
 description = "a Wi-Fi client capability analyzer"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.11,<3.12"
 license = "BSD-3-Clause"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
@@ -15,7 +15,7 @@ authors = [
 classifiers = [
     "Natural Language :: English",
     "Development Status :: 3 - Alpha",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.11",
     "Intended Audience :: System Administrators",
     "Topic :: Utilities",
 ]
@@ -69,7 +69,7 @@ show_missing = true
 # ============================================================================
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py311"
 line-length = 88
 exclude = [".tox"]
 extend-exclude = ["*.md"]
@@ -101,7 +101,7 @@ parametrize-names-type = "csv"
 # ============================================================================
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 follow_imports = "silent"
 warn_redundant_casts = true
 warn_unused_ignores = true

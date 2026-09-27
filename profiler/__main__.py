@@ -118,10 +118,10 @@ def main() -> None:
 def init() -> None:
     """Handle main init"""
 
-    # hard set no support for python < v3.13
-    if sys.version_info < (3, 13):  # noqa: UP036
+    # hard set no support for python < v3.11
+    if sys.version_info < (3, 11):  # noqa: UP036
         sys.exit(
-            f"{os.path.basename(__file__)} requires Python version 3.13...\nyou are trying to run with Python version {platform.python_version()}...\nexiting..."
+            f"{os.path.basename(__file__)} requires Python version 3.11...\nyou are trying to run with Python version {platform.python_version()}...\nexiting..."
         )
 
     if __name__ == "__main__":

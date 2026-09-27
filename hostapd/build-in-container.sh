@@ -28,7 +28,7 @@ echo "Using container runtime: $CONTAINER_CMD"
 $CONTAINER_CMD run --rm \
     -v "$SCRIPT_DIR":/work \
     -w /work \
-    debian:trixie \
+    debian:bookworm \
     bash -c '
 set -e
 

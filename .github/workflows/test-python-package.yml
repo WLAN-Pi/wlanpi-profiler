@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
   push:
-    branches: [ main ]
+    branches: [ debian/bookworm ]
     paths-ignore: # ignore files that don't change build output
       - '**.md'
       - .github/dependabot.yml
@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13"]
+        python-version: ["3.11"]
 
     steps:
     - name: Checkout

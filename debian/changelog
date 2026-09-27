@@ -1,3 +1,11 @@
+wlanpi-profiler (2.1.5-1~bpo12+1) unstable; urgency=medium
+
+  * Rebuild 2.1.5-1 for Debian bookworm (WLAN Pi OS Cortado) with Python
+    3.11 and hostapd 2.12 built against bookworm's OpenSSL 3.0. The
+    trixie hostapd needs OpenSSL 3.4 and can't run on bookworm.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Sun, 27 Sep 2026 00:02:40 -0400
+
 wlanpi-profiler (2.1.5-1) unstable; urgency=medium
 
   * On Intel BE200 (iwlwifi), the profiler takes the radio's other up

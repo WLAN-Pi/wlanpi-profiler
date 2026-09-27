@@ -4,7 +4,7 @@ import pytest
 
 
 def test_version(monkeypatch):
-    """init() refuses to run on Python older than 3.13"""
+    """init() refuses to run on Python older than 3.11"""
     from profiler import __main__
 
     monkeypatch.setattr(__main__.sys, "version_info", (3, 6))

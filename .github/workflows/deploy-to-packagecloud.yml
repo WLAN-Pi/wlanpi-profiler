@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - debian/bookworm
     paths:
       - 'debian/changelog'
 permissions:
@@ -29,6 +29,7 @@ jobs:
     with:
       pkg: wlanpi-profiler
       version: ${{ needs.format.outputs.version }} 
+      distros: '["bookworm"]'
     secrets: inherit
   slack-workflow-status:
     if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) }}
