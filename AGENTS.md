@@ -2,6 +2,14 @@
 
 Guidance for coding agents working in wlanpi-profiler.
 
+## debian/bookworm branch
+
+This branch builds for Debian bookworm (WLAN Pi OS Cortado) and is pinned to
+Python 3.11 (`requires-python`, `SNAKE=/usr/bin/python3.11`,
+`Pre-Depends: python3.11`). Keep it to main plus that delta: land fixes on
+`main`, then cherry-pick. Versions are `<main version>~bpo12+N`. Never
+reuse a trixie-built hostapd; it needs OpenSSL 3.4 and bookworm has 3.0.
+
 ## Deliberate shortcuts
 
 Mark any deliberate simplification that cuts a real corner with a known ceiling
@@ -20,7 +28,7 @@ Find the ledger with: `rg -n "ponytail:" profiler tests`
 
 ## Verify
 
-- `python -m pytest tests/ -q -m "not ondevice"` (CI equivalent)
+- `python -m pytest tests/ -q -m "not ondevice"` (CI equivalent; Python 3.11 on this branch)
 - `ruff check profiler tests && ruff format --check profiler tests`
 - Interface staging changes must be verified on hardware across driver
   families (iwlwifi, ath12k, mt76/mt79xx). Unit tests assert command

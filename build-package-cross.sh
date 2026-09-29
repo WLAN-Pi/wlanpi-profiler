@@ -4,21 +4,21 @@
 #
 # This script uses sbuild/schroot for cross-architecture builds. The arm64
 # chroot runs under qemu-user-static emulation on non-arm64 hosts.
-# Default target: Debian trixie on arm64 (what current WLAN Pi OS images run)
+# Default target: Debian bookworm on arm64 (WLAN Pi OS Cortado, WLAN Pi Go)
 #
 # Usage:
-#   ./build-package-cross.sh                         # Build for trixie/arm64 (default)
+#   ./build-package-cross.sh                         # Build for bookworm/arm64 (default)
 #   INPUTS_ARCH=amd64 ./build-package-cross.sh       # Override architecture
 #
-# Supported distros: trixie. main needs Python 3.13, so older releases fail;
-# build bullseye packages from the debian/bullseye branch instead.
+# Supported distros: bookworm. The debian/bookworm branch is pinned to Python
+# 3.11; build trixie packages from main.
 #
 # Note: This requires sbuild setup. For simpler native builds, use build-package-native.sh instead.
 #
 
 set -e
 
-distro="${INPUTS_DISTRO:-trixie}"
+distro="${INPUTS_DISTRO:-bookworm}"
 arch="${INPUTS_ARCH:-arm64}"
 
 export DEBIAN_FRONTEND=noninteractive

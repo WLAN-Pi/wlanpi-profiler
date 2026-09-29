@@ -4,9 +4,9 @@
 # the architecture (--platform), and tags the image
 # localhost/wlanpi-profiler-builder:<suite>-<arch>, for example:
 #   podman build --platform linux/arm64 -f Dockerfile.build \
-#       --build-arg SUITE=trixie -t localhost/wlanpi-profiler-builder:trixie-arm64 .
+#       --build-arg SUITE=bookworm -t localhost/wlanpi-profiler-builder:bookworm-arm64 .
 
-ARG SUITE=trixie
+ARG SUITE=bookworm
 
 FROM docker.io/library/debian:${SUITE}
 

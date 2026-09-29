@@ -16,12 +16,12 @@ Build-Depends: debhelper (>= 11),
                libssl-dev,
                pkg-config
 Standards-Version: 4.6.0
-X-Python3-Version: >= 3.13
+X-Python3-Version: >= 3.11
 Homepage: https://github.com/WLAN-Pi/profiler
 
 Package: wlanpi-profiler
 Architecture: any
-Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.13), ${misc:Pre-Depends}
+Pre-Depends: dpkg (>= 1.16.1), python3.11, ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Recommends: bash-completion
 Description: WLAN Pi - Wi-Fi client capabilities profiler

@@ -3,16 +3,16 @@
 ## Repository
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#branching-model) for the branching model:
-`main` is the only long-lived branch; create short-lived feature branches from
-`main` and open pull requests against `main`.
+create short-lived feature branches from `main` and open pull requests against
+`main`. The only other long-lived branches are the per-distro packaging branches
+(`debian/bookworm`, this one), which take fixes from `main` by cherry-pick.
 
 ## Prerequisites
 
-`main` targets Debian trixie and needs **Python 3.13**, which is what current
-WLAN Pi OS images run. On an older bullseye-based image (WLAN Pi OS v3.x) the
-steps below fail (for example, `pip install -r requirements.txt` needs Python
-3.10 or newer). Upgrade the WLAN Pi to a current image; developing on bullseye
-is not supported (the `debian/bullseye` branch is not maintained for it).
+This is the `debian/bookworm` branch. It targets Debian bookworm (WLAN Pi OS
+Cortado, WLAN Pi Go) and is pinned to **Python 3.11**. It carries main with
+only the Python and packaging changes needed for bookworm; fixes land on `main`
+first and are cherry-picked here. Build trixie packages from `main`.
 
 ## Setup
 
@@ -21,7 +21,7 @@ is not supported (the `debian/bullseye` branch is not maintained for it).
 2. Create and activate virtualenv
 
 ```bash
-python3 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 ```
 
@@ -64,9 +64,9 @@ Builds the package inside a Debian container (see `Dockerfile.build`).
 **Usage:**
 
 ```bash
-./build-package-native.sh              # trixie, host architecture
-ARCH=arm64 ./build-package-native.sh   # trixie, arm64 (for a WLAN Pi)
-ARCH=amd64 ./build-package-native.sh   # trixie, amd64
+./build-package-native.sh              # bookworm, host architecture
+ARCH=arm64 ./build-package-native.sh   # bookworm, arm64 (for a WLAN Pi)
+ARCH=amd64 ./build-package-native.sh   # bookworm, amd64
 ```
 
 **Output:** `wlanpi-profiler_<version>_<arch>.deb` in the repository root.
@@ -96,7 +96,7 @@ under `qemu-user-static` emulation on non-arm64 hosts.
 **Usage:**
 
 ```bash
-# Build for trixie/arm64 (default)
+# Build for bookworm/arm64 (default)
 ./build-package-cross.sh
 
 # Build for a different architecture

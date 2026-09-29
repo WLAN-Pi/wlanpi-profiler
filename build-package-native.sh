@@ -3,7 +3,7 @@
 # Build wlanpi-profiler Debian package in a podman or docker container
 #
 # Usage: [ARCH=arm64|amd64] [ENGINE=podman|docker] ./build-package-native.sh [SUITE]
-#   SUITE   Debian release to build for (default: trixie)
+#   SUITE   Debian release to build for (default: bookworm)
 #   ARCH    Debian architecture to build for (default: host architecture).
 #           Use ARCH=arm64 on an x86_64 host to build for the WLAN Pi; this
 #           runs the build under QEMU emulation and is much slower.
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Debian release to build for
-SUITE="${1:-trixie}"
+SUITE="${1:-bookworm}"
 
 case "$(uname -m)" in
     aarch64|arm64) HOST_ARCH=arm64 ;;

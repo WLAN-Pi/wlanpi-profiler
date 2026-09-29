@@ -11,7 +11,7 @@ PACKAGE_NAME="wlanpi-profiler"
 WLANPI_IP="${WLANPI_IP:-198.18.42.1}"
 WLANPI_USER="${WLANPI_USER:-wlanpi}"
 DEPLOY_PATH="/tmp"
-SUITE="${1:-trixie}"
+SUITE="${1:-bookworm}"
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Script logic - No need to edit below
@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Use sshpass for non-interactive auth when SSHPASS is set, e.g.:
-#   WLANPI_IP=192.168.6.63 SSHPASS=wlanpi ./build-and-deploy.sh trixie
+#   WLANPI_IP=192.168.6.63 SSHPASS=wlanpi ./build-and-deploy.sh bookworm
 SSH="ssh"
 SCP="scp"
 if [ -n "${SSHPASS:-}" ]; then
