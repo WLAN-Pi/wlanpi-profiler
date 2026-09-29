@@ -630,6 +630,23 @@ def _iface(driver):
     return iface
 
 
+@pytest.mark.parametrize(
+    "driver, refused",
+    [("ath12k_wifi7_pci", True), ("mt7921u", False), ("iwlwifi", False)],
+)
+def test_fakeap_unsupported_only_on_ath12k(monkeypatch, driver, refused):
+    """ath12k drops monitor TX (#311); the check runs no staging command."""
+    iface = _iface(driver)
+    calls = _record_staging(monkeypatch, iface)
+    monkeypatch.setattr(Interface, "get_driver", lambda self, name: driver)
+    reason = iface.fakeap_unsupported()
+    assert bool(reason) is refused
+    if refused:
+        assert "hostapd mode" in reason
+        assert "wlan0" in reason
+    assert calls == []
+
+
 def _assert_no_iftype_change_while_up(calls, initially_up=("wlan0",)):
     """#283: `iw dev X set type ...` -EBUSYs on a running iface for every driver
     except iwlwifi. Staging must only change iftype while X is admin-down.

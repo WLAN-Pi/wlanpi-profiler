@@ -290,3 +290,46 @@ def test_country_code_detected_for_selected_phy():
     src = inspect.getsource(manager._start_impl)
     assert "detect_country_code(__IFACE.phy)" in src
     assert "detect_country_code()" not in src
+
+
+@pytest.mark.parametrize("argv", [["--fakeap"], ["--fakeap", "--noprep"]])
+def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
+    """#311: refuse with a status reason, without setup, staging or cleanup."""
+    import logging
+
+    from profiler import manager, status
+
+    statuses = []
+    monkeypatch.setattr(manager, "are_we_root", lambda: True)
+    monkeypatch.setattr(status, "write_status", lambda **k: statuses.append(k))
+    monkeypatch.setattr(manager.helpers, "check_required_tools", lambda *a, **k: None)
+    monkeypatch.setattr(manager.helpers, "setup_logger", lambda *a, **k: None)
+    monkeypatch.setattr(
+        manager.helpers, "get_app_data_paths", lambda *a, **k: [str(tmp_path)]
+    )
+    monkeypatch.setattr(manager.helpers, "validate", lambda c: (True, None))
+    config = {
+        "GENERAL": {
+            "interface": "wlan0",
+            "channel": 36,
+            "files_path": [str(tmp_path)],
+            "ap_mode": False,
+            "fakeap": True,
+            "listen_only": False,
+        }
+    }
+    monkeypatch.setattr(manager.helpers, "setup_config", lambda a: (config, None))
+    monkeypatch.setattr(Interface, "get_driver", lambda self, name: "ath12k_wifi7_pci")
+    for touch in ("setup", "stage_interface_fakeap", "reset_interface"):
+        monkeypatch.setattr(
+            Interface, touch, lambda *a, _t=touch, **k: pytest.fail(f"{_t} ran")
+        )
+    monkeypatch.setattr(manager, "removeVif", lambda: pytest.fail("removeVif ran"))
+
+    args = helpers.setup_parser().parse_args(["-i", "wlan0", *argv])
+    with pytest.raises(SystemExit) as exc:
+        manager._start_impl(args, logging.getLogger("test"))
+    assert exc.value.code == -1
+    assert statuses[-1]["state"] == status.ProfilerState.FAILED
+    assert statuses[-1]["reason"] == status.StatusReason.INTERFACE_VALIDATION
+    assert "hostapd mode" in statuses[-1]["error"]

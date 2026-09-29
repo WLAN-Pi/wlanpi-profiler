@@ -627,6 +627,18 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             sys.exit(-1)
         __IFACE.name = iface_name
 
+        ap_mode = (config.get("GENERAL") or {}).get("ap_mode", False)
+        if not listen_only and not ap_mode:
+            unsupported = __IFACE.fakeap_unsupported()
+            if unsupported:
+                log.error(unsupported)
+                write_status(
+                    state=ProfilerState.FAILED,
+                    reason=StatusReason.INTERFACE_VALIDATION,
+                    error=unsupported,
+                )
+                sys.exit(-1)
+
         try:
             if args.no_interface_prep:
                 log.warning(
@@ -674,9 +686,6 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
 
                 # setup should have detected a mac address
                 config["GENERAL"]["mac"] = __IFACE.mac
-
-                # Check if using hostapd AP mode (before staging interface)
-                ap_mode = (config.get("GENERAL") or {}).get("ap_mode", False)
 
                 if listen_only:
                     # Listen-only mode: create monitor interface for passive sniffing
