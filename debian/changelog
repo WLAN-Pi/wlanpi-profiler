@@ -1,3 +1,13 @@
+wlanpi-profiler (2.1.7-1) unstable; urgency=medium
+
+  * Drop captured frames whose 802.11 protocol version is not 0. Corrupt
+    frames that still carried the association request type were profiled
+    as clients, writing junk profiles with random MACs, adding them to the
+    day's CSV and inflating the clients-seen count. They are now counted
+    as invalid frames, in live capture and in --pcap analysis (#316).
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Wed, 30 Sep 2026 12:37:08 -0400
+
 wlanpi-profiler (2.1.6-1) unstable; urgency=medium
 
   * Refuse fakeAP mode on Qualcomm ath12k radios (WCN785x) before

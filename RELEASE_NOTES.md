@@ -1,3 +1,14 @@
+Release 2.1.7
+
+**Corrupt frames are no longer profiled as clients**
+
+- Captured frames whose 802.11 protocol version is not 0 are dropped and
+  counted in `invalid_frame_count`, in live capture and in `--pcap`
+  analysis. Corrupt frames that kept the association request type were
+  profiled as clients, writing junk profiles with random MACs, adding them
+  to the day's CSV and inflating `total_clients_seen` (#316). Profiles
+  already written this way are not removed.
+
 Release 2.1.6
 
 **fakeAP is refused on Qualcomm ath12k radios**
