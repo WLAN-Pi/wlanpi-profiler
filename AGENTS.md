@@ -25,9 +25,17 @@ Find the ledger with: `rg -n "ponytail:" profiler tests`
 - Interface staging changes must be verified on hardware across driver
   families (iwlwifi, ath12k, mt76/mt79xx). Unit tests assert command
   ordering (see `tests/test_interface.py`), not driver behaviour.
+- A hostapd-mode or listen-only hardware check passes only when a client
+  joins and a new profile is written under `/var/www/html/profiler/clients`.
+  `AP-ENABLED` alone proves nothing: on ath12k before
+  `ath12k-wlanpi-mgmt-rx-to-monitor-without-vdev.patch` (wlanpi-kernel) the AP
+  came up and clients joined, but the monitor never saw an association
+  request.
 - rtl88XXau is explicitly out of scope for hardware verification: it is not
   tested, and missing rtl88XXau hardware results never block a change or a
   review. Keep its unit tests passing; do not request or wait for device runs.
+  Never mention rtl88XXau to the user: not in replies, caveats, driver
+  lists or verification summaries.
 
 ## Interface staging rules
 
