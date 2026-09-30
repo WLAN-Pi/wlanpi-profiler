@@ -1,3 +1,16 @@
+wlanpi-profiler (2.1.6-1) unstable; urgency=medium
+
+  * Refuse fakeAP mode on Qualcomm ath12k radios (WCN785x) before
+    touching the radio. The driver drops every frame sent on a monitor
+    interface, so fakeAP ran without an error but nothing reached the
+    air and no client was profiled. The profiler now exits with a reason
+    that points to hostapd mode, the default, and writes it to the
+    status file for Core and the WebUI (#311).
+  * fakeAP with --noprep no longer crashes with UnboundLocalError on
+    every driver.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 29 Sep 2026 23:38:30 -0400
+
 wlanpi-profiler (2.1.5-1) unstable; urgency=medium
 
   * On Intel BE200 (iwlwifi), the profiler takes the radio's other up
