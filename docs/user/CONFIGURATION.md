@@ -155,7 +155,7 @@ Use `--11be` flag or `be_disabled: false` in config.ini to enable Wi-Fi 7 with W
 
 - Type: Boolean
 - Default: false
-- Description: Use legacy FakeAP mode (Scapy-based, slower but more compatible)
+- Description: Use legacy FakeAP mode (Scapy-based, slower but more compatible). Not supported on Qualcomm ath12k radios (WCN785x), which can't inject frames; the profiler exits with an error
 
 **listen_only**
 

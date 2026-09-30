@@ -386,6 +386,21 @@ class Interface:
                         return True
         return False
 
+    def fakeap_unsupported(self) -> str:
+        """Return why fakeAP can't run on this interface's driver, or "" if it can.
+
+        Reads only the driver name, so callers can refuse before staging.
+        """
+        driver = self.get_driver(self.name)
+        # ath12k frees every frame sent on a monitor vdev
+        # (ath12k_wifi7_mac_op_tx), so fakeAP would run but put nothing on air.
+        if "ath12k" in driver:
+            return (
+                f"fakeAP mode is not supported on {self.name} ({driver}): "
+                "the driver cannot inject frames. Use hostapd mode (the default)."
+            )
+        return ""
+
     def stage_interface_fakeap(self) -> None:
         """Prepare the interface for fakeAP monitor mode and injection"""
         import shutil

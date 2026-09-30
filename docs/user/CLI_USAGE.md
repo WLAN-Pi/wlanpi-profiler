@@ -205,6 +205,8 @@ sudo profiler --fakeap --interface wlan0 --channel 36
 # Use legacy scapy-based mode instead of hostapd
 ```
 
+Not available on Qualcomm ath12k radios (WCN785x): the driver drops injected frames, so the profiler refuses `--fakeap` there.
+
 ## See also
 
 - [Configuration guide](CONFIGURATION.md)
