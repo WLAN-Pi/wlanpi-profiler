@@ -216,7 +216,7 @@ These fields are captured from the last known state of the profiler session.
 
 #### `metrics.invalid_frame_count` (integer)
 
-- **Description**: Number of frames filtered due to invalid/corrupted MAC addresses
+- **Description**: Number of corrupt frames filtered: invalid MAC addresses or a non-zero 802.11 protocol version
 - **Default**: `0`
 
 #### `metrics.bad_fcs_count` (integer)

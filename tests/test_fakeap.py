@@ -162,3 +162,49 @@ class TestTxBeaconsFailure:
             tx.run()
 
         assert exc.value.code == 1
+
+
+class TestSnifferProtocolVersion:
+    """Frames with an 802.11 protocol version other than 0 are corrupt (#316)."""
+
+    @pytest.mark.parametrize("proto,queued", [(0, 1), (3, 0)])
+    def test_received_frame_drops_nonzero_version(self, proto, queued):
+        import logging
+        import queue
+        from time import time
+
+        from scapy.all import Dot11AssoReq
+
+        sniffer = object.__new__(fakeap.Sniffer)
+        sniffer.log = logging.getLogger("test.sniffer")
+        sniffer.mac = "02:00:00:00:00:01"
+        sniffer.listen_only = False
+        sniffer.last_stats_log_time = time()
+        sniffer.seen_macs = set()
+        sniffer.assoc_macs = set()
+        sniffer.assoc_reqs = {}
+        sniffer.total_assoc_requests = 0
+        sniffer.invalid_frame_count = 0
+        sniffer.bad_fcs_count = 0
+        sniffer._update_monitoring_metrics = lambda *a, **k: None
+        sniffer.queue = queue.Queue()
+        sniffer.dot11_assoc_request_cb = sniffer.assoc_req
+
+        frame = (
+            RadioTap()
+            / Dot11(
+                proto=proto,
+                type=0,
+                subtype=0,
+                addr1=sniffer.mac,
+                addr2="a8:93:4a:e2:02:3b",
+                addr3=sniffer.mac,
+            )
+            / Dot11AssoReq()
+            / Dot11Elt(ID=0, info=b"profiler")
+        )
+        sniffer.received_frame(RadioTap(bytes(frame)))
+
+        assert sniffer.queue.qsize() == queued
+        assert sniffer.invalid_frame_count == 1 - queued
+        assert len(sniffer.seen_macs) == queued

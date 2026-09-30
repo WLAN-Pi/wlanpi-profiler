@@ -220,8 +220,8 @@ Crash/failure → info file preserved
 
 #### `invalid_frame_count` (integer)
 
-- **Description**: Number of frames filtered due to invalid/corrupted MAC addresses
-- **Purpose**: Track frames with malformed addresses (all zeros, broadcast, zero OUI, etc.)
+- **Description**: Number of corrupt frames filtered: invalid MAC addresses or a non-zero 802.11 protocol version
+- **Purpose**: Track frames with malformed addresses (all zeros, broadcast, zero OUI, etc.) or a reserved protocol version
 - **Initial**: `0`
 - **Example**: `2`
 

@@ -273,7 +273,7 @@ def write_info(
         profile_count: Number of clients profiled this session (default: 0)
         failed_profile_count: Clients that sent auth but never sent assoc (default: 0)
         total_clients_seen: Total unique MAC addresses observed (default: 0)
-        invalid_frame_count: Frames filtered due to invalid/corrupted MAC addresses (default: 0)
+        invalid_frame_count: Corrupt frames filtered (invalid MAC or non-zero 802.11 protocol version) (default: 0)
         bad_fcs_count: Frames filtered due to bad FCS (checksum mismatch) (default: 0)
     """
     info_file = get_info_file_path()
@@ -381,7 +381,7 @@ def update_monitoring_metrics_in_info(
     Args:
         total_clients_seen: Total unique MAC addresses observed (optional, only updates if provided)
         failed_profile_count: Clients that sent auth but never sent assoc (optional, only updates if provided)
-        invalid_frame_count: Frames filtered due to invalid/corrupted MAC addresses (optional, only updates if provided)
+        invalid_frame_count: Corrupt frames filtered (invalid MAC or non-zero 802.11 protocol version) (optional, only updates if provided)
         bad_fcs_count: Frames filtered due to bad FCS (checksum mismatch) (optional, only updates if provided)
     """
     log = logging.getLogger(__name__)
