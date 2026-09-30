@@ -574,8 +574,11 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             if frame.haslayer(scapy.layers.dot11.Dot11AssoReq) or frame.haslayer(
                 scapy.layers.dot11.Dot11ReassoReq
             ):
-                # Filter invalid/corrupted MAC addresses
-                if not helpers.is_valid_mac(frame.addr2):
+                # Filter corrupted frames: invalid MACs or non-zero protocol version
+                if (
+                    not helpers.is_valid_mac(frame.addr2)
+                    or frame[scapy.layers.dot11.Dot11].proto != 0
+                ):
                     continue
                 # put frame into the multiprocessing queue for the profiler to analyze
                 queue.put(frame)

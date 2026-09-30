@@ -857,6 +857,13 @@ class Sniffer(multiprocessing.Process):
         if not packet.haslayer(Dot11):
             return  # Ignore non-802.11 packets
 
+        # 802.11 defines only version 0. Corrupt monitor-ring frames (#316)
+        # carry other versions yet still match the assoc-req BPF filter.
+        if packet[Dot11].proto != 0:
+            self.invalid_frame_count += 1
+            self._update_monitoring_metrics()
+            return
+
         # Periodic stats logging (every 60 seconds)
         current_time = time()
         if current_time - self.last_stats_log_time >= 60:
