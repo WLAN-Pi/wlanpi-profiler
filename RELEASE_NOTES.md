@@ -1,3 +1,21 @@
+Release 2.1.6
+
+**fakeAP is refused on Qualcomm ath12k radios**
+
+- On a Qualcomm WCN785x (`ath12k`, the WLAN Pi M4 radio), `--fakeap` now
+  exits before touching the radio with `fakeAP mode is not supported on
+  wlan0 (ath12k_wifi7_pci): the driver cannot inject frames. Use hostapd mode
+  (the default).` The reason is written to the status file, so Core and the
+  WebUI show it. ath12k drops every frame sent on a monitor interface, so
+  fakeAP used to run without an error while nothing reached the air (#311).
+  Other drivers are unchanged.
+- `--fakeap --noprep` no longer crashes with `UnboundLocalError` on every
+  driver.
+- Hostapd mode (the default) on ath12k needs a WLAN Pi kernel with
+  `ath12k-wlanpi-mgmt-rx-to-monitor-without-vdev.patch`
+  (WLAN-Pi/wlanpi-kernel#61, WLAN-Pi/wlanpi-kernel#62). Without it, clients join but are never
+  profiled (#298).
+
 Release 2.1.5
 
 **The profiler leaves the radio as it found it**
