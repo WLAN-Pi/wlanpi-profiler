@@ -67,7 +67,7 @@ ruff==0.16.8
     # via -r extras.in
 tomli-w==1.2.0
     # via tox
-tox==4.63.0
+tox==4.64.5
     # via -r extras.in
 typing-extensions==4.16.0
     # via mypy
