@@ -57,7 +57,7 @@ pytest==9.1.1
     #   pytest-mock
 pytest-cov==7.1.0
     # via -r extras.in
-pytest-mock==3.15.1
+pytest-mock==3.16.0
     # via -r extras.in
 python-discovery==1.6.1
     # via
