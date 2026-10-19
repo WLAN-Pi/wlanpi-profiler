@@ -501,6 +501,38 @@ class TestInterface:
         assert len(channels) == 2
 
 
+def test_channel_flags_do_not_cross_band_boundaries():
+    iw = """Band 1:
+        * 2472 MHz [13]
+          Maximum TX power: 22.0 dBm
+          No IR
+        * 2484 MHz [14] (disabled)
+Band 2:
+        * 5180 MHz [36] (disabled)
+        * 5200 MHz [40]
+          No IR
+        * 5260 MHz [52]
+          No IR
+          Radar detection
+Band 4:
+        * 5955 MHz [1]
+        * 5975 MHz [5]"""
+    flags = {
+        (band, c.ch): (c.no_ir, c.radar_detect, c.disabled)
+        for band, chs in Interface.get_channels_status(iw).items()
+        for c in chs
+    }
+    assert flags == {
+        ("1:", "13"): (True, False, False),
+        ("1:", "14"): (False, False, True),
+        ("2:", "36"): (False, False, True),
+        ("2:", "40"): (True, False, False),
+        ("2:", "52"): (True, True, False),
+        ("4:", "1"): (False, False, False),
+        ("4:", "5"): (False, False, False),
+    }
+
+
 class TestRunStagingCommand:
     """Staging commands must fail loudly (phase 0)."""
 

@@ -22,7 +22,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, CONFIG_FILE
-from .helpers import flag_last_object, run_command
+from .helpers import run_command
 from .status import parse_reg_domains
 
 
@@ -984,62 +984,30 @@ class Interface:
         if not iw_phy_channels or "command failed" in iw_phy_channels:
             log.warning("unable to detect valid channels from")
             return {}
-        freq = ""
-        ch = ""
-        no_ir = False
-        radar_detect = False
-        band = ""
-        disabled = False
-        first_band = True
-        first_channel_in_band = True
-        bands = {}
-        channels = []
         channel = namedtuple(
             "channel", ["freq", "ch", "no_ir", "radar_detect", "disabled"]
         )
-
-        for line, last_line in flag_last_object(iw_phy_channels.splitlines()):
+        bands: dict[str, list[Any]] = {}
+        channels: list[Any] = []
+        for line in iw_phy_channels.splitlines():
             line = line.strip().lower()
-            if first_band:
-                first_band = False
-                if line.startswith("band "):
-                    band = line.split(" ")[1]
-                    continue
-            if first_channel_in_band:
-                first_channel_in_band = False
-                if line.startswith("*"):
-                    freq = line.split()[1]
-                    ch = line.split()[3].replace("[", "").replace("]", "")
-                    continue
-            if line.startswith("no ir"):
-                no_ir = True
-            if line.startswith("radar detection"):
-                radar_detect = True
-            if line.startswith("*"):
-                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
-                # reset vars
-                freq = ""
-                ch = ""
-                no_ir = False
-                radar_detect = False
-                disabled = False
-                if "disabled" in line:
-                    disabled = True
-                freq = line.split()[1]
-                ch = line.split()[3].replace("[", "").replace("]", "")
             if line.startswith("band "):
-                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
-                bands[band] = channels
-                # reset channels list
-                channels = []
-                # reset channel flags
-                disabled = False
-                radar_detect = False
-                first_channel_in_band = True
-                band = line.split(" ")[1]
-            if last_line:
-                channels.append(channel(freq, ch, no_ir, radar_detect, disabled))
-                bands[band] = channels
+                channels = bands.setdefault(line.split()[1], [])
+            elif line.startswith("*"):
+                fields = line.split()
+                channels.append(
+                    channel(
+                        fields[1],
+                        fields[3].strip("[]"),
+                        False,
+                        False,
+                        "disabled" in line,
+                    )
+                )
+            elif channels and line.startswith("no ir"):
+                channels[-1] = channels[-1]._replace(no_ir=True)
+            elif channels and line.startswith("radar detection"):
+                channels[-1] = channels[-1]._replace(radar_detect=True)
         return bands
 
     def checks(self, staged: bool = False) -> None:
