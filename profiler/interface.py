@@ -210,9 +210,8 @@ class Interface:
 
         ifaces = []
         for phy in self.phys:
-            monitor = {True: "yes", False: "no"}.get(
-                self.get_monitor_support(phy.phy_id), "?"
-            )
+            supported = self.get_monitor_support(phy.phy_id)
+            monitor = "?" if supported is None else ("yes" if supported else "no")
             for iface in phy.interfaces:
                 eth_tool_info = self.get_ethtool_info(iface.name)
                 driver = self.get_driver(iface.name)
