@@ -631,16 +631,17 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
         __IFACE.name = iface_name
 
         ap_mode = (config.get("GENERAL") or {}).get("ap_mode", False)
-        if not listen_only and not ap_mode:
+        unsupported = __IFACE.monitor_unsupported()
+        if not unsupported and not listen_only and not ap_mode:
             unsupported = __IFACE.fakeap_unsupported()
-            if unsupported:
-                log.error(unsupported)
-                write_status(
-                    state=ProfilerState.FAILED,
-                    reason=StatusReason.INTERFACE_VALIDATION,
-                    error=unsupported,
-                )
-                sys.exit(-1)
+        if unsupported:
+            log.error(unsupported)
+            write_status(
+                state=ProfilerState.FAILED,
+                reason=StatusReason.INTERFACE_VALIDATION,
+                error=unsupported,
+            )
+            sys.exit(-1)
 
         try:
             if args.no_interface_prep:

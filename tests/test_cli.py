@@ -292,9 +292,7 @@ def test_country_code_detected_for_selected_phy():
     assert "detect_country_code()" not in src
 
 
-@pytest.mark.parametrize("argv", [["--fakeap"], ["--fakeap", "--noprep"]])
-def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
-    """#311: refuse with a status reason, without setup, staging or cleanup."""
+def _start_until_refused(monkeypatch, tmp_path, argv, fakeap):
     import logging
 
     from profiler import manager, status
@@ -313,14 +311,19 @@ def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
             "interface": "wlan0",
             "channel": 36,
             "files_path": [str(tmp_path)],
-            "ap_mode": False,
-            "fakeap": True,
-            "listen_only": False,
+            "ap_mode": not fakeap and "--listen-only" not in argv,
+            "fakeap": fakeap,
+            "listen_only": "--listen-only" in argv,
         }
     }
     monkeypatch.setattr(manager.helpers, "setup_config", lambda a: (config, None))
-    monkeypatch.setattr(Interface, "get_driver", lambda self, name: "ath12k_wifi7_pci")
-    for touch in ("setup", "stage_interface_fakeap", "reset_interface"):
+    for touch in (
+        "setup",
+        "stage_interface_fakeap",
+        "stage_interface_hostapd",
+        "stage_interface_listen_only",
+        "reset_interface",
+    ):
         monkeypatch.setattr(
             Interface, touch, lambda *a, _t=touch, **k: pytest.fail(f"{_t} ran")
         )
@@ -332,4 +335,24 @@ def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
     assert exc.value.code == -1
     assert statuses[-1]["state"] == status.ProfilerState.FAILED
     assert statuses[-1]["reason"] == status.StatusReason.INTERFACE_VALIDATION
-    assert "hostapd mode" in statuses[-1]["error"]
+    return statuses[-1]["error"]
+
+
+@pytest.mark.parametrize("argv", [["--fakeap"], ["--fakeap", "--noprep"]])
+def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
+    """#311"""
+    monkeypatch.setattr(Interface, "monitor_unsupported", lambda self: "")
+    monkeypatch.setattr(Interface, "get_driver", lambda self, name: "ath12k_wifi7_pci")
+    error = _start_until_refused(monkeypatch, tmp_path, argv, fakeap=True)
+    assert "hostapd mode" in error
+
+
+@pytest.mark.parametrize("argv", [[], ["--listen-only"], ["--fakeap"], ["--noprep"]])
+def test_interface_without_monitor_refused_before_staging(monkeypatch, tmp_path, argv):
+    reason = "wlan0 (brcmfmac) does not support monitor mode"
+    monkeypatch.setattr(Interface, "monitor_unsupported", lambda self: reason)
+    monkeypatch.setattr(
+        Interface, "fakeap_unsupported", lambda self: pytest.fail("fakeap check ran")
+    )
+    error = _start_until_refused(monkeypatch, tmp_path, argv, fakeap="--fakeap" in argv)
+    assert error == reason

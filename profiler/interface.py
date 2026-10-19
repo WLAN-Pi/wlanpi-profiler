@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP
+from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, CONFIG_FILE
 from .helpers import flag_last_object, run_command
 from .status import parse_reg_domains
 
@@ -62,6 +62,7 @@ class InterfaceInformation:
         phy: str,
         interface: str,
         mode: str,
+        monitor: str,
         driver: str,
         driver_version: str,
         firmware_rev: str,
@@ -70,6 +71,7 @@ class InterfaceInformation:
         self.phy = phy
         self.interface = interface
         self.mode = mode
+        self.monitor = monitor
         self.driver = driver
         self.driver_version = driver_version
         self.firmware_rev = firmware_rev
@@ -208,6 +210,8 @@ class Interface:
 
         ifaces = []
         for phy in self.phys:
+            supported = self.get_monitor_support(phy.phy_id)
+            monitor = "?" if supported is None else ("yes" if supported else "no")
             for iface in phy.interfaces:
                 eth_tool_info = self.get_ethtool_info(iface.name)
                 driver = self.get_driver(iface.name)
@@ -220,6 +224,7 @@ class Interface:
                         f"phy{phy.phy_id}",
                         iface.name,
                         mode,
+                        monitor,
                         driver,
                         driver_version,
                         firmware_rev,
@@ -234,17 +239,19 @@ class Interface:
                 "PHY",
                 "Interface",
                 "Mode",
+                "Monitor",
                 "Driver",
                 "DriverVersion",
                 "FirmwareRev",
                 "Chipset",
             ),
         )
-        ifaces.insert(1, InterfaceInformation(" ", " ", " ", " ", " ", " ", " "))
+        ifaces.insert(1, InterfaceInformation(" ", " ", " ", " ", " ", " ", " ", " "))
 
         phy_len = Interface.get_attr_max_len(ifaces, "phy")
         interface_len = Interface.get_attr_max_len(ifaces, "interface")
         mode_len = Interface.get_attr_max_len(ifaces, "mode")
+        monitor_len = Interface.get_attr_max_len(ifaces, "monitor")
         driver_len = Interface.get_attr_max_len(ifaces, "driver")
         driverv_len = Interface.get_attr_max_len(ifaces, "driver_version")
         firmwarer_len = Interface.get_attr_max_len(ifaces, "firmware_rev")
@@ -255,10 +262,11 @@ class Interface:
 
         out = ""
         for iface in ifaces:
-            out += "{0:<{phy_len}}  {1:<{interface_len}}  {2:<{mode_len}}  {3:<{driver_len}}  {4:<{driverv_len}}  {5:<{firmwarer_len}}  {6:<{chipset_len}}\n".format(
+            out += "{0:<{phy_len}}  {1:<{interface_len}}  {2:<{mode_len}}  {3:<{monitor_len}}  {4:<{driver_len}}  {5:<{driverv_len}}  {6:<{firmwarer_len}}  {7:<{chipset_len}}\n".format(
                 iface.phy,
                 iface.interface,
                 iface.mode,
+                iface.monitor,
                 iface.driver,
                 iface.driver_version,
                 iface.firmware_rev,
@@ -266,6 +274,7 @@ class Interface:
                 phy_len=phy_len,
                 interface_len=interface_len,
                 mode_len=mode_len,
+                monitor_len=monitor_len,
                 driver_len=driver_len,
                 driverv_len=driverv_len,
                 firmwarer_len=firmwarer_len,
@@ -385,6 +394,36 @@ class Interface:
                                 )
                         return True
         return False
+
+    def monitor_unsupported(self) -> str:
+        phys = self.build_iw_phy_list()
+        own = next(
+            (p for p in phys if any(i.name == self.name for i in p.interfaces)), None
+        )
+        known_unsupported = (
+            own is not None and self.get_monitor_support(own.phy_id) is False
+        )
+        if not known_unsupported:
+            return ""
+        capable_primaries = sorted(
+            i.name
+            for p in phys
+            if p is not own and self.get_monitor_support(p.phy_id)
+            for i in p.interfaces
+            if i.type != "monitor"
+        )
+        reason = (
+            f"{self.name} ({self.get_driver(self.name)}) does not support monitor "
+            "mode, which the profiler needs."
+        )
+        if not capable_primaries:
+            return f"{reason} No other wireless interface supports it."
+        listed = ", ".join(f"{n} ({self.get_driver(n)})" for n in capable_primaries)
+        first = capable_primaries[0]
+        return (
+            f"{reason} Monitor-capable: {listed}. Use -i {first} or set "
+            f"'interface: {first}' in {CONFIG_FILE}."
+        )
 
     def fakeap_unsupported(self) -> str:
         """Return why fakeAP can't run on this interface's driver, or "" if it can.
@@ -918,6 +957,25 @@ class Interface:
     def get_ap_capabilities(self) -> dict[str, bool]:
         """Query `iw phy <phy> info` for 11ax/11be AP support"""
         return self.parse_ap_capabilities(run_command(["iw", "phy", self.phy, "info"]))
+
+    @staticmethod
+    def parse_interface_modes(iw_phy_info: str) -> set[str]:
+        m = re.search(
+            r"^[ \t]*Supported interface modes:[ \t]*\n((?:[ \t]+\* .*(?:\n|$))*)",
+            iw_phy_info,
+            re.M,
+        )
+        if not m:
+            return set()
+        return {line.split("* ", 1)[1].strip() for line in m.group(1).splitlines()}
+
+    def get_monitor_support(self, phy_id: str) -> bool | None:
+        try:
+            info = run_command(["iw", "phy", f"phy{phy_id}", "info"], check=True)
+        except subprocess.CalledProcessError:
+            return None
+        modes = self.parse_interface_modes(info)
+        return "monitor" in modes if modes else None
 
     @staticmethod
     def get_channels_status(iw_phy_channels: str) -> dict[str, Any]:

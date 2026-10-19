@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 
 from profiler.interface import Interface
@@ -645,6 +647,160 @@ def test_fakeap_unsupported_only_on_ath12k(monkeypatch, driver, refused):
         assert "hostapd mode" in reason
         assert "wlan0" in reason
     assert calls == []
+
+
+IW_PHY_BRCMFMAC = """\
+\tAvailable Antennas: TX 0 RX 0
+\tSupported interface modes:
+\t\t * IBSS
+\t\t * managed
+\t\t * AP
+\t\t * P2P-client
+\t\t * P2P-GO
+\t\t * P2P-device
+\tBand 1:
+\tSupported commands:
+\t\t * new_interface
+\t\t * set_interface
+"""
+IW_PHY_MT76X2U = """\
+\tConfigured Antennas: TX 0x202 RX 0x202
+\tSupported interface modes:
+\t\t * IBSS
+\t\t * managed
+\t\t * AP
+\t\t * AP/VLAN
+\t\t * monitor
+\t\t * mesh point
+\t\t * P2P-client
+\t\t * P2P-GO
+\tBand 1:
+"""
+
+
+R4_PHYS = {
+    "0": [("wlan1", "managed"), ("wlanpi0", "monitor")],
+    "1": [("wlan0", "managed")],
+}
+R4_IW = {"phy0": IW_PHY_MT76X2U, "phy1": IW_PHY_BRCMFMAC}
+R4_DRIVERS = {"wlan0": "brcmfmac", "wlan1": "mt76x2u", "wlanpi0": "mt76x2u"}
+
+
+class TestParseInterfaceModes:
+    def test_brcmfmac_has_no_monitor(self):
+        modes = Interface.parse_interface_modes(IW_PHY_BRCMFMAC)
+        assert "monitor" not in modes
+        assert "P2P-device" in modes
+        assert "new_interface" not in modes
+
+    def test_mt76x2u_has_monitor(self):
+        modes = Interface.parse_interface_modes(IW_PHY_MT76X2U)
+        assert {"monitor", "mesh point", "AP/VLAN"} <= modes
+
+    def test_iw_failure_is_empty(self):
+        assert Interface.parse_interface_modes("command failed: No such device") == (
+            set()
+        )
+
+
+def test_monitor_support_unknown_when_iw_fails(monkeypatch):
+    def fail(cmd, *a, **k):
+        raise subprocess.CalledProcessError(237, cmd)
+
+    monkeypatch.setattr("profiler.interface.run_command", fail)
+    assert Interface().get_monitor_support("9") is None
+
+
+class TestMonitorUnsupported:
+    @staticmethod
+    def _iface(monkeypatch, name, phys, iw_info, drivers):
+        from collections import namedtuple
+
+        phy = namedtuple("phy", ["phy_id", "interfaces"])
+        dev = namedtuple("iface", ["name", "ifindex", "addr", "type"])
+        listing = [
+            phy(pid, [dev(n, "", "", t) for n, t in ifaces])
+            for pid, ifaces in phys.items()
+        ]
+        staged = []
+        monkeypatch.setattr(
+            "profiler.interface._run_staging_command", lambda cmd: staged.append(cmd)
+        )
+        monkeypatch.setattr(
+            Interface, "build_iw_phy_list", staticmethod(lambda: listing)
+        )
+        monkeypatch.setattr(
+            "profiler.interface.run_command",
+            lambda cmd, *a, **k: iw_info[cmd[2]] if cmd[:2] == ["iw", "phy"] else "",
+        )
+        monkeypatch.setattr(Interface, "get_driver", lambda self, n: drivers[n])
+        iface = Interface()
+        iface.name = name
+        return iface, staged
+
+    def test_r4_onboard_refused_with_usb_suggested(self, monkeypatch):
+        iface, staged = self._iface(monkeypatch, "wlan0", R4_PHYS, R4_IW, R4_DRIVERS)
+        reason = iface.monitor_unsupported()
+        assert reason.startswith("wlan0 (brcmfmac) does not support monitor mode")
+        assert "Monitor-capable: wlan1 (mt76x2u)." in reason
+        assert "-i wlan1" in reason
+        assert "wlanpi0" not in reason
+        assert staged == []
+
+    def test_usb_adapter_accepted(self, monkeypatch):
+        iface, _ = self._iface(monkeypatch, "wlan1", R4_PHYS, R4_IW, R4_DRIVERS)
+        assert iface.monitor_unsupported() == ""
+
+    def test_no_alternative(self, monkeypatch):
+        iface, _ = self._iface(
+            monkeypatch,
+            "wlan0",
+            {"1": [("wlan0", "managed")]},
+            {"phy1": IW_PHY_BRCMFMAC},
+            {"wlan0": "brcmfmac"},
+        )
+        assert iface.monitor_unsupported().endswith(
+            "No other wireless interface supports it."
+        )
+
+    @pytest.mark.parametrize("name, iw", [("wlan9", IW_PHY_BRCMFMAC), ("wlan0", "")])
+    def test_unknown_fails_open(self, monkeypatch, name, iw):
+        iface, _ = self._iface(
+            monkeypatch,
+            name,
+            {"1": [("wlan0", "managed")]},
+            {"phy1": iw},
+            {"wlan0": "brcmfmac"},
+        )
+        assert iface.monitor_unsupported() == ""
+
+
+def test_list_interfaces_shows_monitor_column(monkeypatch, capsys):
+    from collections import namedtuple
+
+    phy = namedtuple("phy", ["phy_id", "interfaces"])
+    dev = namedtuple("iface", ["name", "ifindex", "addr", "type"])
+    listing = [
+        phy("0", [dev("wlan1", "", "", "managed")]),
+        phy("1", [dev("wlan0", "", "", "managed")]),
+    ]
+    iw = {"phy0": IW_PHY_MT76X2U, "phy1": IW_PHY_BRCMFMAC}
+    monkeypatch.setattr(Interface, "build_iw_phy_list", staticmethod(lambda: listing))
+    monkeypatch.setattr(
+        "profiler.interface.run_command",
+        lambda cmd, *a, **k: iw[cmd[2]] if cmd[:2] == ["iw", "phy"] else "",
+    )
+    for name in ("get_ethtool_info", "get_driver", "get_chipset"):
+        monkeypatch.setattr(Interface, name, lambda self, i: "")
+    monkeypatch.setattr(Interface, "get_mode", lambda self, iface="": "managed")
+    Interface().print_interface_information()
+    rows = {
+        line.split()[1]: line.split()
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("phy")
+    }
+    assert rows["wlan1"][2:4] == ["managed", "yes"]
+    assert rows["wlan0"][2:4] == ["managed", "no"]
 
 
 def _assert_no_iftype_change_while_up(calls, initially_up=("wlan0",)):
