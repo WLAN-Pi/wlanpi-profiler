@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 
 from profiler.interface import Interface
@@ -647,7 +649,6 @@ def test_fakeap_unsupported_only_on_ath12k(monkeypatch, driver, refused):
     assert calls == []
 
 
-# `iw phy phyN info` excerpts from a Pi 4 (WLAN Pi R4) on 26.10 DeadEye.
 IW_PHY_BRCMFMAC = """\
 \tAvailable Antennas: TX 0 RX 0
 \tSupported interface modes:
@@ -690,7 +691,6 @@ class TestParseInterfaceModes:
         modes = Interface.parse_interface_modes(IW_PHY_BRCMFMAC)
         assert "monitor" not in modes
         assert "P2P-device" in modes
-        # the Supported commands block is not interface modes
         assert "new_interface" not in modes
 
     def test_mt76x2u_has_monitor(self):
@@ -701,6 +701,14 @@ class TestParseInterfaceModes:
         assert Interface.parse_interface_modes("command failed: No such device") == (
             set()
         )
+
+
+def test_monitor_support_unknown_when_iw_fails(monkeypatch):
+    def fail(cmd, *a, **k):
+        raise subprocess.CalledProcessError(237, cmd)
+
+    monkeypatch.setattr("profiler.interface.run_command", fail)
+    assert Interface().get_monitor_support("9") is None
 
 
 class TestMonitorUnsupported:
@@ -736,7 +744,6 @@ class TestMonitorUnsupported:
         assert reason.startswith("wlan0 (brcmfmac) does not support monitor mode")
         assert "Monitor-capable: wlan1 (mt76x2u)." in reason
         assert "-i wlan1" in reason
-        # Core's monitor is not a usable profiler interface
         assert "wlanpi0" not in reason
         assert staged == []
 
@@ -758,7 +765,6 @@ class TestMonitorUnsupported:
 
     @pytest.mark.parametrize("name, iw", [("wlan9", IW_PHY_BRCMFMAC), ("wlan0", "")])
     def test_unknown_fails_open(self, monkeypatch, name, iw):
-        """Missing interface or unparsable iw output: leave it to setup()."""
         iface, _ = self._iface(
             monkeypatch,
             name,

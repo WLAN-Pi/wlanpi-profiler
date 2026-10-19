@@ -396,20 +396,16 @@ class Interface:
         return False
 
     def monitor_unsupported(self) -> str:
-        """Return why this interface's radio can't run monitor mode, or "" if it can.
-
-        Every profiler mode sniffs on a monitor interface. A radio without one
-        (the Pi 4's onboard brcmfmac) otherwise fails mid-staging with
-        `iw ... type monitor` exit 161 (-EOPNOTSUPP). Reads only; fails open
-        when the interface or the iw output is unknown so setup() reports it.
-        """
         phys = self.build_iw_phy_list()
         own = next(
             (p for p in phys if any(i.name == self.name for i in p.interfaces)), None
         )
-        if own is None or self.get_monitor_support(own.phy_id) is not False:
+        known_unsupported = (
+            own is not None and self.get_monitor_support(own.phy_id) is False
+        )
+        if not known_unsupported:
             return ""
-        capable = sorted(
+        capable_primaries = sorted(
             i.name
             for p in phys
             if p is not own and self.get_monitor_support(p.phy_id)
@@ -420,12 +416,13 @@ class Interface:
             f"{self.name} ({self.get_driver(self.name)}) does not support monitor "
             "mode, which the profiler needs."
         )
-        if not capable:
+        if not capable_primaries:
             return f"{reason} No other wireless interface supports it."
-        listed = ", ".join(f"{n} ({self.get_driver(n)})" for n in capable)
+        listed = ", ".join(f"{n} ({self.get_driver(n)})" for n in capable_primaries)
+        first = capable_primaries[0]
         return (
-            f"{reason} Monitor-capable: {listed}. Use -i {capable[0]} or set "
-            f"'interface: {capable[0]}' in {CONFIG_FILE}."
+            f"{reason} Monitor-capable: {listed}. Use -i {first} or set "
+            f"'interface: {first}' in {CONFIG_FILE}."
         )
 
     def fakeap_unsupported(self) -> str:
@@ -963,10 +960,6 @@ class Interface:
 
     @staticmethod
     def parse_interface_modes(iw_phy_info: str) -> set[str]:
-        """Return the iftypes listed under `Supported interface modes:`.
-
-        Empty when the block is missing, e.g. iw failed and returned stderr.
-        """
         m = re.search(
             r"^[ \t]*Supported interface modes:[ \t]*\n((?:[ \t]+\* .*(?:\n|$))*)",
             iw_phy_info,
@@ -977,10 +970,11 @@ class Interface:
         return {line.split("* ", 1)[1].strip() for line in m.group(1).splitlines()}
 
     def get_monitor_support(self, phy_id: str) -> bool | None:
-        """True/False if phy<phy_id> lists monitor mode, None if iw can't say"""
-        modes = self.parse_interface_modes(
-            run_command(["iw", "phy", f"phy{phy_id}", "info"])
-        )
+        try:
+            info = run_command(["iw", "phy", f"phy{phy_id}", "info"], check=True)
+        except subprocess.CalledProcessError:
+            return None
+        modes = self.parse_interface_modes(info)
         return "monitor" in modes if modes else None
 
     @staticmethod

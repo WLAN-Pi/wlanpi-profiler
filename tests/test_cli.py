@@ -293,7 +293,6 @@ def test_country_code_detected_for_selected_phy():
 
 
 def _start_until_refused(monkeypatch, tmp_path, argv, fakeap):
-    """Run _start_impl with -i wlan0; setup, staging and cleanup must not run."""
     import logging
 
     from profiler import manager, status
@@ -341,7 +340,7 @@ def _start_until_refused(monkeypatch, tmp_path, argv, fakeap):
 
 @pytest.mark.parametrize("argv", [["--fakeap"], ["--fakeap", "--noprep"]])
 def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
-    """#311: refuse with a status reason, without setup, staging or cleanup."""
+    """#311"""
     monkeypatch.setattr(Interface, "monitor_unsupported", lambda self: "")
     monkeypatch.setattr(Interface, "get_driver", lambda self, name: "ath12k_wifi7_pci")
     error = _start_until_refused(monkeypatch, tmp_path, argv, fakeap=True)
@@ -350,7 +349,6 @@ def test_fakeap_on_ath12k_refused_before_staging(monkeypatch, tmp_path, argv):
 
 @pytest.mark.parametrize("argv", [[], ["--listen-only"], ["--fakeap"], ["--noprep"]])
 def test_interface_without_monitor_refused_before_staging(monkeypatch, tmp_path, argv):
-    """Pi 4 onboard brcmfmac: every mode needs a monitor interface."""
     reason = "wlan0 (brcmfmac) does not support monitor mode"
     monkeypatch.setattr(Interface, "monitor_unsupported", lambda self: reason)
     monkeypatch.setattr(
