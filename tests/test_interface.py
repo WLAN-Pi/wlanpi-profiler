@@ -501,25 +501,27 @@ class TestInterface:
         assert len(channels) == 2
 
 
-def test_channel_flags_do_not_cross_band_boundaries():
-    iw = """Band 1:
-        * 2472 MHz [13]
-          Maximum TX power: 22.0 dBm
-          No IR
-        * 2484 MHz [14] (disabled)
+BAND_BOUNDARY_CHANNELS = """Band 1:
+    * 2472 MHz [13]
+      Maximum TX power: 22.0 dBm
+      No IR
+    * 2484 MHz [14] (disabled)
 Band 2:
-        * 5180 MHz [36] (disabled)
-        * 5200 MHz [40]
-          No IR
-        * 5260 MHz [52]
-          No IR
-          Radar detection
+    * 5180 MHz [36] (disabled)
+    * 5200 MHz [40]
+      No IR
+    * 5260 MHz [52]
+      No IR
+      Radar detection
 Band 4:
-        * 5955 MHz [1]
-        * 5975 MHz [5]"""
+    * 5955 MHz [1]
+    * 5975 MHz [5]"""
+
+
+def test_channel_flags_do_not_cross_band_boundaries():
     flags = {
         (band, c.ch): (c.no_ir, c.radar_detect, c.disabled)
-        for band, chs in Interface.get_channels_status(iw).items()
+        for band, chs in Interface.get_channels_status(BAND_BOUNDARY_CHANNELS).items()
         for c in chs
     }
     assert flags == {
@@ -531,6 +533,22 @@ Band 4:
         ("4:", "1"): (False, False, False),
         ("4:", "5"): (False, False, False),
     }
+
+
+@pytest.mark.parametrize("freq, refused", [(5180, True), (5260, True), (5955, False)])
+def test_ap_channel_validation_uses_own_band_flags(monkeypatch, freq, refused):
+    from profiler.interface import InterfaceError
+
+    monkeypatch.setattr(
+        "profiler.interface.run_command", lambda cmd, *a, **k: BAND_BOUNDARY_CHANNELS
+    )
+    iface = Interface()
+    iface.phy, iface.frequency = "phy0", freq
+    if refused:
+        with pytest.raises(InterfaceError):
+            iface.validate_channel_for_ap()
+    else:
+        iface.validate_channel_for_ap()
 
 
 class TestRunStagingCommand:
