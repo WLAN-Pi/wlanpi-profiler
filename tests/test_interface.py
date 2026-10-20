@@ -574,9 +574,34 @@ def test_ap_channel_validation_refuses_unlisted_frequency(monkeypatch, iw_output
 
 
 def test_malformed_channel_line_is_skipped_with_its_flags():
-    iw = "Band 2:\n* 5180 MHz [36]\n* garbage\nNo IR\n* 5200 MHz [40]\n"
+    iw = (
+        "Band 2:\n* 5180 MHz [36]\n* garbage\nNo IR\nRadar detection\n* 5200 MHz [40]\n"
+    )
     chs = Interface.get_channels_status(iw)["2:"]
-    assert [(c.ch, c.no_ir) for c in chs] == [("36", False), ("40", False)]
+    assert [(c.ch, c.no_ir, c.radar_detect) for c in chs] == [
+        ("36", False, False),
+        ("40", False, False),
+    ]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        subprocess.CalledProcessError(1, "iw", output=BAND_BOUNDARY_CHANNELS[:60]),
+        FileNotFoundError("iw"),
+    ],
+)
+def test_ap_channel_validation_refuses_when_iw_fails(monkeypatch, error):
+    from profiler.interface import InterfaceError
+
+    def fail(cmd, *a, **k):
+        raise error
+
+    monkeypatch.setattr("profiler.interface.run_command", fail)
+    iface = Interface()
+    iface.phy, iface.frequency = "phy0", 2472
+    with pytest.raises(InterfaceError, match="refusing to start"):
+        iface.validate_channel_for_ap()
 
 
 class TestRunStagingCommand:

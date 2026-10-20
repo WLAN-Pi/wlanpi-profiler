@@ -764,7 +764,14 @@ class Interface:
         """
         self.log.debug("start validate_channel_for_ap")
 
-        iw_phy_channels = run_command(["iw", "phy", f"{self.phy}", "channels"])
+        cmd = ["iw", "phy", f"{self.phy}", "channels"]
+        try:
+            iw_phy_channels = run_command(cmd, check=True)
+        except (subprocess.CalledProcessError, OSError) as e:
+            raise InterfaceError(
+                f"'{' '.join(cmd)}' failed ({e}); refusing to start an AP "
+                "without a regulatory check."
+            ) from e
         channels_status = self.get_channels_status(iw_phy_channels)
 
         requested_band = None
