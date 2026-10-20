@@ -228,3 +228,14 @@ def test_sniffer_refreshes_interface_cache_before_sniff(monkeypatch):
     monkeypatch.setattr(fakeap, "sniff", lambda **k: calls.append("sniff"))
     sniffer.run()
     assert calls == ["reload", "sniff"]
+
+
+def test_sniffer_bpf_filter_compiles_for_radiotap():
+    from scapy.arch.common import compile_filter
+    from scapy.data import DLT_IEEE802_11_RADIO
+
+    try:
+        bpf = compile_filter(fakeap.SNIFFER_BPF_FILTER, linktype=DLT_IEEE802_11_RADIO)
+    except ImportError:
+        pytest.skip("libpcap not available")
+    assert bpf.bf_len > 0
