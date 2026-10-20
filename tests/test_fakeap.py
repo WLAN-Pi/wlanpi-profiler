@@ -208,3 +208,14 @@ class TestSnifferProtocolVersion:
         assert sniffer.queue.qsize() == queued
         assert sniffer.invalid_frame_count == 1 - queued
         assert len(sniffer.seen_macs) == queued
+
+
+def test_sniffer_bpf_filter_compiles_for_radiotap():
+    from scapy.arch.common import compile_filter
+    from scapy.data import DLT_IEEE802_11_RADIO
+
+    try:
+        bpf = compile_filter(fakeap.SNIFFER_BPF_FILTER, linktype=DLT_IEEE802_11_RADIO)
+    except ImportError:
+        pytest.skip("libpcap not available")
+    assert bpf.bf_len > 0

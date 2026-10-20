@@ -440,6 +440,12 @@ class _Utils:
         return sequence_number.value
 
 
+SNIFFER_BPF_FILTER = (
+    "type mgt subtype probe-req or type mgt subtype auth or "
+    "type mgt subtype assoc-req or type mgt subtype reassoc-req"
+)
+
+
 class TxBeacons(multiprocessing.Process):
     """Handle Tx of fake AP frames"""
 
@@ -649,7 +655,7 @@ class Sniffer(multiprocessing.Process):
             self.log.info("BPF filters disabled (filtering in Python instead)")
         else:
             # Enable BPF filters by default for performance
-            self.bpf_filter = "type mgt subtype probe-req or type mgt subtype auth or type mgt subtype assoc-req or type mgt subtype reassoc-req"
+            self.bpf_filter = SNIFFER_BPF_FILTER
             self.log.info(
                 "BPF filters enabled (kernel-level filtering for better performance)"
             )
