@@ -781,6 +781,9 @@ class Sniffer(multiprocessing.Process):
     def run(self) -> None:
         """Main process loop - called by multiprocessing.Process.start()"""
         self._open_socket()
+        # scapy compiles the BPF filter for the link type it cached at import;
+        # staging may since have switched this interface to monitor (#246).
+        scapyconf.ifaces.reload()
         try:
             sniff(
                 iface=self.interface,
