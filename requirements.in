@@ -1,4 +1,4 @@
-scapy
+scapy>=2.8.0
 manuf2
 jinja2
 argcomplete  # tab-completion for the profiler CLI
