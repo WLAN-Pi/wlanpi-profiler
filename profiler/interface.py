@@ -500,7 +500,7 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+                ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         elif "88XXau" in self.driver:
             # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
@@ -511,7 +511,7 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+                ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         else:
             cmds = [
@@ -722,7 +722,7 @@ class Interface:
                     ["ip", "link", "set", f"{self.name}", "down"],
                     ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
                     ["ip", "link", "set", f"{self.name}", "up"],
-                    ["iw", f"{self.name}", "set", "channel", f"{self.channel}", "HT20"],
+                    ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
                 ]
 
         # Run the staging commands
