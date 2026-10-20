@@ -19,11 +19,9 @@ def test_platform(monkeypatch):
     monkeypatch.setattr(__main__.sys, "platform", "win32")
     monkeypatch.setattr(manager, "start", lambda args: None)
 
-    # pcap mode is allowed on non-Linux
     monkeypatch.setattr(__main__.sys, "argv", ["profiler", "--pcap", "x.pcap"])
     __main__.main()
 
-    # live capture mode exits on non-Linux
     monkeypatch.setattr(__main__.sys, "argv", ["profiler"])
     with pytest.raises(SystemExit):
         __main__.main()

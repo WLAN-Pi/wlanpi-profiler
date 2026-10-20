@@ -10,8 +10,6 @@ validations per beacon capture to reduce the ~25-second overhead per test.
 
 import os
 import subprocess
-
-# Import helpers from existing test file
 import sys
 
 import pytest
@@ -90,16 +88,14 @@ class TestComprehensiveModeAndArgs:
     @pytest.mark.parametrize(
         "mode,security,expect_eht,expect_ft,passphrase",
         [
-            # AP mode security tests
             ("ap", "wpa2", False, False, "profiler"),
             ("ap", "ft-wpa2", False, True, "profiler"),
             ("ap", "wpa3-mixed", True, False, "Custom123"),
             ("ap", "ft-wpa3-mixed", True, True, "Test@Pass1"),
-            # FakeAP mode security tests
             ("fakeap", "wpa2", False, False, "profiler"),
             ("fakeap", "ft-wpa2", False, True, "profiler"),
             ("fakeap", "wpa3-mixed", True, False, "EightChr"),
-            ("fakeap", "ft-wpa3-mixed", True, True, "a" * 63),  # Max length
+            ("fakeap", "ft-wpa3-mixed", True, True, "a" * 63),
         ],
     )
     def test_mode_security_passphrase_vendor_ie(
@@ -123,7 +119,7 @@ class TestComprehensiveModeAndArgs:
         - FT Mobility Domain IE
         - Cipher suites
         """
-        ssid = f"OTA-{mode[:2]}-{security[:4]}"  # Keep under 32 chars
+        ssid = f"OTA-{mode[:2]}-{security[:4]}"
         runner = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid
         )
@@ -141,10 +137,6 @@ class TestComprehensiveModeAndArgs:
             assert len(beacons) >= 1, f"No beacons captured for {mode}/{security}"
             beacon = beacons[0]
 
-            # Validate: Custom passphrase works (profiler started successfully)
-            # We can't verify passphrase OTA, but successful beacon = passphrase accepted
-
-            # Validate: Security mode AKMs
             if security == "wpa2":
                 assert BeaconCapture.verify_rsn_akm(beacon, ["PSK"])
             elif security == "ft-wpa2":
@@ -156,22 +148,18 @@ class TestComprehensiveModeAndArgs:
                     beacon, ["PSK", "FT-PSK", "SAE", "FT-SAE"]
                 )
 
-            # Validate: Ciphers
             if "wpa3" in security:
                 assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP", "GCMP-256"])
             else:
                 assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP"])
 
-            # Validate: FT/Mobility Domain
             assert BeaconCapture.has_mobility_domain(beacon) == expect_ft
 
-            # Validate: PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), "Missing HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Missing VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Missing HE"
             assert BeaconCapture.has_eht_capabilities(beacon) == expect_eht
 
-            # Validate: Vendor IE present by default
             assert BeaconCapture.has_profiler_vendor_ie(beacon), "Missing vendor IE"
             assert BeaconCapture.verify_profiler_vendor_ie_content(beacon), (
                 "Invalid vendor IE"
@@ -190,10 +178,10 @@ class TestComprehensiveModeAndArgs:
     @pytest.mark.parametrize(
         "mode,phy_flags,expect_he,expect_eht",
         [
-            ("ap", [], True, True),  # Default: all enabled
-            ("ap", ["--no11ax"], False, False),  # --no11ax disables both HE and EHT
-            ("ap", ["--no11be"], True, False),  # --no11be disables only EHT
-            ("fakeap", [], True, True),  # Default: all enabled
+            ("ap", [], True, True),
+            ("ap", ["--no11ax"], False, False),
+            ("ap", ["--no11be"], True, False),
+            ("fakeap", [], True, True),
             ("fakeap", ["--no11ax"], False, False),
             ("fakeap", ["--no11be"], True, False),
         ],
@@ -234,18 +222,15 @@ class TestComprehensiveModeAndArgs:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Validate: PHY capabilities based on flags
             assert BeaconCapture.has_ht_capabilities(beacon), "Missing HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Missing VHT"
             assert BeaconCapture.has_he_capabilities(beacon) == expect_he
             assert BeaconCapture.has_eht_capabilities(beacon) == expect_eht
 
-            # Validate: Vendor IE absent due to --noprofilertlv
             assert not BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Vendor IE should be absent"
             )
 
-            # Validate: All IEs parse correctly
             elt = beacon.getlayer(Dot11Elt)
             ie_count = 0
             while elt:
@@ -280,7 +265,6 @@ class TestComprehensiveModeAndArgs:
         - --hostname_ssid uses hostname as SSID
         - Profiler starts and beacons successfully
         """
-        # Get remote hostname
         hostname_cmd = [
             "ssh",
             "-o",
@@ -306,7 +290,6 @@ class TestComprehensiveModeAndArgs:
                 extra_args=["--hostname_ssid"],
             )
 
-            # Capture beacons with hostname as SSID
             beacons = capture.capture(ssid=expected_ssid, count=3)
 
             assert len(beacons) >= 1, f"No beacons with hostname SSID '{expected_ssid}'"
@@ -355,13 +338,11 @@ class TestComprehensiveModeAndArgs:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Validate: All PHY present with override
             assert BeaconCapture.has_ht_capabilities(beacon)
             assert BeaconCapture.has_vht_capabilities(beacon)
             assert BeaconCapture.has_he_capabilities(beacon)
             assert BeaconCapture.has_eht_capabilities(beacon), "--11be override failed"
 
-            # Validate: Warning logged
             log_output = runner.stop()
             assert "Enabling 802.11be with security_mode 'wpa2'" in log_output
 
@@ -405,21 +386,18 @@ class TestComprehensiveModeAndArgs:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Validate HT Capabilities
             ht_cap = BeaconCapture.get_ie(beacon, 0x2D)
             assert ht_cap is not None, "HT Capabilities missing"
             assert len(ht_cap.info) == 26, (
                 f"HT Capabilities wrong length: {len(ht_cap.info)}"
             )
 
-            # Validate VHT Capabilities
             vht_cap = BeaconCapture.get_ie(beacon, 0xBF)
             assert vht_cap is not None, "VHT Capabilities missing"
             assert len(vht_cap.info) == 12, (
                 f"VHT Capabilities wrong length: {len(vht_cap.info)}"
             )
 
-            # Validate HE Capabilities
             he_cap = None
             elt = beacon.getlayer(Dot11Elt)
             while elt:
@@ -432,7 +410,6 @@ class TestComprehensiveModeAndArgs:
                 f"HE Capabilities too short: {len(he_cap.info)}"
             )
 
-            # Validate HE Operation
             he_op = None
             elt = beacon.getlayer(Dot11Elt)
             while elt:
@@ -443,7 +420,6 @@ class TestComprehensiveModeAndArgs:
             assert he_op is not None, "HE Operation missing"
             assert len(he_op.info) >= 7, f"HE Operation too short: {len(he_op.info)}"
 
-            # Validate EHT Capabilities
             eht_cap = None
             elt = beacon.getlayer(Dot11Elt)
             while elt:
@@ -456,7 +432,6 @@ class TestComprehensiveModeAndArgs:
                 f"EHT Capabilities too short: {len(eht_cap.info)}"
             )
 
-            # Validate RSN IE
             rsn = BeaconCapture.get_ie(beacon, 0x30)
             assert rsn is not None, "RSN IE missing"
             assert len(rsn.info) >= 20, f"RSN IE too short: {len(rsn.info)}"
@@ -484,7 +459,6 @@ class TestRSNXIE:
         """
         capture = BeaconCapture(interface=ota_interface, timeout=15)
 
-        # Test WPA3 has RSNX
         ssid_wpa3 = "OTA-RSNX-WPA3"
         runner_wpa3 = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid_wpa3

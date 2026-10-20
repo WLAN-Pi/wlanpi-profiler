@@ -14,31 +14,23 @@ from scapy.all import rdpcap
 
 from profiler import profiler
 
-# Expected capabilities for each Wi-Fi 7 device
-# These are the ACTUAL values detected from real device pcaps.
-
 WIFI7_DEVICE_EXPECTED_CAPS = {
     "OnePlus11_Android15": {
         "chipset": "Qualcomm",
         "is_6ghz": False,
         "capabilities": {
-            # Extended Capabilities
             "dot11aa_scs_support": 0,
-            "qos_r1_mscs_support": -1,  # Not reported - ExtCap IE is only 10 bytes, need 11 for MSCS
-            # EHT MAC
+            "qos_r1_mscs_support": -1,
             "dot11be_epcs_support": 1,
             "dot11be_om_support": 1,
             "dot11be_rtwt_support": 0,
             "dot11be_scs_traffic_description_support": 0,
-            # EHT PHY
             "dot11be_mcs15_support": 1,
             "dot11be_mcs14_support": 1,
-            # RSNX
             "rsnx_sae_h2e": 1,
-            # MLE
             "dot11be_mle": 1,
             "dot11be_mle_mlc_type": 0,
-            "dot11be_mle_emlsr_support": -1,  # Not present
+            "dot11be_mle_emlsr_support": -1,
             "dot11be_mle_emlsr_padding_delay": -1,
             "dot11be_mle_emlsr_transition_delay": -1,
             "dot11be_mle_emlmr_support": -1,
@@ -51,17 +43,16 @@ WIFI7_DEVICE_EXPECTED_CAPS = {
         "chipset": "Broadcom",
         "is_6ghz": False,
         "capabilities": {
-            # Early Wi-Fi 7 device - has basic 11be but not all advanced features
             "dot11aa_scs_support": 0,
-            "qos_r1_mscs_support": -1,  # Not reported - ExtCap IE is only 10 bytes, need 11 for MSCS
-            "dot11be_epcs_support": 0,  # Not supported
+            "qos_r1_mscs_support": -1,
+            "dot11be_epcs_support": 0,
             "dot11be_om_support": 1,
             "dot11be_rtwt_support": 0,
             "dot11be_scs_traffic_description_support": 0,
-            "dot11be_mcs15_support": 0,  # Not supported
-            "dot11be_mcs14_support": 0,  # Not supported
+            "dot11be_mcs15_support": 0,
+            "dot11be_mcs14_support": 0,
             "rsnx_sae_h2e": 1,
-            "dot11be_mle": -1,  # No MLE support
+            "dot11be_mle": -1,
             "dot11be_mle_mlc_type": -1,
             "dot11be_mle_emlsr_support": -1,
             "dot11be_mle_emlsr_padding_delay": -1,
@@ -82,7 +73,7 @@ WIFI7_DEVICE_EXPECTED_CAPS = {
             "dot11be_om_support": 1,
             "dot11be_rtwt_support": 1,
             "dot11be_scs_traffic_description_support": 0,
-            "dot11be_mcs15_support": 0,  # Not advertised in this frame
+            "dot11be_mcs15_support": 0,
             "dot11be_mcs14_support": 1,
             "rsnx_sae_h2e": 1,
             "dot11be_mle": 1,
@@ -106,7 +97,7 @@ WIFI7_DEVICE_EXPECTED_CAPS = {
             "dot11be_om_support": 1,
             "dot11be_rtwt_support": 1,
             "dot11be_scs_traffic_description_support": 0,
-            "dot11be_mcs15_support": 0,  # Not advertised in this frame
+            "dot11be_mcs15_support": 0,
             "dot11be_mcs14_support": 1,
             "rsnx_sae_h2e": 1,
             "dot11be_mle": 1,
@@ -124,24 +115,16 @@ WIFI7_DEVICE_EXPECTED_CAPS = {
         "chipset": "Mediatek",
         "is_6ghz": False,
         "capabilities": {
-            # This device correctly reports the 4-bit MCS 15 MRU support value
-            # per IEEE 802.11be-2024 spec (not just a boolean)
             "dot11aa_scs_support": 0,
             "qos_r1_mscs_support": 1,
             "dot11be_epcs_support": 0,
             "dot11be_om_support": 1,
             "dot11be_rtwt_support": 0,
             "dot11be_scs_traffic_description_support": 0,
-            # Per IEEE 802.11be-2024 Table 9-417r:
-            # Value 7 = 0b0111 means MCS 15 supported in:
-            #   B0=1: 52+26 and 106+26-tone MRUs
-            #   B1=1: 484+242-tone MRU (80 MHz)
-            #   B2=1: 996+484+242-tone MRU (160 MHz)
-            #   B3=0: NOT in 3x996-tone MRU (320 MHz)
             "dot11be_mcs15_support": 7,
             "dot11be_mcs14_support": 1,
             "rsnx_sae_h2e": 1,
-            "dot11be_mle": -1,  # No MLE support
+            "dot11be_mle": -1,
             "dot11be_mle_mlc_type": -1,
             "dot11be_mle_emlsr_support": -1,
             "dot11be_mle_emlsr_padding_delay": -1,
@@ -178,25 +161,18 @@ class TestWiFi7DeviceRegression:
         if not pcap_path.exists():
             pytest.skip(f"Pcap file not found: {pcap_path}")
 
-        # Load expected values
         expected = WIFI7_DEVICE_EXPECTED_CAPS[device_name]
 
-        # Run profiler
         p = profiler.Profiler()
         p.ft_disabled = False
         p.he_disabled = False
         p.be_disabled = False
 
-        # Note: analyze_assoc_req expects Profiler to have these attributes set
-        # They are normally set during __init__ but we set them manually for testing
-
         cap = rdpcap(str(pcap_path))
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], expected["is_6ghz"])
 
-        # Convert to dict
         cap_dict = {c.db_key: c.db_value for c in capabilities if c.db_key}
 
-        # Validate each expected capability
         failures = []
         for cap_key, expected_val in expected["capabilities"].items():
             actual_val = cap_dict.get(cap_key)
@@ -204,21 +180,17 @@ class TestWiFi7DeviceRegression:
             if actual_val is None:
                 failures.append(f"  ❌ {cap_key}: MISSING (expected {expected_val})")
             elif actual_val != expected_val:
-                # Special case: MCS 15 can have different values (1, 7, 15, etc.)
-                # as long as it's non-zero when expected non-zero
                 if (
                     cap_key == "dot11be_mcs15_support"
                     and expected_val > 0
                     and actual_val > 0
                 ):
-                    continue  # Accept any non-zero value
+                    continue
 
                 failures.append(
                     f"  ❌ {cap_key}: expected {expected_val}, got {actual_val}"
                 )
 
-        # Validate GCMP-256 support (now in cipher capabilities, not standalone)
-        # All Wi-Fi 7 devices in our test suite support GCMP-256
         group_cipher_cap = next(
             (c for c in capabilities if c.db_key == "group_cipher"), None
         )
@@ -237,7 +209,6 @@ class TestWiFi7DeviceRegression:
                 "  ❌ GCMP-256: Not found in group_cipher or pairwise_cipher capabilities"
             )
 
-        # Report results
         if failures:
             pytest.fail(
                 f"\n{device_name} ({expected['chipset']}) - Capability mismatches:\n"
@@ -315,7 +286,6 @@ class TestWiFi7DeviceRegression:
         cap = rdpcap(str(pcap_path))
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], False)
 
-        # If Common Info Length is incorrect, MLC Type parsing will fail
         mle_cap = next((c for c in capabilities if c.db_key == "dot11be_mle"), None)
         mlc_type = next(
             (c for c in capabilities if c.db_key == "dot11be_mle_mlc_type"), None
@@ -380,7 +350,6 @@ class TestWiFi7DeviceRegression:
             for c in capabilities:
                 if c.db_key and c.db_key in all_caps:
                     detected_caps.add(c.db_key)
-                # Check for GCMP-256 in cipher capabilities
                 if c.db_key in ("group_cipher", "pairwise_cipher"):
                     if "GCMP-256" in str(c.value):
                         gcmp256_detected = True

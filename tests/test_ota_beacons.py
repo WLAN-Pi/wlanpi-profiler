@@ -52,7 +52,6 @@ from scapy.all import (
     sniff,
 )
 
-# Skip all tests in this file unless OTA testing is explicitly enabled
 pytestmark = pytest.mark.skipif(
     os.getenv("PROFILER_OTA_TESTS") != "1",
     reason="OTA tests disabled (set PROFILER_OTA_TESTS=1 to enable)",
@@ -92,30 +91,23 @@ class BeaconCapture:
         """
         self.beacons = []
 
-        # BPF filter for beacons with specific SSID
-        # Note: Scapy's BPF filter doesn't support SSID filtering well,
-        # so we filter in the handler
         filter_str = "type mgt subtype beacon"
 
         def ssid_filter(pkt):
             if pkt.haslayer(Dot11Beacon):
                 try:
-                    # Extract SSID from Dot11Elt
                     elt = pkt[Dot11Elt]
                     while elt:
-                        if elt.ID == 0:  # SSID element
+                        if elt.ID == 0:
                             if elt.info.decode("utf-8", errors="ignore") == ssid:
                                 self.beacons.append(pkt)
                                 if len(self.beacons) >= count:
-                                    return True  # Stop capture
+                                    return True
                         elt = elt.payload.getlayer(Dot11Elt)
                 except Exception:
                     pass
             return False
 
-        # Capture packets. The capture interface and the profiler's interface
-        # are on the same host, so re-assert monitor mode after the profiler
-        # has settled and retry a couple of times.
         channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
         last_error: Exception | None = None
         for attempt in range(3):
@@ -182,30 +174,23 @@ class BeaconCapture:
         if not rsn:
             return False
 
-        # Parse RSN IE to extract AKM suites
-        # RSN format: version(2) + group cipher(4) + pairwise count(2) +
-        #             pairwise suites(4*n) + akm count(2) + akm suites(4*m)
         info = rsn.info
         if len(info) < 8:
             return False
 
-        # Skip version + group cipher + pairwise count
         offset = 2 + 4 + 2
         if len(info) < offset:
             return False
 
-        # Get pairwise cipher suite count
         pairwise_count = int.from_bytes(info[6:8], "little")
-        offset += 4 * pairwise_count  # Skip pairwise suites
+        offset += 4 * pairwise_count
 
         if len(info) < offset + 2:
             return False
 
-        # Get AKM suite count
         akm_count = int.from_bytes(info[offset : offset + 2], "little")
         offset += 2
 
-        # Extract AKM OUIs
         akm_ouis = []
         for i in range(akm_count):
             akm_offset = offset + (i * 4)
@@ -213,11 +198,6 @@ class BeaconCapture:
                 akm_oui = info[akm_offset : akm_offset + 4]
                 akm_ouis.append(akm_oui)
 
-        # Map AKM OUI to names
-        # 00-0F-AC:02 = PSK
-        # 00-0F-AC:04 = FT-PSK
-        # 00-0F-AC:08 = SAE
-        # 00-0F-AC:09 = FT-SAE
         akm_map = {
             b"\x00\x0f\xac\x02": "PSK",
             b"\x00\x0f\xac\x04": "FT-PSK",
@@ -227,7 +207,6 @@ class BeaconCapture:
 
         found_akms = [akm_map.get(oui) for oui in akm_ouis if oui in akm_map]
 
-        # Check all expected AKMs are present
         return all(akm in found_akms for akm in expected_akms)
 
     @staticmethod
@@ -247,18 +226,13 @@ class BeaconCapture:
         if not rsn:
             return False
 
-        # Parse RSN IE to extract pairwise cipher suites
-        # RSN format: version(2) + group cipher(4) + pairwise count(2) +
-        #             pairwise suites(4*n) + akm count(2) + akm suites(4*m)
         info = rsn.info
         if len(info) < 8:
             return False
 
-        # Get pairwise cipher suite count
         pairwise_count = int.from_bytes(info[6:8], "little")
-        offset = 8  # After version + group cipher + pairwise count
+        offset = 8
 
-        # Extract pairwise cipher OUIs
         cipher_ouis = []
         for i in range(pairwise_count):
             cipher_offset = offset + (i * 4)
@@ -266,10 +240,6 @@ class BeaconCapture:
                 cipher_oui = info[cipher_offset : cipher_offset + 4]
                 cipher_ouis.append(cipher_oui)
 
-        # Map cipher OUI to names
-        # 00-0F-AC:04 = CCMP-128 (AES)
-        # 00-0F-AC:08 = GCMP-128
-        # 00-0F-AC:09 = GCMP-256
         cipher_map = {
             b"\x00\x0f\xac\x04": "CCMP",
             b"\x00\x0f\xac\x08": "GCMP",
@@ -280,28 +250,26 @@ class BeaconCapture:
             cipher_map.get(oui) for oui in cipher_ouis if oui in cipher_map
         ]
 
-        # Check all expected ciphers are present
         return all(cipher in found_ciphers for cipher in expected_ciphers)
 
     @staticmethod
     def has_ht_capabilities(beacon: Dot11Beacon) -> bool:
         """Check if beacon advertises HT (802.11n) capabilities"""
-        return BeaconCapture.has_ie(beacon, 0x2D)  # HT Capabilities IE
+        return BeaconCapture.has_ie(beacon, 0x2D)
 
     @staticmethod
     def has_vht_capabilities(beacon: Dot11Beacon) -> bool:
         """Check if beacon advertises VHT (802.11ac) capabilities"""
-        return BeaconCapture.has_ie(beacon, 0xBF)  # VHT Capabilities IE
+        return BeaconCapture.has_ie(beacon, 0xBF)
 
     @staticmethod
     def has_he_capabilities(beacon: Dot11Beacon) -> bool:
         """Check if beacon advertises HE (802.11ax/Wi-Fi 6) capabilities"""
-        # HE Capabilities is extension IE (ID=255) with extension ID=35
         elt = beacon.getlayer(Dot11Elt)
         while elt:
             if elt.ID == 255 and len(elt.info) > 0:
                 ext_id = elt.info[0]
-                if ext_id == 0x23:  # HE Capabilities extension ID
+                if ext_id == 0x23:
                     return True
             elt = elt.payload.getlayer(Dot11Elt)
         return False
@@ -309,12 +277,11 @@ class BeaconCapture:
     @staticmethod
     def has_eht_capabilities(beacon: Dot11Beacon) -> bool:
         """Check if beacon advertises EHT (802.11be/Wi-Fi 7) capabilities"""
-        # EHT Capabilities is extension IE (ID=255) with extension ID=108
         elt = beacon.getlayer(Dot11Elt)
         while elt:
             if elt.ID == 255 and len(elt.info) > 0:
                 ext_id = elt.info[0]
-                if ext_id == 0x6C:  # EHT Capabilities extension ID
+                if ext_id == 0x6C:
                     return True
             elt = elt.payload.getlayer(Dot11Elt)
         return False
@@ -322,7 +289,7 @@ class BeaconCapture:
     @staticmethod
     def has_mobility_domain(beacon: Dot11Beacon) -> bool:
         """Check if beacon advertises Mobility Domain (802.11r/FT)"""
-        return BeaconCapture.has_ie(beacon, 0x36)  # Mobility Domain IE
+        return BeaconCapture.has_ie(beacon, 0x36)
 
     @staticmethod
     def get_vendor_ie(beacon: Dot11Beacon, oui: bytes) -> Dot11Elt | None:
@@ -339,7 +306,6 @@ class BeaconCapture:
         elt = beacon.getlayer(Dot11Elt)
         while elt:
             if elt.ID == 0xDD and len(elt.info) >= 3:
-                # Vendor IE format: OUI (3 bytes) + data
                 if elt.info[:3] == oui:
                     return elt
             elt = elt.payload.getlayer(Dot11Elt)
@@ -373,20 +339,16 @@ class BeaconCapture:
         if not vendor_ie:
             return False
 
-        # Vendor IE format: OUI (3) + subtype (1) + TLVs
         if len(vendor_ie.info) < 4:
             return False
 
-        # Check subtype
         if vendor_ie.info[3] != expected_subtype:
             return False
 
-        # Parse TLVs (at minimum should have profiler version TLV)
-        offset = 4  # After OUI + subtype
-        if len(vendor_ie.info) < offset + 3:  # Type + Length + at least 1 byte value
+        offset = 4
+        if len(vendor_ie.info) < offset + 3:
             return False
 
-        # TLV 0: Profiler version (type=0)
         tlv_type = vendor_ie.info[offset]
         if tlv_type != 0:
             return False
@@ -395,22 +357,18 @@ class BeaconCapture:
         if len(vendor_ie.info) < offset + 2 + tlv_length:
             return False
 
-        # Check that profiler version is non-empty
         profiler_version = vendor_ie.info[offset + 2 : offset + 2 + tlv_length]
         if len(profiler_version) == 0:
             return False
 
-        # TLV 1: System version (type=1) - optional but usually present
         offset += 2 + tlv_length
         if len(vendor_ie.info) >= offset + 3:
             tlv_type = vendor_ie.info[offset]
             if tlv_type == 1:
                 tlv_length = vendor_ie.info[offset + 1]
                 if len(vendor_ie.info) >= offset + 2 + tlv_length:
-                    # Valid TLV 1
                     return True
 
-        # If we got here, TLV 0 was valid but TLV 1 might be missing (still valid)
         return True
 
     @staticmethod
@@ -423,7 +381,7 @@ class BeaconCapture:
         Returns:
             True if RSNX IE present
         """
-        return BeaconCapture.has_ie(beacon, 0xF4)  # RSNX IE
+        return BeaconCapture.has_ie(beacon, 0xF4)
 
     @staticmethod
     def get_extended_capabilities(beacon: Dot11Beacon) -> bytes | None:
@@ -501,9 +459,6 @@ class RemoteProfilerRunner:
             fakeap: Use fakeap mode (Scapy-based) instead of AP mode (hostapd-based)
             extra_args: Additional CLI arguments
         """
-        # Resolve the profiler interface. fakeAP injects frames, which some
-        # drivers (e.g. iwlwifi/iwlmld) do not support, so allow a separate
-        # injection-capable interface via PROFILER_OTA_FAKEAP_INTERFACE.
         iface = self.interface
         if iface is None:
             if fakeap:
@@ -513,12 +468,8 @@ class RemoteProfilerRunner:
             else:
                 iface = os.getenv("PROFILER_OTA_AP_INTERFACE", "wlan0")
 
-        # Kill any leftover profiler/hostapd and remove stale monitor vifs
-        # before starting; on a single host a previous run's cleanup can race
-        # with this one and break staging.
         self._cleanup_remote()
 
-        # Build profiler command
         cmd_parts = [
             "sudo",
             "profiler",
@@ -527,7 +478,6 @@ class RemoteProfilerRunner:
             str(self.channel),
         ]
 
-        # Only add SSID if not using --hostname_ssid
         if not (extra_args and "--hostname_ssid" in extra_args):
             cmd_parts.extend(["-s", self.ssid])
 
@@ -550,9 +500,6 @@ class RemoteProfilerRunner:
 
         profiler_cmd = shlex.join(cmd_parts)
 
-        # SSH command to run profiler in background and capture PID
-        # We use nohup and redirect to capture output
-        # BatchMode=yes ensures no password prompts (key auth required)
         ssh_cmd = [
             "ssh",
             "-o",
@@ -567,7 +514,6 @@ class RemoteProfilerRunner:
             f"nohup {profiler_cmd} > /tmp/profiler-ota-test.log 2>&1 & echo $!",
         ]
 
-        # Execute SSH command to start profiler
         result = subprocess.run(
             ssh_cmd,
             capture_output=True,
@@ -580,7 +526,6 @@ class RemoteProfilerRunner:
                 f"Failed to start profiler on {self.remote_host}:\n{result.stderr}"
             )
 
-        # Extract PID
         try:
             self.pid = int(result.stdout.strip())
         except ValueError:
@@ -588,10 +533,8 @@ class RemoteProfilerRunner:
                 f"Failed to get profiler PID from remote. Output: {result.stdout}"
             )
 
-        # Wait for profiler to start beaconing
         time.sleep(5)
 
-        # Verify profiler is still running
         check_cmd = [
             "ssh",
             "-o",
@@ -610,16 +553,11 @@ class RemoteProfilerRunner:
         )
 
         if "stopped" in check_result.stdout:
-            # Get log output
             log_output = self._get_remote_log()
             pytest.fail(
                 f"Profiler stopped unexpectedly on remote.\nLog output:\n{log_output}"
             )
 
-        # Wait until the profiler has actually finished staging its interface
-        # and is beaconing. On a single host the capture card and the profiler
-        # card are both reconfigured, so the capture must not start until the
-        # profiler has settled.
         self._wait_for_ready()
 
     def _wait_for_ready(self, timeout: float = 30.0) -> None:
@@ -661,7 +599,6 @@ class RemoteProfilerRunner:
             Profiler log output
         """
         if self.pid:
-            # Send SIGTERM to profiler
             kill_cmd = [
                 "ssh",
                 "-o",
@@ -674,10 +611,8 @@ class RemoteProfilerRunner:
 
             subprocess.run(kill_cmd, capture_output=True, timeout=10)
 
-            # Wait for graceful shutdown
             time.sleep(2)
 
-            # Force kill if still running
             force_kill_cmd = [
                 "ssh",
                 "-o",
@@ -690,8 +625,6 @@ class RemoteProfilerRunner:
 
             subprocess.run(force_kill_cmd, capture_output=True, timeout=10)
 
-        # Also kill any stray profiler/hostapd processes to prevent interference
-        # This handles child processes that may not have been cleaned up
         cleanup_cmd = [
             "ssh",
             "-o",
@@ -704,29 +637,9 @@ class RemoteProfilerRunner:
 
         subprocess.run(cleanup_cmd, capture_output=True, timeout=10)
 
-        # Give kernel time to clean up interfaces
         time.sleep(0.5)
 
-        # Get and return log output
         return self._get_remote_log()
-
-
-# Test Matrix Configuration
-# -------------------------
-# Security Modes: wpa2, ft-wpa2, wpa3-mixed, ft-wpa3-mixed
-# PHY Features: 11n (HT), 11ac (VHT), 11ax (HE), 11be (EHT)
-#
-# Expected behavior:
-# - wpa2: Auto-disables 11be, should show HT+VHT+HE (no EHT)
-# - ft-wpa2: Auto-disables 11be, should show HT+VHT+HE (no EHT)
-# - wpa3-mixed: Allows 11be, should show HT+VHT+HE+EHT
-# - ft-wpa3-mixed: Allows 11be, should show HT+VHT+HE+EHT
-#
-# With --no11ax:
-# - All modes: Auto-disables 11be, should show HT+VHT (no HE, no EHT)
-#
-# With --no11be:
-# - All modes: Should show HT+VHT+HE (no EHT)
 
 
 @pytest.fixture
@@ -743,7 +656,6 @@ def ota_interface(request):
         iface = os.getenv("PROFILER_OTA_FAKEAP_CAPTURE_INTERFACE", iface)
     channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
 
-    # Verify interface exists
     try:
         subprocess.run(
             ["iw", "dev", iface, "info"],
@@ -754,7 +666,6 @@ def ota_interface(request):
     except subprocess.CalledProcessError:
         pytest.skip(f"Interface {iface} not found on localhost")
 
-    # Put interface in monitor mode if not already
     try:
         _ensure_monitor(iface, channel)
     except subprocess.CalledProcessError as e:
@@ -783,8 +694,6 @@ def _ensure_monitor(iface: str, channel: int) -> None:
     full managed->monitor reset between attempts.
     Raises subprocess.CalledProcessError if it cannot be staged.
     """
-    # Remove a stale monitor vif left behind by a previous profiler run; it
-    # blocks re-staging the primary interface as monitor (and the capture DLT).
     subprocess.run(
         ["sudo", "iw", "dev", f"{iface}profiler", "del"],
         capture_output=True,
@@ -846,7 +755,6 @@ def setup_ssh_key_auth(host: str) -> bool:
     """
     import getpass
 
-    # Check if key auth already works (no password prompt)
     try:
         result = subprocess.run(
             [
@@ -854,7 +762,7 @@ def setup_ssh_key_auth(host: str) -> bool:
                 "-o",
                 "ConnectTimeout=5",
                 "-o",
-                "BatchMode=yes",  # Fail if password required
+                "BatchMode=yes",
                 "-o",
                 "PasswordAuthentication=no",
                 host,
@@ -873,7 +781,6 @@ def setup_ssh_key_auth(host: str) -> bool:
     print(f"\n⚠ SSH key authentication not configured for {host}")
     print("Setting up SSH key authentication...")
 
-    # Check if local SSH key exists
     ssh_key_path = os.path.expanduser("~/.ssh/id_rsa")
     ssh_pub_key_path = f"{ssh_key_path}.pub"
 
@@ -890,7 +797,7 @@ def setup_ssh_key_auth(host: str) -> bool:
                     "-f",
                     ssh_key_path,
                     "-N",
-                    "",  # No passphrase
+                    "",
                     "-C",
                     f"profiler-ota-tests@{os.uname().nodename}",
                 ],
@@ -902,16 +809,12 @@ def setup_ssh_key_auth(host: str) -> bool:
             print(f"✗ Failed to generate SSH key: {e.stderr.decode()}")
             return False
 
-    # Copy SSH key to remote host
     print(f"\nCopying SSH public key to {host}...")
     print("You will be prompted for the remote host password.")
 
-    # Get password from user
     password = getpass.getpass(f"Password for {host}: ")
 
-    # Use sshpass if available, otherwise try ssh-copy-id with password
     try:
-        # Try sshpass first (more reliable for automation)
         subprocess.run(["which", "sshpass"], check=True, capture_output=True)
 
         result = subprocess.run(
@@ -935,7 +838,6 @@ def setup_ssh_key_auth(host: str) -> bool:
             return False
 
     except subprocess.CalledProcessError:
-        # sshpass not available, use ssh-copy-id with manual password entry
         print(
             "\nNote: sshpass not found, using ssh-copy-id (you may need to enter password)"
         )
@@ -957,7 +859,6 @@ def setup_ssh_key_auth(host: str) -> bool:
             print(f"✗ Failed to copy SSH key: {result.stderr}")
             return False
 
-    # Verify key auth now works
     try:
         result = subprocess.run(
             [
@@ -991,11 +892,9 @@ def remote_host():
     """Get remote WLAN Pi SSH target from environment and ensure key auth is setup"""
     host = os.getenv("PROFILER_REMOTE_HOST", "wlanpi@198.18.42.1")
 
-    # Setup SSH key authentication if needed
     if not setup_ssh_key_auth(host):
         pytest.skip(f"Failed to setup SSH key authentication for {host}")
 
-    # Verify SSH connectivity (should work with key auth now)
     try:
         result = subprocess.run(
             [
@@ -1003,7 +902,7 @@ def remote_host():
                 "-o",
                 "ConnectTimeout=5",
                 "-o",
-                "BatchMode=yes",  # Ensure no password prompt
+                "BatchMode=yes",
                 host,
                 "echo 'connected'",
             ],
@@ -1047,33 +946,26 @@ class TestOTASecurityModes:
         capture = BeaconCapture(interface=ota_interface, timeout=15)
 
         try:
-            # Start profiler with WPA2 mode on remote
             runner.start(security_mode="wpa2")
 
-            # Capture beacons on local monitor interface
             beacons = capture.capture(ssid=ssid, count=3)
 
-            # Verify we got beacons
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
 
             beacon = beacons[0]
 
-            # Verify RSN AKM is PSK only
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK"]), (
                 "Expected PSK-only AKM for wpa2 mode"
             )
 
-            # Verify RSN pairwise ciphers are CCMP only (no GCMP-256)
             assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP"]), (
                 "Expected CCMP-only pairwise cipher for wpa2 mode (no GCMP-256)"
             )
 
-            # Verify no FT (Mobility Domain)
             assert not BeaconCapture.has_mobility_domain(beacon), (
                 "Unexpected Mobility Domain IE (FT should be disabled)"
             )
 
-            # Verify PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), (
                 "Expected HT capabilities (802.11n)"
             )
@@ -1084,7 +976,6 @@ class TestOTASecurityModes:
                 "Expected HE capabilities (802.11ax/Wi-Fi 6)"
             )
 
-            # Verify 11be auto-disabled
             assert not BeaconCapture.has_eht_capabilities(beacon), (
                 "Unexpected EHT capabilities (11be should be auto-disabled for WPA2)"
             )
@@ -1123,27 +1014,22 @@ class TestOTASecurityModes:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify RSN AKM includes FT
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK", "FT-PSK"]), (
                 "Expected PSK + FT-PSK AKMs for ft-wpa2 mode"
             )
 
-            # Verify RSN pairwise ciphers are CCMP only (no GCMP-256)
             assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP"]), (
                 "Expected CCMP-only pairwise cipher for ft-wpa2 mode (no GCMP-256)"
             )
 
-            # Verify FT present
             assert BeaconCapture.has_mobility_domain(beacon), (
                 "Expected Mobility Domain IE (FT should be enabled)"
             )
 
-            # Verify PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
 
-            # Verify 11be auto-disabled
             assert not BeaconCapture.has_eht_capabilities(beacon), (
                 "Unexpected EHT (11be should be auto-disabled for WPA2)"
             )
@@ -1181,22 +1067,18 @@ class TestOTASecurityModes:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify RSN AKM includes WPA3
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK", "SAE"]), (
                 "Expected PSK + SAE AKMs for wpa3-mixed mode"
             )
 
-            # Verify RSN pairwise ciphers include GCMP-256 for WPA3
             assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP", "GCMP-256"]), (
                 "Expected CCMP + GCMP-256 pairwise ciphers for wpa3-mixed mode"
             )
 
-            # Verify no FT
             assert not BeaconCapture.has_mobility_domain(beacon), (
                 "Unexpected Mobility Domain IE (FT should be disabled)"
             )
 
-            # Verify all PHY capabilities including 11be
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
@@ -1237,22 +1119,18 @@ class TestOTASecurityModes:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify RSN AKM includes all
             assert BeaconCapture.verify_rsn_akm(
                 beacon, ["PSK", "FT-PSK", "SAE", "FT-SAE"]
             ), "Expected PSK + FT-PSK + SAE + FT-SAE for ft-wpa3-mixed mode"
 
-            # Verify RSN pairwise ciphers include GCMP-256
             assert BeaconCapture.verify_rsn_ciphers(beacon, ["CCMP", "GCMP-256"]), (
                 "Expected CCMP + GCMP-256 pairwise ciphers for ft-wpa3-mixed mode"
             )
 
-            # Verify FT present
             assert BeaconCapture.has_mobility_domain(beacon), (
                 "Expected Mobility Domain IE"
             )
 
-            # Verify all PHY capabilities including 11be
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
@@ -1295,11 +1173,9 @@ class TestOTAPHYFeatures:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify HT/VHT present
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
 
-            # Verify HE/EHT absent
             assert not BeaconCapture.has_he_capabilities(beacon), (
                 "Unexpected HE (11ax disabled)"
             )
@@ -1338,12 +1214,10 @@ class TestOTAPHYFeatures:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify HT/VHT/HE present
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
 
-            # Verify EHT absent
             assert not BeaconCapture.has_eht_capabilities(beacon), (
                 "Unexpected EHT (11be disabled)"
             )
@@ -1382,7 +1256,6 @@ class TestOTAPHYFeatures:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify all PHY capabilities present (override worked)
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
@@ -1390,7 +1263,6 @@ class TestOTAPHYFeatures:
                 "Expected EHT (override with --11be should enable it)"
             )
 
-            # Get profiler output to verify warning was shown
             log_output = runner.stop()
 
             assert "Enabling 802.11be with security_mode 'wpa2'" in log_output, (
@@ -1398,7 +1270,6 @@ class TestOTAPHYFeatures:
             )
 
         finally:
-            # Make sure we stop even if assertions fail
             try:
                 runner.stop()
             except Exception:
@@ -1411,15 +1282,15 @@ class TestOTAComprehensiveMatrix:
     @pytest.mark.parametrize(
         "security_mode,expected_akms,has_ft,has_eht",
         [
-            ("wpa2", ["PSK"], False, False),  # Auto-disables 11be
-            ("ft-wpa2", ["PSK", "FT-PSK"], True, False),  # Auto-disables 11be
-            ("wpa3-mixed", ["PSK", "SAE"], False, True),  # Allows 11be
+            ("wpa2", ["PSK"], False, False),
+            ("ft-wpa2", ["PSK", "FT-PSK"], True, False),
+            ("wpa3-mixed", ["PSK", "SAE"], False, True),
             (
                 "ft-wpa3-mixed",
                 ["PSK", "FT-PSK", "SAE", "FT-SAE"],
                 True,
                 True,
-            ),  # Allows 11be
+            ),
         ],
     )
     def test_security_mode_matrix(
@@ -1446,18 +1317,15 @@ class TestOTAComprehensiveMatrix:
             assert len(beacons) >= 1, f"No beacons captured for {security_mode}"
             beacon = beacons[0]
 
-            # Verify RSN AKMs
             assert BeaconCapture.verify_rsn_akm(beacon, expected_akms), (
                 f"AKM mismatch for {security_mode}"
             )
 
-            # Verify FT/Mobility Domain
             assert BeaconCapture.has_mobility_domain(beacon) == has_ft, (
                 f"FT mismatch for {security_mode}: "
                 f"expected={'present' if has_ft else 'absent'}"
             )
 
-            # Verify base PHY features always present
             assert BeaconCapture.has_ht_capabilities(beacon), (
                 f"Missing HT for {security_mode}"
             )
@@ -1468,7 +1336,6 @@ class TestOTAComprehensiveMatrix:
                 f"Missing HE for {security_mode}"
             )
 
-            # Verify EHT presence based on security mode
             assert BeaconCapture.has_eht_capabilities(beacon) == has_eht, (
                 f"EHT mismatch for {security_mode}: "
                 f"expected={'present' if has_eht else 'absent'}"
@@ -1505,16 +1372,13 @@ class TestOTAFakeAPMode:
         capture = BeaconCapture(interface=ota_interface, timeout=15)
 
         try:
-            # Start profiler in fakeap mode
             runner.start(security_mode="wpa2", fakeap=True)
 
-            # Capture beacons
             beacons = capture.capture(ssid=ssid, count=3)
 
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify security
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK"]), (
                 "Expected PSK-only AKM"
             )
@@ -1522,7 +1386,6 @@ class TestOTAFakeAPMode:
                 "Unexpected Mobility Domain IE"
             )
 
-            # Verify PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
@@ -1530,7 +1393,6 @@ class TestOTAFakeAPMode:
                 "Unexpected EHT (should be auto-disabled for WPA2)"
             )
 
-            # Verify vendor IE present by default
             assert BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Expected WLAN Pi Profiler vendor IE in fakeap mode"
             )
@@ -1567,18 +1429,15 @@ class TestOTAFakeAPMode:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify security
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK", "SAE"]), (
                 "Expected PSK + SAE AKMs"
             )
 
-            # Verify PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
             assert BeaconCapture.has_eht_capabilities(beacon), "Expected EHT"
 
-            # Verify vendor IE
             assert BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Expected WLAN Pi Profiler vendor IE"
             )
@@ -1624,12 +1483,10 @@ class TestOTAFakeAPMode:
             assert len(beacons) >= 1, f"No beacons captured for {security_mode}"
             beacon = beacons[0]
 
-            # Verify AKMs match expected
             assert BeaconCapture.verify_rsn_akm(beacon, expected_akms), (
                 f"AKM mismatch for {security_mode} in fakeAP mode"
             )
 
-            # Verify base PHY features present
             assert BeaconCapture.has_ht_capabilities(beacon), "Expected HT"
             assert BeaconCapture.has_vht_capabilities(beacon), "Expected VHT"
             assert BeaconCapture.has_he_capabilities(beacon), "Expected HE"
@@ -1669,12 +1526,10 @@ class TestOTAVendorIE:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify vendor IE present
             assert BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Expected WLAN Pi Profiler vendor IE (OUI: 31:41:59) in AP mode"
             )
 
-            # Verify vendor IE content structure
             assert BeaconCapture.verify_profiler_vendor_ie_content(beacon), (
                 "Profiler vendor IE has invalid structure or missing TLVs"
             )
@@ -1712,12 +1567,10 @@ class TestOTAVendorIE:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify vendor IE present
             assert BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Expected WLAN Pi Profiler vendor IE (OUI: 31:41:59) in FakeAP mode"
             )
 
-            # Verify vendor IE content structure
             assert BeaconCapture.verify_profiler_vendor_ie_content(beacon), (
                 "Profiler vendor IE has invalid structure or missing TLVs"
             )
@@ -1758,7 +1611,6 @@ class TestOTANoProfilerTLV:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify vendor IE absent
             assert not BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Unexpected WLAN Pi Profiler vendor IE (should be disabled with --noprofilertlv)"
             )
@@ -1795,7 +1647,6 @@ class TestOTANoProfilerTLV:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify vendor IE absent
             assert not BeaconCapture.has_profiler_vendor_ie(beacon), (
                 "Unexpected WLAN Pi Profiler vendor IE (should be disabled with --noprofilertlv)"
             )
@@ -1821,7 +1672,6 @@ class TestOTAHostnameSSID:
         Expected:
         - SSID matches remote hostname (wlanpi)
         """
-        # Get remote hostname
         hostname_cmd = [
             "ssh",
             "-o",
@@ -1844,7 +1694,6 @@ class TestOTAHostnameSSID:
                 security_mode="wpa2", fakeap=False, extra_args=["--hostname_ssid"]
             )
 
-            # Capture beacons with expected hostname SSID
             beacons = capture.capture(ssid=expected_ssid, count=3)
 
             assert len(beacons) >= 1, (
@@ -1868,7 +1717,6 @@ class TestOTAHostnameSSID:
         Expected:
         - SSID matches remote hostname (wlanpi)
         """
-        # Get remote hostname
         hostname_cmd = [
             "ssh",
             "-o",
@@ -1891,7 +1739,6 @@ class TestOTAHostnameSSID:
                 security_mode="wpa2", fakeap=True, extra_args=["--hostname_ssid"]
             )
 
-            # Capture beacons with expected hostname SSID
             beacons = capture.capture(ssid=expected_ssid, count=3)
 
             assert len(beacons) >= 1, (
@@ -1920,7 +1767,6 @@ class TestOTAInformationElements:
         - RSNX IE present for wpa3-mixed and ft-wpa3-mixed
         - RSNX IE absent for wpa2 and ft-wpa2
         """
-        # Test WPA3-mixed (should have RSNX)
         ssid_wpa3 = "OTA-RSNX-WPA3"
         runner_wpa3 = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid_wpa3
@@ -1934,7 +1780,6 @@ class TestOTAInformationElements:
             assert len(beacons_wpa3) >= 1, "No beacons captured for WPA3-mixed"
             beacon_wpa3 = beacons_wpa3[0]
 
-            # WPA3 should have RSNX IE
             assert BeaconCapture.has_rsnx_ie(beacon_wpa3), (
                 "Expected RSNX IE in WPA3-mixed mode (signals SAE H2E support)"
             )
@@ -1945,7 +1790,6 @@ class TestOTAInformationElements:
             except Exception:
                 pass
 
-        # Test WPA2 (should NOT have RSNX)
         ssid_wpa2 = "OTA-RSNX-WPA2"
         runner_wpa2 = RemoteProfilerRunner(
             remote_host=remote_host, channel=test_channel, ssid=ssid_wpa2
@@ -1958,7 +1802,6 @@ class TestOTAInformationElements:
             assert len(beacons_wpa2) >= 1, "No beacons captured for WPA2"
             beacon_wpa2 = beacons_wpa2[0]
 
-            # WPA2 should NOT have RSNX IE
             assert not BeaconCapture.has_rsnx_ie(beacon_wpa2), (
                 "Unexpected RSNX IE in WPA2 mode (only for WPA3/SAE)"
             )
@@ -1996,7 +1839,6 @@ class TestOTAInformationElements:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Verify Extended Capabilities IE present
             ext_cap = BeaconCapture.get_extended_capabilities(beacon)
             assert ext_cap is not None, "Expected Extended Capabilities IE"
             assert len(ext_cap) > 0, "Extended Capabilities IE is empty"
@@ -2063,7 +1905,6 @@ class TestOTAModeFeatureMatrix:
             assert len(beacons) >= 1, f"No beacons captured for {mode}/{security_mode}"
             beacon = beacons[0]
 
-            # Verify security
             assert BeaconCapture.verify_rsn_akm(beacon, expected_akms), (
                 f"AKM mismatch for {mode}/{security_mode}"
             )
@@ -2071,12 +1912,10 @@ class TestOTAModeFeatureMatrix:
                 f"Cipher mismatch for {mode}/{security_mode}"
             )
 
-            # Verify PHY capabilities
             assert BeaconCapture.has_ht_capabilities(beacon), f"Missing HT in {mode}"
             assert BeaconCapture.has_vht_capabilities(beacon), f"Missing VHT in {mode}"
             assert BeaconCapture.has_he_capabilities(beacon), f"Missing HE in {mode}"
 
-            # Verify EHT auto-disable behavior
             has_eht = BeaconCapture.has_eht_capabilities(beacon)
             if auto_disables_11be:
                 assert not has_eht, (
@@ -2120,7 +1959,6 @@ class TestOTAModeFeatureMatrix:
             assert len(beacons) >= 1, f"No beacons captured for {mode} --no11ax"
             beacon = beacons[0]
 
-            # Should have HT and VHT only
             assert BeaconCapture.has_ht_capabilities(beacon), f"Missing HT in {mode}"
             assert BeaconCapture.has_vht_capabilities(beacon), f"Missing VHT in {mode}"
             assert not BeaconCapture.has_he_capabilities(beacon), (
@@ -2161,7 +1999,6 @@ class TestOTAModeFeatureMatrix:
             assert len(beacons) >= 1, f"No beacons captured for {mode} --no11be"
             beacon = beacons[0]
 
-            # Should have HT, VHT, HE but not EHT
             assert BeaconCapture.has_ht_capabilities(beacon), f"Missing HT in {mode}"
             assert BeaconCapture.has_vht_capabilities(beacon), f"Missing VHT in {mode}"
             assert BeaconCapture.has_he_capabilities(beacon), f"Missing HE in {mode}"
@@ -2202,7 +2039,6 @@ class TestOTAModeFeatureMatrix:
             assert len(beacons) >= 1, f"No beacons captured for {mode} WPA2+11be"
             beacon = beacons[0]
 
-            # All PHY features should be present
             assert BeaconCapture.has_ht_capabilities(beacon), f"Missing HT in {mode}"
             assert BeaconCapture.has_vht_capabilities(beacon), f"Missing VHT in {mode}"
             assert BeaconCapture.has_he_capabilities(beacon), f"Missing HE in {mode}"
@@ -2210,7 +2046,6 @@ class TestOTAModeFeatureMatrix:
                 f"EHT should be enabled with --11be override in {mode}"
             )
 
-            # Verify warning in log
             log_output = runner.stop()
             assert "Enabling 802.11be with security_mode 'wpa2'" in log_output, (
                 f"Expected warning about non-standard WPA2+11be in {mode}"
@@ -2247,20 +2082,18 @@ class TestOTAWiFi7EHT:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Get EHT Capabilities IE
             elt = beacon.getlayer(Dot11Elt)
             eht_cap = None
             while elt:
                 if elt.ID == 0xFF and len(elt.info) > 0:
                     ext_id = elt.info[0]
-                    if ext_id == 0x6C:  # EHT Capabilities
+                    if ext_id == 0x6C:
                         eht_cap = elt
                         break
                 elt = elt.payload.getlayer(Dot11Elt)
 
             assert eht_cap is not None, "EHT Capabilities IE not found"
 
-            # Verify minimum length (1 byte ext ID + 2 bytes MAC caps + 9 bytes PHY caps = 12 bytes minimum)
             assert len(eht_cap.info) >= 12, (
                 f"EHT Capabilities IE too short: {len(eht_cap.info)} bytes (expected >= 12)"
             )
@@ -2296,13 +2129,12 @@ class TestOTAWiFi7EHT:
             assert len(beacons) >= 1, f"No beacons captured for SSID {ssid}"
             beacon = beacons[0]
 
-            # Get EHT Operation IE
             elt = beacon.getlayer(Dot11Elt)
             eht_op = None
             while elt:
                 if elt.ID == 0xFF and len(elt.info) > 0:
                     ext_id = elt.info[0]
-                    if ext_id == 0x6A:  # EHT Operation
+                    if ext_id == 0x6A:
                         eht_op = elt
                         break
                 elt = elt.payload.getlayer(Dot11Elt)
@@ -2343,16 +2175,15 @@ class TestOTAWiFi7EHT:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Check no EHT Capabilities
             elt = beacon.getlayer(Dot11Elt)
             found_eht_caps = False
             found_eht_op = False
             while elt:
                 if elt.ID == 0xFF and len(elt.info) > 0:
                     ext_id = elt.info[0]
-                    if ext_id == 0x6C:  # EHT Capabilities
+                    if ext_id == 0x6C:
                         found_eht_caps = True
-                    if ext_id == 0x6A:  # EHT Operation
+                    if ext_id == 0x6A:
                         found_eht_op = True
                 elt = elt.payload.getlayer(Dot11Elt)
 
@@ -2381,10 +2212,10 @@ class TestOTAPassphrase:
     @pytest.mark.parametrize(
         "test_passphrase",
         [
-            "TestPass123",  # Simple alphanumeric
-            "Complex!Pass@2024#",  # Special characters
-            "12345678",  # Minimum length (8 chars)
-            "a" * 63,  # Maximum length (63 chars)
+            "TestPass123",
+            "Complex!Pass@2024#",
+            "12345678",
+            "a" * 63,
         ],
     )
     def test_custom_passphrase(
@@ -2411,13 +2242,11 @@ class TestOTAPassphrase:
             )
             beacons = capture.capture(ssid=ssid, count=3)
 
-            # Main verification: profiler started and beaconed with custom passphrase
             assert len(beacons) >= 1, (
                 f"No beacons captured for {mode} with passphrase length {len(test_passphrase)}"
             )
             beacon = beacons[0]
 
-            # Verify basic beacon structure still correct
             assert BeaconCapture.verify_rsn_akm(beacon, ["PSK"]), (
                 f"RSN AKM incorrect with custom passphrase in {mode}"
             )
@@ -2449,11 +2278,10 @@ class TestOTAPassphrase:
         try:
             runner.start(
                 security_mode="wpa2",
-                fakeap=False,  # Test with AP mode
-                extra_args=["--passphrase", "short"],  # Only 5 chars
+                fakeap=False,
+                extra_args=["--passphrase", "short"],
             )
         except pytest.fail.Exception:
-            # Expected: profiler exits because argparse rejects the value
             pass
         finally:
             try:
@@ -2478,10 +2306,9 @@ class TestOTAPassphrase:
             runner.start(
                 security_mode="wpa2",
                 fakeap=False,
-                extra_args=["--passphrase", "a" * 64],  # 64 chars (too long)
+                extra_args=["--passphrase", "a" * 64],
             )
         except pytest.fail.Exception:
-            # Expected: profiler exits because argparse rejects the value
             pass
         finally:
             try:
@@ -2528,7 +2355,6 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Walk through all IEs and validate structure
             elt = beacon.getlayer(Dot11Elt)
             ie_count = 0
             malformed_ies = []
@@ -2538,7 +2364,6 @@ class TestOTAIEStructureValidation:
                 ie_id = elt.ID if hasattr(elt, "ID") else "unknown"
 
                 try:
-                    # Validate basic structure
                     assert hasattr(elt, "ID"), f"IE {ie_count} missing ID field"
                     assert hasattr(elt, "len"), (
                         f"IE {ie_count} (ID={ie_id}) missing len field"
@@ -2547,17 +2372,12 @@ class TestOTAIEStructureValidation:
                         f"IE {ie_count} (ID={ie_id}) missing info field"
                     )
 
-                    # Validate length field matches actual data length
                     declared_len = elt.len
                     actual_len = len(elt.info) if elt.info else 0
 
-                    # For extension IEs (0xFF), length includes extension ID byte
                     if ie_id == 0xFF and actual_len > 0:
-                        # Extension IE: len field should be 1 + data length
-                        # First byte is extension ID, rest is data
-                        pass  # Extension IEs are handled specially
+                        pass
                     else:
-                        # Standard IE: len field should match info length
                         assert declared_len == actual_len, (
                             f"IE {ie_count} (ID={ie_id}) length mismatch: "
                             f"declared={declared_len}, actual={actual_len}"
@@ -2566,10 +2386,8 @@ class TestOTAIEStructureValidation:
                 except AssertionError as e:
                     malformed_ies.append(f"IE {ie_count} (ID={ie_id}): {e!s}")
 
-                # Move to next IE
                 elt = elt.payload.getlayer(Dot11Elt)
 
-            # Report any malformed IEs
             if malformed_ies:
                 log_output = runner.stop()
                 print(
@@ -2621,43 +2439,37 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Find HE Capabilities IE
             elt = beacon.getlayer(Dot11Elt)
             he_cap = None
             while elt:
                 if elt.ID == 0xFF and len(elt.info) > 0:
                     ext_id = elt.info[0]
-                    if ext_id == 0x23:  # HE Capabilities
+                    if ext_id == 0x23:
                         he_cap = elt
                         break
                 elt = elt.payload.getlayer(Dot11Elt)
 
             assert he_cap is not None, f"HE Capabilities IE not found in {mode} beacon"
 
-            # Validate structure
             assert len(he_cap.info) >= 22, (
                 f"HE Capabilities IE too short in {mode}: {len(he_cap.info)} bytes (expected >= 22)"
             )
 
-            # Validate extension ID
             ext_id = he_cap.info[0]
             assert ext_id == 0x23, (
                 f"HE Capabilities has wrong extension ID: {ext_id:#x} (expected 0x23)"
             )
 
-            # Parse HE MAC Capabilities (bytes 1-6, 6 bytes)
             he_mac_caps = he_cap.info[1:7]
             assert len(he_mac_caps) == 6, (
                 f"HE MAC Capabilities wrong length: {len(he_mac_caps)}"
             )
 
-            # Parse HE PHY Capabilities (bytes 7-17, 11 bytes)
             he_phy_caps = he_cap.info[7:18]
             assert len(he_phy_caps) == 11, (
                 f"HE PHY Capabilities wrong length: {len(he_phy_caps)}"
             )
 
-            # Parse supported MCS and NSS set (at least 4 bytes)
             mcs_offset = 18
             assert len(he_cap.info) >= mcs_offset + 4, (
                 f"HE Capabilities missing MCS/NSS set in {mode}"
@@ -2706,43 +2518,35 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Find HE Operation IE
             elt = beacon.getlayer(Dot11Elt)
             he_op = None
             while elt:
                 if elt.ID == 0xFF and len(elt.info) > 0:
                     ext_id = elt.info[0]
-                    if ext_id == 0x24:  # HE Operation
+                    if ext_id == 0x24:
                         he_op = elt
                         break
                 elt = elt.payload.getlayer(Dot11Elt)
 
             assert he_op is not None, f"HE Operation IE not found in {mode} beacon"
 
-            # Validate structure
-            # Minimum: 1 (ext ID) + 3 (operation params) + 1 (bss color) + 2 (basic MCS) = 7 bytes
-            # Optional: + 3 bytes VHT Operation Information (if VHT Operation Info Present bit set)
             assert len(he_op.info) >= 7, (
                 f"HE Operation IE too short in {mode}: {len(he_op.info)} bytes (expected >= 7)"
             )
 
-            # Validate extension ID
             ext_id = he_op.info[0]
             assert ext_id == 0x24, (
                 f"HE Operation has wrong extension ID: {ext_id:#x} (expected 0x24)"
             )
 
-            # Parse HE Operation Parameters (bytes 1-3, 3 bytes)
             he_op_params = he_op.info[1:4]
             assert len(he_op_params) == 3, (
                 f"HE Operation Parameters wrong length: {len(he_op_params)}"
             )
 
-            # Byte 4: BSS Color Information (1 byte)
             assert len(he_op.info) >= 5, "HE Operation missing BSS Color field"
             bss_color_info = he_op.info[4]
 
-            # Bytes 5-6: Basic HE-MCS and NSS Set (2 bytes)
             assert len(he_op.info) >= 7, "HE Operation missing Basic MCS/NSS set"
             basic_mcs = he_op.info[5:7]
             assert len(basic_mcs) == 2, (
@@ -2791,31 +2595,21 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Find HT Capabilities IE
             ht_cap = BeaconCapture.get_ie(beacon, 0x2D)
             assert ht_cap is not None, f"HT Capabilities IE not found in {mode} beacon"
 
-            # HT Capabilities is always 26 bytes
             assert len(ht_cap.info) == 26, (
                 f"HT Capabilities IE wrong length in {mode}: {len(ht_cap.info)} bytes (expected 26)"
             )
 
-            # Parse HT Capabilities Info (bytes 0-1, 2 bytes)
             ht_cap_info = ht_cap.info[0:2]
 
-            # Parse A-MPDU Parameters (byte 2, 1 byte)
             ampdu_params = ht_cap.info[2]
 
-            # Parse Supported MCS Set (bytes 3-18, 16 bytes)
             mcs_set = ht_cap.info[3:19]
             assert len(mcs_set) == 16, f"HT MCS Set wrong length: {len(mcs_set)}"
 
-            # Parse HT Extended Capabilities (bytes 19-20, 2 bytes)
-
-            # Parse Transmit Beamforming Capabilities (bytes 21-24, 4 bytes)
             txbf_cap = ht_cap.info[21:25]
-
-            # Parse ASEL Capabilities (byte 25, 1 byte)
 
             print(f"\n{mode} HT Capabilities structure validated:")
             print(f"  Total length: {len(ht_cap.info)} bytes")
@@ -2859,21 +2653,17 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Find VHT Capabilities IE
             vht_cap = BeaconCapture.get_ie(beacon, 0xBF)
             assert vht_cap is not None, (
                 f"VHT Capabilities IE not found in {mode} beacon"
             )
 
-            # VHT Capabilities is always 12 bytes
             assert len(vht_cap.info) == 12, (
                 f"VHT Capabilities IE wrong length in {mode}: {len(vht_cap.info)} bytes (expected 12)"
             )
 
-            # Parse VHT Capabilities Info (bytes 0-3, 4 bytes)
             vht_cap_info = vht_cap.info[0:4]
 
-            # Parse Supported VHT-MCS and NSS Set (bytes 4-11, 8 bytes)
             vht_mcs_set = vht_cap.info[4:12]
             assert len(vht_mcs_set) == 8, (
                 f"VHT MCS Set wrong length: {len(vht_mcs_set)}"
@@ -2919,43 +2709,34 @@ class TestOTAIEStructureValidation:
             assert len(beacons) >= 1, "No beacons captured"
             beacon = beacons[0]
 
-            # Find RSN IE
             rsn = BeaconCapture.get_ie(beacon, 0x30)
             assert rsn is not None, f"RSN IE not found in {mode} beacon"
 
-            # RSN minimum: version(2) + group cipher(4) + pairwise count(2) +
-            #              pairwise cipher(4) + akm count(2) + akm(4) + rsn caps(2) = 20 bytes
             assert len(rsn.info) >= 20, (
                 f"RSN IE too short in {mode}: {len(rsn.info)} bytes (expected >= 20)"
             )
 
-            # Parse version (bytes 0-1)
             version = int.from_bytes(rsn.info[0:2], "little")
             assert version == 1, f"RSN version should be 1, got {version}"
 
-            # Parse group cipher suite (bytes 2-5, 4 bytes OUI+type)
             group_cipher = rsn.info[2:6]
             assert len(group_cipher) == 4, "Group cipher suite should be 4 bytes"
 
-            # Parse pairwise cipher suite count (bytes 6-7)
             pairwise_count = int.from_bytes(rsn.info[6:8], "little")
             assert pairwise_count >= 1, (
                 f"Pairwise cipher count should be >= 1, got {pairwise_count}"
             )
 
-            # Validate we have enough bytes for pairwise ciphers
             pairwise_end = 8 + (pairwise_count * 4)
             assert len(rsn.info) >= pairwise_end + 2, (
                 f"RSN IE too short for {pairwise_count} pairwise ciphers"
             )
 
-            # Parse AKM suite count
             akm_count = int.from_bytes(
                 rsn.info[pairwise_end : pairwise_end + 2], "little"
             )
             assert akm_count >= 1, f"AKM count should be >= 1, got {akm_count}"
 
-            # Validate we have enough bytes for AKM suites + RSN caps
             akm_end = pairwise_end + 2 + (akm_count * 4)
             assert len(rsn.info) >= akm_end + 2, (
                 f"RSN IE too short for {akm_count} AKM suites and RSN capabilities"

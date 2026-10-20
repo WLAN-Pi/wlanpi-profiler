@@ -24,7 +24,7 @@ def run(tmp_path, engines=("podman",), uname="x86_64", **env):
     repo.mkdir()
     bin_.mkdir()
     shutil.copy(SCRIPT, repo)
-    (repo / "wlanpi-profiler_0_arm64.deb").touch()  # stale build output
+    (repo / "wlanpi-profiler_0_arm64.deb").touch()
     shims = dict.fromkeys(engines, ENGINE_SHIM)
     shims["uname"] = f"#!/bin/sh\necho {uname}\n"
     for name, body in shims.items():

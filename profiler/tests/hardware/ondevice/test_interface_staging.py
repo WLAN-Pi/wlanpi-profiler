@@ -19,7 +19,6 @@ import subprocess
 import pytest
 
 
-# Check if we're running on actual WLAN Pi hardware
 def find_iw_path() -> str | None:
     """Find the path to the 'iw' command, checking common locations."""
     for path in ["/sbin/iw", "/usr/sbin/iw", "iw"]:
@@ -49,9 +48,8 @@ def is_wlanpi_hardware() -> bool:
             )
             return result.returncode == 0 and "Interface" in result.stdout
         except Exception:
-            pass  # Fallback to ip link
+            pass
 
-    # Fallback check using 'ip link' for wlan interfaces
     try:
         result = subprocess.run(
             ["ip", "link"], capture_output=True, text=True, timeout=5
@@ -93,7 +91,6 @@ class TestRealInterfaceOperations:
             [IW_PATH, "list"], capture_output=True, text=True, timeout=5
         )
         assert result.returncode == 0
-        # Should show capabilities
         assert "Wiphy" in result.stdout or "Band" in result.stdout
 
     def test_rfkill_list(self) -> None:
@@ -102,23 +99,19 @@ class TestRealInterfaceOperations:
             ["rfkill", "list"], capture_output=True, text=True, timeout=5
         )
         assert result.returncode == 0
-        # Should show at least some devices (may be empty, that's ok)
 
     def test_interface_info_command(self) -> None:
         """Test that we can query interface information"""
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
         )
-        # First get list of interfaces
         result = subprocess.run(
             [IW_PATH, "dev"], capture_output=True, text=True, timeout=5
         )
         if "Interface" in result.stdout:
-            # Extract first interface name
             for line in result.stdout.split("\n"):
                 if "Interface" in line:
                     interface = line.split()[-1]
-                    # Try to get info about this interface
                     info_result = subprocess.run(
                         [IW_PATH, "dev", interface, "info"],
                         capture_output=True,
@@ -146,7 +139,6 @@ class TestProfilerInterfaceModule:
         """Test that Interface can be instantiated"""
         from profiler.interface import Interface
 
-        # This should work even without root
         interface = Interface()
         assert interface is not None
 
@@ -156,8 +148,6 @@ class TestProfilerInterfaceModule:
 
         interface = Interface()
 
-        # The Interface class should be able to detect system state
-        # without requiring root for read-only operations
         assert hasattr(interface, "name") or hasattr(interface, "phy")
 
 
@@ -199,7 +189,6 @@ class TestInterfaceStageability:
         assert IW_PATH is not None, (
             "iw command not found in /sbin/iw, /usr/sbin/iw, or PATH"
         )
-        # Get first wireless interface
         result = subprocess.run(
             [IW_PATH, "dev"], capture_output=True, text=True, timeout=5
         )
@@ -211,7 +200,6 @@ class TestInterfaceStageability:
             if "Interface" in line:
                 interface = line.split()[-1]
 
-                # Try to set it down (will restore state after)
                 down_result = subprocess.run(
                     ["ip", "link", "set", interface, "down"],
                     capture_output=True,
@@ -219,14 +207,12 @@ class TestInterfaceStageability:
                     timeout=5,
                 )
 
-                # We expect this to work or fail gracefully
                 assert down_result.returncode in [
                     0,
                     1,
                     2,
-                ]  # 0=success, 1/2=may already be down or in use
+                ]
 
-                # Try to bring it back up
                 subprocess.run(["ip", "link", "set", interface, "up"], timeout=5)
                 break
 
@@ -240,7 +226,6 @@ class TestInterfaceStageability:
             [IW_PATH, "phy"], capture_output=True, text=True, timeout=5
         )
 
-        # Should show physical device info
         assert result.returncode == 0
 
 
@@ -270,9 +255,8 @@ class TestProfilerIntegration:
             text=True,
             timeout=10,
         )
-        # This may fail on some systems, but should at least execute
         assert result.returncode in [
             0,
             -1,
             255,
-        ]  # Various exit codes depending on platform
+        ]

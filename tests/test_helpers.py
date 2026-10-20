@@ -147,20 +147,18 @@ class TestHelpers:
     @pytest.mark.parametrize(
         "passphrase,should_pass",
         [
-            # Valid passphrases (8-63 characters)
-            ("profiler", True),  # Default: 8 chars (minimum)
-            ("12345678", True),  # 8 chars
-            ("MySecurePass123", True),  # 16 chars
-            ("a" * 63, True),  # 63 chars (maximum)
-            ("Hello123", True),  # 8 chars with mixed case
-            ("Pass@123", True),  # 8 chars with special char
-            ("🔒secure🔒", True),  # Emoji allowed (8+ bytes in UTF-8)
-            # Invalid passphrases
-            ("short", False),  # Too short (5 chars)
-            ("1234567", False),  # Too short (7 chars)
-            ("a" * 64, False),  # Too long (64 chars)
-            ("a" * 100, False),  # Way too long
-            ("", False),  # Empty
+            ("profiler", True),
+            ("12345678", True),
+            ("MySecurePass123", True),
+            ("a" * 63, True),
+            ("Hello123", True),
+            ("Pass@123", True),
+            ("🔒secure🔒", True),
+            ("short", False),
+            ("1234567", False),
+            ("a" * 64, False),
+            ("a" * 100, False),
+            ("", False),
         ],
     )
     def test_passphrase(self, passphrase, should_pass):
@@ -221,36 +219,27 @@ class TestHelpers:
             )
         )
         assert error is None
-        # Verify essential config values are set correctly
         assert config["GENERAL"]["channel"] == 1
         assert config["GENERAL"]["frequency"] == 0
         assert config["GENERAL"]["interface"] == "wlan999"
         assert config["GENERAL"]["ssid"] == "Jerry Can You Hear Me"
-        # ap_mode and fakeap are now always set (default: ap_mode=True, fakeap=False)
         assert config["GENERAL"]["ap_mode"] is True
         assert config["GENERAL"]["fakeap"] is False
-        # files_path can be string or list depending on implementation
         assert "files_path" in config["GENERAL"]
 
     def test_passphrase_config_handling(self):
         """Test passphrase configuration priority: CLI > config.ini > default"""
         parser = helpers.setup_parser()
 
-        # Test 1: No passphrase specified - should use default
         config, error = helpers.setup_config(parser.parse_args([]))
         assert error is None
         assert config["GENERAL"]["passphrase"] == "profiler"
 
-        # Test 2: CLI argument - should override default
         config, error = helpers.setup_config(
             parser.parse_args(["--passphrase", "CustomPass123"])
         )
         assert error is None
         assert config["GENERAL"]["passphrase"] == "CustomPass123"
-
-        # Test 3: Config file with passphrase - should use config value
-        # (simulated by pre-loading config dict)
-        # In real usage, this would be loaded from config.ini via ConfigParser
 
     def test_get_app_data_paths_from_config(self):
         """Test that get_app_data_paths reads from config.ini"""
@@ -259,37 +248,29 @@ class TestHelpers:
 
         parser = helpers.setup_parser()
 
-        # Test 1: Config file specifies custom path (use writable temp dir)
         temp_config_dir = tempfile.mkdtemp(prefix="profiler_test_config_")
         config_with_path = {"GENERAL": {"files_path": temp_config_dir}}
         args_no_path = parser.parse_args([])
         paths = helpers.get_app_data_paths(args_no_path, config_with_path)
-        # Should use path from config
         assert any(str(p) == temp_config_dir for p in paths), (
             f"Expected {temp_config_dir} in {[str(p) for p in paths]}"
         )
 
-        # Test 2: Command-line arg overrides config
         temp_cli_dir = tempfile.mkdtemp(prefix="profiler_test_cli_")
         args_with_path = parser.parse_args(["--files_path", temp_cli_dir])
         paths = helpers.get_app_data_paths(args_with_path, config_with_path)
-        # Should use command-line path (higher priority)
         assert any(str(p) == temp_cli_dir for p in paths), (
             f"Expected {temp_cli_dir} in {[str(p) for p in paths]}"
         )
-        # Should NOT use config path when CLI is specified
         assert not any(str(p) == temp_config_dir for p in paths), (
             f"Config path should not be in {[str(p) for p in paths]}"
         )
 
-        # Test 3: No config, no args - falls back to platform defaults
         config_no_path = {"GENERAL": {}}
         args_no_path = parser.parse_args([])
         paths = helpers.get_app_data_paths(args_no_path, config_no_path)
-        # Should have at least one default path
         assert len(paths) > 0
 
-        # Cleanup
         os.rmdir(temp_config_dir)
         os.rmdir(temp_cli_dir)
 
@@ -298,31 +279,24 @@ class TestHelpers:
         parser = helpers.setup_parser()
         args = parser.parse_args([])
 
-        # Test 1: debug as boolean True (as returned by convert_configparser_to_dict)
         config_bool_true = {"GENERAL": {"debug": True}}
         helpers.setup_logger(args, config_bool_true)
         assert logging.root.level == logging.DEBUG
 
-        # Reset logging
         logging.root.setLevel(logging.INFO)
 
-        # Test 2: debug as boolean False
         config_bool_false = {"GENERAL": {"debug": False}}
         helpers.setup_logger(args, config_bool_false)
         assert logging.root.level == logging.INFO
 
-        # Reset logging
         logging.root.setLevel(logging.INFO)
 
-        # Test 3: debug as string "true" (fallback case)
         config_str_true = {"GENERAL": {"debug": "true"}}
         helpers.setup_logger(args, config_str_true)
         assert logging.root.level == logging.DEBUG
 
-        # Reset logging
         logging.root.setLevel(logging.INFO)
 
-        # Test 4: debug as string "false"
         config_str_false = {"GENERAL": {"debug": "false"}}
         helpers.setup_logger(args, config_str_false)
         assert logging.root.level == logging.INFO
@@ -336,7 +310,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # ft_disabled=True should map to wpa3-mixed (no FT)
         assert error is None
         assert config["GENERAL"]["security_mode"] == "wpa3-mixed"
 
@@ -349,7 +322,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # ft_disabled=False should use default (ft-wpa3-mixed)
         assert error is None
         assert config["GENERAL"]["security_mode"] == "ft-wpa3-mixed"
 
@@ -362,7 +334,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file), "--no11r"])
         config, error = helpers.setup_config(args)
 
-        # --no11r should strip FT: ft-wpa3-mixed → wpa3-mixed
         assert error is None
         assert config["GENERAL"]["security_mode"] == "wpa3-mixed"
 
@@ -375,7 +346,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file), "--no11r"])
         config, error = helpers.setup_config(args)
 
-        # --no11r should strip FT: ft-wpa2 → wpa2
         assert error is None
         assert config["GENERAL"]["security_mode"] == "wpa2"
 
@@ -388,7 +358,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # security_mode should take precedence
         assert error is None
         assert config["GENERAL"]["security_mode"] == "ft-wpa2"
 
@@ -403,7 +372,6 @@ class TestHelpers:
         )
         config, error = helpers.setup_config(args)
 
-        # CLI should override config file
         assert error is None
         assert config["GENERAL"]["security_mode"] == "wpa2"
 
@@ -416,7 +384,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # Should auto-disable 11be for WPA2
         assert error is None
         assert config["GENERAL"]["be_disabled"]
 
@@ -429,7 +396,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # Should auto-disable 11be for ft-wpa2
         assert error is None
         assert config["GENERAL"]["be_disabled"]
 
@@ -442,7 +408,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # Should NOT auto-disable 11be for wpa3-mixed
         assert error is None
         assert not config["GENERAL"].get("be_disabled", False)
 
@@ -455,7 +420,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file), "--11be"])
         config, error = helpers.setup_config(args)
 
-        # User override should work
         assert error is None
         assert not config["GENERAL"]["be_disabled"]
 
@@ -468,7 +432,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # be_disabled: false is treated as "not set", so 11be is auto-disabled
         assert error is None
         assert config["GENERAL"]["be_disabled"]
 
@@ -559,7 +522,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file)])
         config, error = helpers.setup_config(args)
 
-        # Should auto-disable 11be when 11ax is disabled
         assert error is None
         assert config["GENERAL"]["be_disabled"]
 
@@ -572,7 +534,6 @@ class TestHelpers:
         args = parser.parse_args(["--config", str(config_file), "--no11ax"])
         config, error = helpers.setup_config(args)
 
-        # Should auto-disable 11be when 11ax is disabled via CLI
         assert error is None
         assert config["GENERAL"]["be_disabled"]
 
@@ -589,7 +550,6 @@ class TestHelpers:
         with caplog.at_level(logging.WARNING):
             _, _ = helpers.setup_config(args)
 
-        # Should see deprecation warning
         assert "DEPRECATED: --no11r" in caplog.text
 
 
@@ -623,7 +583,6 @@ class TestRunCommand:
         assert helpers.run_command(["echo", "hello"]).strip() == "hello"
 
     def test_failure_does_not_raise_by_default(self):
-        # Lenient by default to preserve existing callers
         helpers.run_command(["false"])
 
     def test_failure_raises_when_check_true(self):
@@ -653,7 +612,6 @@ class TestCheckRequiredTools:
         helpers.check_required_tools(required=[], optional=[])
 
     def test_missing_optional_only_warns(self):
-        # A missing optional tool must not abort startup.
         helpers.check_required_tools(
             required=[], optional=["profiler-definitely-missing-tool"]
         )

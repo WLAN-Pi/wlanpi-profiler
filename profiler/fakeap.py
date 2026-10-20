@@ -21,7 +21,6 @@ import sys
 from time import sleep, time
 from typing import Any
 
-# suppress scapy warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 try:
@@ -143,40 +142,30 @@ class _Utils:
         channel_bytes = bytes([channel])
         dsset = Dot11Elt(ID="DSset", info=channel_bytes)
 
-        dtim_data = b"\x00\x04\x00\x03\x00\x00"  # Fixed: DTIM count=0, period=4 (was 5, 4 - invalid!)
+        dtim_data = b"\x00\x04\x00\x03\x00\x00"
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
         ht_cap_data = b"\xef\x19\x1b\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         ht_capabilities = Dot11Elt(ID=0x2D, info=ht_cap_data)
 
-        # Map security_mode to AKM suites and optionally mobility domain
-        # security_mode can be: wpa2, ft-wpa2, wpa3-mixed, ft-wpa3-mixed
-        mobility_domain = None  # Only created for FT modes
+        mobility_domain = None
 
         if ft_disabled or security_mode in ["wpa2", "wpa3-mixed"]:
-            # No FT modes
             if security_mode == "wpa3-mixed":
-                # WPA2/WPA3 transition - add GCMP-256 for WPA3
-                # RSN format: version(2) + group_cipher(4) + pairwise_count(2) + pairwise_ciphers(4*n) + akm_count(2) + akms(4*m) + rsn_caps(2)
-                # Pairwise ciphers: CCMP (for WPA2) + GCMP-256 (for WPA3)
-                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"  # Count=2, CCMP, GCMP-256
-                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x08\x80\x00"  # PSK + SAE
+                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"
+                akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x08\x80\x00"
                 rsn_data = b"\x01\x00\x00\x0f\xac\x04" + pairwise_ciphers + akm
             else:
-                # WPA2 only
                 akm = b"\x01\x00\x00\x0f\xac\x02\x80\x00"
                 rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
         else:
-            # FT modes (ft-wpa2 or ft-wpa3-mixed)
             mobility_domain_data = b"\x45\xc2\x00"
             mobility_domain = Dot11Elt(ID=0x36, info=mobility_domain_data)
             if security_mode == "ft-wpa3-mixed":
-                # FT-WPA2 + FT-WPA3 transition - add GCMP-256 for WPA3
-                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"  # Count=2, CCMP, GCMP-256
+                pairwise_ciphers = b"\x02\x00\x00\x0f\xac\x04\x00\x0f\xac\x09"
                 akm = b"\x04\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x00\x0f\xac\x08\x00\x0f\xac\x09\x8c\x00"
                 rsn_data = b"\x01\x00\x00\x0f\xac\x04" + pairwise_ciphers + akm
             else:
-                # FT-WPA2 only
                 akm = b"\x02\x00\x00\x0f\xac\x02\x00\x0f\xac\x04\x8c\x00"
                 rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04" + akm
 
@@ -218,31 +207,12 @@ class _Utils:
         eht_cap_data = b"\x6c\x00\x00\xe2\xff\xdb\x00\x18\x36\xd8\x1e\x00\x44\x44\x44\x44\x44\x44\x44\x44\x44"
         eht_capabilities = Dot11Elt(ID=0xFF, info=eht_cap_data)
 
-        # EHT CBW
-        # 0111 7 or 1100 C - 320 MHz
-        # 0011 3 or 1011 B - 160 MHz
-        # 0010 2 or 1010 A - 80 MHz
-        # 0001 1 or 1001 9 - 40 MHz
-        # 0000 0 or 1000 8 - 20 MHz
-        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xf8\x4f\x3f" # 20 MHz CBW
-        # eht_op_data24 = b"\x6a\x05\x11\x00\x00\x00\xf9\x4f\x3f" # 40 MHz CBW
-        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xfa\x4f\x3f" # 80 MHz CBW
-        eht_op_data5 = b"\x6a\x05\x11\x00\x00\x00\xfb\x4f\x3f"  # 160 MHz CBW
-        # eht_op_data6 = b"\x6a\x05\x11\x00\x00\x00\xfc\x4f\x3f" # 320 MHz CBW
+        eht_op_data5 = b"\x6a\x05\x11\x00\x00\x00\xfb\x4f\x3f"
 
         eht_operation = Dot11Elt(ID=0xFF, info=eht_op_data5)
 
-        # Multi-Link Element (MLE) - currently not included in frame
-        # mac = mac.replace(":", "")
-        # mle_data = b"\x6b\xb0\x01\x0d" + b"\x40\xed\x00\xad\xaa\x1b" + b"\x02\x00\x01\x00\x41\x00"
-        # mle_data = (
-        #     b"\x6b\xb0\x01\x0d" + bytes.fromhex(mac) + b"\x02\x00\x01\x00\x41\x00"
-        # )
-        # mle = Dot11Elt(ID=0xFF, info=mle_data)
-
         frame = essid / rates / dsset / dtim / ht_capabilities / rsn
 
-        # Add mobility domain if FT is enabled
         if mobility_domain is not None:
             frame = frame / mobility_domain
 
@@ -256,7 +226,6 @@ class _Utils:
         )
 
         if not profiler_tlv_disabled:
-            # Add WLAN Pi vendor IE
             frame = frame / _Utils.build_wlanpi_vendor_ie_type_0(testing)
 
         frame = frame / wmm
@@ -266,7 +235,6 @@ class _Utils:
 
         if not be_disabled:
             frame = frame / eht_operation / eht_capabilities
-            # frame = frame / mle / eht_operation / eht_capabilities
 
         return frame
 
@@ -288,11 +256,7 @@ class _Utils:
         rates_data = [140, 18, 152, 36, 176, 72, 96, 108]
         rates = Dot11Elt(ID="Rates", info=bytes(rates_data))
 
-        # Note: DSset (channel) element not used in 6 GHz frames
-        # channel = bytes([channel])  # type: ignore
-        # dsset = Dot11Elt(ID="DSset", info=channel)
-
-        dtim_data = b"\x00\x04\x00\x03\x00\x00"  # Fixed: DTIM count=0, period=4 (was 5, 4 - invalid!)
+        dtim_data = b"\x00\x04\x00\x03\x00\x00"
         dtim = Dot11Elt(ID="TIM", info=dtim_data)
 
         rsn_data = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x02\x00\x00\x0f\xac\x08\x00\x0f\xac\x09\xe8\x00"
@@ -335,17 +299,7 @@ class _Utils:
         eht_cap_data = b"\x6c\x00\x00\xe2\xff\xdb\x00\x18\x36\xd8\x1e\x00\x44\x44\x44\x44\x44\x44\x44\x44\x44"
         eht_capabilities = Dot11Elt(ID=0xFF, info=eht_cap_data)
 
-        # EHT CBW
-        # 0111 7 or 1100 C - 320 MHz
-        # 0011 3 or 1011 B - 160 MHz
-        # 0010 2 or 1010 A - 80 MHz
-        # 0001 1 or 1001 9 - 40 MHz
-        # 0000 0 or 1000 8 - 20 MHz
-        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xf8\x4f\x3f" # 20 MHz CBW
-        # eht_op_data24 = b"\x6a\x05\x11\x00\x00\x00\xf9\x4f\x3f" # 40 MHz CBW
-        # eht_op_data = b"\x6a\x05\x11\x00\x00\x00\xfa\x4f\x3f" # 80 MHz CBW
-        # eht_op_data5 = b"\x6a\x05\x11\x00\x00\x00\xfb\x4f\x3f" # 160 MHz CBW
-        eht_op_data6 = b"\x6a\x05\x11\x00\x00\x00\xfc\x4f\x3f"  # 320 MHz CBW
+        eht_op_data6 = b"\x6a\x05\x11\x00\x00\x00\xfc\x4f\x3f"
         eht_operation = Dot11Elt(ID=0xFF, info=eht_op_data6)
 
         rsnex_data = b"\x20"
@@ -418,10 +372,6 @@ class _Utils:
                 profiler_tlv_disabled,
                 testing,
             )
-        # for gathering data to validate tests:
-        #
-        # frame_bytes = bytes(frame)
-        # print(frame_bytes)
         return frame
 
     @staticmethod
@@ -469,12 +419,9 @@ class TxBeacons(multiprocessing.Process):
             raise ValueError("cannot determine channel to beacon on")
         self.channel = int(channel)
         scapyconf.iface = self.interface
-        # Socket is opened in the child process (run()) so the parent does not
-        # inherit a duplicate raw socket fd.
         self.l2socket: socket.socket | None = None
         self.beacon_interval = 0.102_400
 
-        # Beacon process uses its own local sequence counter (no lock contention!)
         self.beacon_seq = 0
 
         with lock:
@@ -490,14 +437,11 @@ class TxBeacons(multiprocessing.Process):
             beacon_frame_ies = _Utils.build_fake_frame_ies(self.config, self.mac)
             self.beacon_frame = RadioTap() / dot11 / dot11beacon / beacon_frame_ies
 
-            # Pre-serialize beacon frame for fast transmission
             beacon_bytes = bytes(self.beacon_frame)
 
-            # Calculate offsets for sequence number
             radiotap_len = struct.unpack("<H", beacon_bytes[2:4])[0]
             self.seq_offset = radiotap_len + 22
 
-            # Store as bytearray for efficient updates
             self.beacon_template = bytearray(beacon_bytes)
 
             self.log.debug(
@@ -536,7 +480,6 @@ class TxBeacons(multiprocessing.Process):
             sys.exit(1)
         self.log.debug("Raw AF_PACKET socket created for beacons on %s", self.interface)
 
-        # Set socket priority for beacons
         try:
             self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
             self.log.info("Socket priority set to 7 (highest) for beacons")
@@ -566,8 +509,6 @@ class TxBeacons(multiprocessing.Process):
                 reason=StatusReason.FAKEAP_CRASHED,
                 error=str(e),
             )
-            # Exit non-zero so the manager treats this as an abnormal exit and
-            # does not report a crashed beacon process as a clean shutdown.
             sys.exit(1)
         finally:
             self.log.debug("TxBeacons shutting down")
@@ -575,19 +516,15 @@ class TxBeacons(multiprocessing.Process):
 
     def beacon(self) -> None:
         """Update and Tx Beacon Frame"""
-        # Use local sequence counter (no lock, no contention!)
         self.beacon_seq = (self.beacon_seq + 1) % 4096
         seq_num = self.beacon_seq
 
-        # Fast byte-level patching of pre-serialized template
         frame_bytes = bytearray(self.beacon_template)
 
-        # Patch sequence number (bits 4-15 of sequence control field)
         frame_bytes[self.seq_offset : self.seq_offset + 2] = struct.pack(
             "<H", seq_num << 4
         )
 
-        # Send via raw socket
         if not self.l2socket:
             return
         try:
@@ -631,46 +568,32 @@ class Sniffer(multiprocessing.Process):
         self.listen_only: bool = bool((config.get("GENERAL") or {}).get("listen_only"))
         self.assoc_reqs: dict[str, Any] = {}
 
-        # Monitoring metrics (track client interactions)
-        self.seen_macs: set[str] = set()  # All unique MACs observed
-        self.authed_macs: set[str] = set()  # MACs that sent auth request
-        self.assoc_macs: set[str] = set()  # MACs that sent assoc request
-        self.total_probe_requests = 0  # Total probe requests (can be >1 per MAC)
-        self.total_auth_requests = 0  # Total auth requests (can be >1 per MAC)
-        self.total_assoc_requests = 0  # Total assoc requests (can be >1 per MAC)
-        self.invalid_frame_count = 0  # Corrupted/invalid frames filtered
-        self.bad_fcs_count = 0  # Frames with bad FCS (checksum mismatch)
-        self.last_stats_log_time: float = 0  # For periodic logging
-        self.last_metrics_update_time: float = (
-            0  # For debouncing monitoring metrics writes
-        )
-        self.metrics_update_interval = 10.0  # Write to disk every 10 seconds
-        self.metrics_dirty = False  # Track if metrics changed since last write
+        self.seen_macs: set[str] = set()
+        self.authed_macs: set[str] = set()
+        self.assoc_macs: set[str] = set()
+        self.total_probe_requests = 0
+        self.total_auth_requests = 0
+        self.total_assoc_requests = 0
+        self.invalid_frame_count = 0
+        self.bad_fcs_count = 0
+        self.last_stats_log_time: float = 0
+        self.last_metrics_update_time: float = 0
+        self.metrics_update_interval = 10.0
+        self.metrics_dirty = False
 
-        # BPF filters for improved kernel-level packet filtering
-        # Default to enabled for better performance
         if hasattr(args, "no_bpf_filters") and args.no_bpf_filters:
-            # Explicit --no-bpf-filters flag
             self.bpf_filter = ""
             self.log.info("BPF filters disabled (filtering in Python instead)")
         else:
-            # Enable BPF filters by default for performance
             self.bpf_filter = SNIFFER_BPF_FILTER
             self.log.info(
                 "BPF filters enabled (kernel-level filtering for better performance)"
             )
-        # mgt bpf filter: assoc-req, assoc-resp, reassoc-req, reassoc-resp, probe-req, probe-resp, beacon, atim, disassoc, auth, deauth
-        # ctl bpf filter: ps-poll, rts, cts, ack, cf-end, cf-end-ack
         scapyconf.iface = self.interface
-        # self.log.debug(scapyconf.ifaces)
-        # Socket is opened in the child process (run()) so the parent does not
-        # inherit a duplicate raw socket fd.
         self.l2socket: socket.socket | None = None
 
         self.received_frame_cb = self.received_frame
-        # Determine if we're in Rx-only mode (listen-only or hostapd mode)
         if self.listen_only:
-            # Check if this is hostapd mode (ap_mode=True) or true listen-only
             ap_mode = config.get("GENERAL", {}).get("ap_mode", False)
             if ap_mode:
                 self.log.info(
@@ -680,8 +603,8 @@ class Sniffer(multiprocessing.Process):
                 self.log.info(
                     "Sniffer in Rx-only mode (passive monitoring, no AP responses)"
                 )
-            self.dot11_probe_request_cb = lambda *args, **kwargs: None  # No-op
-            self.dot11_auth_cb = lambda *args, **kwargs: None  # No-op
+            self.dot11_probe_request_cb = lambda *args, **kwargs: None
+            self.dot11_auth_cb = lambda *args, **kwargs: None
         else:
             self.dot11_probe_request_cb = self.probe_response
             self.dot11_auth_cb = self.auth
@@ -703,27 +626,20 @@ class Sniffer(multiprocessing.Process):
                 / Dot11Auth(seqnum=0x02)
             )
 
-            # Pre-serialize frames to bytearrays for fast patching
             probe_resp_bytes = bytes(self.probe_response_frame)
             auth_bytes = bytes(self.auth_frame)
 
-            # Calculate RadioTap header length (bytes 2-3, little-endian)
             radiotap_len = struct.unpack("<H", probe_resp_bytes[2:4])[0]
 
-            # 802.11 MAC header offsets (after RadioTap header)
-            # Frame Control (2) + Duration (2) + addr1 (6) + addr2 (6) + addr3 (6) + Seq (2)
             self.addr1_offset = radiotap_len + 4
             self.seq_offset = radiotap_len + 22
 
-            # Store templates as bytearrays for efficient in-place updates
             self.probe_response_template = bytearray(probe_resp_bytes)
             self.auth_template = bytearray(auth_bytes)
 
-            # Pre-allocate buffers for zero-allocation response path
             self.probe_response_buffer = bytearray(len(probe_resp_bytes))
             self.auth_buffer = bytearray(len(auth_bytes))
 
-            # MAC address cache for repeated clients (LRU with 128 entries)
             from functools import lru_cache
 
             @lru_cache(maxsize=128)
@@ -732,10 +648,8 @@ class Sniffer(multiprocessing.Process):
 
             self._parse_mac = parse_mac_cached
 
-            # Sniffer process uses its own local sequence counter (no lock contention!)
             self.sniffer_seq = 0
 
-            # Only log frame template details in fake AP mode (not needed in hostapd mode)
             if not self.listen_only:
                 self.log.debug(
                     "Frame templates created: probe=%d bytes, auth=%d bytes, addr1_offset=%d, seq_offset=%d (using local seq counter)",
@@ -777,7 +691,6 @@ class Sniffer(multiprocessing.Process):
             sys.exit(1)
         self.log.debug("Raw AF_PACKET socket created for %s", self.interface)
 
-        # Set socket priority for probe responses
         try:
             self.l2socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 7)
             self.log.info("Socket priority set to 7 (highest) for probe responses")
@@ -800,7 +713,7 @@ class Sniffer(multiprocessing.Process):
             )
         except KeyboardInterrupt:
             self.log.info("Sniffer received shutdown signal")
-            self.log_session_stats()  # Log final stats on shutdown
+            self.log_session_stats()
         except Scapy_Exception as error:
             if "ailed to compile filter" in str(error):
                 self.log.warning(
@@ -810,7 +723,6 @@ class Sniffer(multiprocessing.Process):
                 self.log.info(
                     "Running without BPF filters (filtering in Python instead)"
                 )
-                # Retry without BPF filters
                 try:
                     sniff(
                         iface=self.interface,
@@ -846,7 +758,6 @@ class Sniffer(multiprocessing.Process):
                 )
                 sys.exit(1)
         finally:
-            # Always log final stats and write final metrics on exit
             self.log.info("Sniffer shutting down")
             if self.invalid_frame_count > 0:
                 self.log.info(
@@ -857,14 +768,12 @@ class Sniffer(multiprocessing.Process):
                     f"Filtered {self.bad_fcs_count} frames with bad FCS during session"
                 )
             self.log_session_stats()
-            # Force write final monitoring metrics (bypass debounce)
             self._update_monitoring_metrics(force=True)
 
     def received_frame(self, packet: Any) -> None:
         """Handle incoming packets for profiling"""
-        # Check if this is a Dot11 packet (802.11 management frame)
         if not packet.haslayer(Dot11):
-            return  # Ignore non-802.11 packets
+            return
 
         # 802.11 defines only version 0. Corrupt monitor-ring frames (#316)
         # carry other versions yet still match the assoc-req BPF filter.
@@ -873,28 +782,25 @@ class Sniffer(multiprocessing.Process):
             self._update_monitoring_metrics()
             return
 
-        # Periodic stats logging (every 60 seconds)
         current_time = time()
         if current_time - self.last_stats_log_time >= 60:
             self.log_session_stats()
             self.last_stats_log_time = current_time
 
-        # Track all unique MACs seen (any frame type)
         mac = packet.addr2
         if mac and mac not in self.seen_macs:
             self.seen_macs.add(mac)
             self._update_monitoring_metrics()
 
-        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:  # auth
-            if packet.addr1 == self.mac:  # if we are the receiver
+        if packet.subtype == DOT11_SUBTYPE_AUTH_REQ:
+            if packet.addr1 == self.mac:
                 self.log.debug("rx auth sent from MAC %s", packet.addr2)
-                # Track auth metrics
                 self.total_auth_requests += 1
                 if mac not in self.authed_macs:
                     self.authed_macs.add(mac)
                     self._update_monitoring_metrics()
                 self.dot11_auth_cb(packet.addr2)
-        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:  # probe request
+        elif packet.subtype == DOT11_SUBTYPE_PROBE_REQ:
             self.total_probe_requests += 1
             if Dot11Elt in packet and packet[Dot11Elt].ID == 0:
                 ssid = packet[Dot11Elt].info
@@ -908,18 +814,16 @@ class Sniffer(multiprocessing.Process):
             packet.subtype == DOT11_SUBTYPE_ASSOC_REQ
             or packet.subtype == DOT11_SUBTYPE_REASSOC_REQ
         ):
-            # Track assoc metrics
             self.total_assoc_requests += 1
             if mac not in self.assoc_macs:
                 self.assoc_macs.add(mac)
                 self._update_monitoring_metrics()
 
-            if packet.addr1 == self.mac:  # if we are the receiver
+            if packet.addr1 == self.mac:
                 self.dot11_assoc_request_cb(packet)
             if self.listen_only:
                 self.dot11_assoc_request_cb(packet)
 
-            # self.log.debug("packet dump for %s %s", packet.addr2, packet.show(dump=True))
             if Dot11Elt in packet:
                 if packet[Dot11Elt].ID == 0:
                     self.log.debug(
@@ -937,27 +841,21 @@ class Sniffer(multiprocessing.Process):
         """Send probe resp to assist with profiler discovery"""
         t_start = time()
 
-        # Use local sequence counter (no lock, no contention!)
         self.sniffer_seq = (self.sniffer_seq + 1) % 4096
         seq_num = self.sniffer_seq
-        lock_wait_ms = 0.0  # No lock anymore!
+        lock_wait_ms = 0.0
         lock_ms = 0.0
 
-        # Fast byte-level patching using pre-allocated buffer
         t_manip_start = time()
 
-        # Reuse buffer (in-place copy for zero allocation)
         self.probe_response_buffer[:] = self.probe_response_template
 
-        # Parse destination MAC from string to bytes (with caching)
         client_mac_bytes = self._parse_mac(probe_request.addr2)
 
-        # Patch addr1 (destination MAC)
         self.probe_response_buffer[self.addr1_offset : self.addr1_offset + 6] = (
             client_mac_bytes
         )
 
-        # Patch sequence number (bits 4-15 of sequence control field)
         self.probe_response_buffer[self.seq_offset : self.seq_offset + 2] = struct.pack(
             "<H", seq_num << 4
         )
@@ -965,7 +863,6 @@ class Sniffer(multiprocessing.Process):
         t_manip_end = time()
         manip_ms = (t_manip_end - t_manip_start) * 1000
 
-        # Send via raw socket
         if not self.l2socket:
             return
         t_send_start = time()
@@ -1016,24 +913,18 @@ class Sniffer(multiprocessing.Process):
         """Send authentication frame to get the station to prompt an assoc request"""
         t_start = time()
 
-        # Use local sequence counter (no lock, no contention!)
         self.sniffer_seq = (self.sniffer_seq + 1) % 4096
         seq_num = self.sniffer_seq
-        lock_ms = 0.0  # No lock anymore!
+        lock_ms = 0.0
 
-        # Fast byte-level patching using pre-allocated buffer
         t_manip_start = time()
 
-        # Reuse buffer (in-place copy for zero allocation)
         self.auth_buffer[:] = self.auth_template
 
-        # Parse destination MAC from string to bytes (with caching)
         client_mac_bytes = self._parse_mac(receiver)
 
-        # Patch addr1 (destination MAC)
         self.auth_buffer[self.addr1_offset : self.addr1_offset + 6] = client_mac_bytes
 
-        # Patch sequence number (bits 4-15 of sequence control field)
         self.auth_buffer[self.seq_offset : self.seq_offset + 2] = struct.pack(
             "<H", seq_num << 4
         )
@@ -1041,7 +932,6 @@ class Sniffer(multiprocessing.Process):
         t_manip_end = time()
         manip_ms = (t_manip_end - t_manip_start) * 1000
 
-        # Send via raw socket
         if not self.l2socket:
             return
         t_send_start = time()
@@ -1078,22 +968,17 @@ class Sniffer(multiprocessing.Process):
         """
         from .status import update_monitoring_metrics_in_info
 
-        # Mark that metrics have changed
         self.metrics_dirty = True
 
-        # Check if enough time has passed since last update (debounce)
         current_time = time()
         time_since_last_update = current_time - self.last_metrics_update_time
 
         if not force and time_since_last_update < self.metrics_update_interval:
-            # Too soon - skip this update to reduce disk I/O
             return
 
-        # Only write if metrics actually changed
         if not self.metrics_dirty and not force:
             return
 
-        # Calculate failed profile count: MACs that authed but never sent assoc
         failed_count = len(self.authed_macs - self.assoc_macs)
 
         update_monitoring_metrics_in_info(
@@ -1103,7 +988,6 @@ class Sniffer(multiprocessing.Process):
             bad_fcs_count=self.bad_fcs_count,
         )
 
-        # Reset debounce timer and dirty flag
         self.last_metrics_update_time = current_time
         self.metrics_dirty = False
 

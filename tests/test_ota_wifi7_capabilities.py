@@ -41,7 +41,6 @@ import time
 import pytest
 from scapy.all import Dot11Beacon, Dot11Elt, sniff
 
-# Skip all tests in this file unless OTA testing is explicitly enabled
 pytestmark = pytest.mark.skipif(
     os.getenv("PROFILER_OTA_TESTS") != "1",
     reason="OTA tests disabled (set PROFILER_OTA_TESTS=1 to enable)",
@@ -66,11 +65,11 @@ class WiFi7BeaconAnalyzer:
                 try:
                     elt = pkt[Dot11Elt]
                     while elt:
-                        if elt.ID == 0:  # SSID element
+                        if elt.ID == 0:
                             if elt.info.decode("utf-8", errors="ignore") == ssid:
                                 self.beacons.append(pkt)
                                 if len(self.beacons) >= count:
-                                    return True  # Stop capture
+                                    return True
                         elt = elt.payload.getlayer(Dot11Elt)
                 except Exception:
                     pass
@@ -94,7 +93,7 @@ class WiFi7BeaconAnalyzer:
         """Extract Extension IE from beacon by extension ID"""
         elt = beacon.getlayer(Dot11Elt)
         while elt:
-            if elt.ID == 255 and len(elt.info) > 0:  # Extension IE
+            if elt.ID == 255 and len(elt.info) > 0:
                 if elt.info[0] == ext_id:
                     return bytes(elt.info)
             elt = elt.payload.getlayer(Dot11Elt)
@@ -123,14 +122,8 @@ class WiFi7BeaconAnalyzer:
         if not he_cap or len(he_cap) < 8:
             return {"present": False, "error": "HE Capabilities IE not found"}
 
-        # PHY capabilities byte 0 is at offset 7 (after ext_id + MAC caps)
         phy_cap_0 = he_cap[7]
 
-        # Bits 1-4 are channel width indicators
-        # Bit 1: 40 MHz in 2.4 GHz
-        # Bit 2: 40 & 80 MHz in 5 GHz
-        # Bit 3: 160 MHz in 5 GHz
-        # Bit 4: 160 MHz & 80+80 MHz in 5 GHz
         supports_40_80 = (phy_cap_0 & 0x02) != 0
         supports_160 = (phy_cap_0 & 0x04) != 0
         supports_160_8080 = (phy_cap_0 & 0x08) != 0
@@ -158,9 +151,6 @@ class WiFi7BeaconAnalyzer:
         if not eht_cap or len(eht_cap) < 12:
             return {"present": False, "error": "EHT Capabilities IE not found"}
 
-        # PHY capabilities start at offset 3 (after ext_id + MAC caps)
-        # Byte 5 (offset 8) = bits 40-47
-        # Byte 6 (offset 9) = bits 48-55
         if len(eht_cap) < 10:
             return {"present": True, "error": "EHT Capabilities too short for MCS-15"}
 
@@ -188,16 +178,14 @@ class WiFi7BeaconAnalyzer:
         if not eht_cap or len(eht_cap) < 12:
             return {"present": False, "error": "EHT Capabilities IE not found"}
 
-        # Byte 7 (offset 10) contains bits 56-63
-        # Bits 60-62 are at bit positions 4-6 of byte 7
         if len(eht_cap) < 11:
             return {"present": True, "error": "EHT Capabilities too short"}
 
         phy_cap_7 = eht_cap[10]
 
-        mu_bf_80 = (phy_cap_7 & (1 << 4)) != 0  # Bit 60
-        mu_bf_160 = (phy_cap_7 & (1 << 5)) != 0  # Bit 61
-        mu_bf_320 = (phy_cap_7 & (1 << 6)) != 0  # Bit 62
+        mu_bf_80 = (phy_cap_7 & (1 << 4)) != 0
+        mu_bf_160 = (phy_cap_7 & (1 << 5)) != 0
+        mu_bf_320 = (phy_cap_7 & (1 << 6)) != 0
 
         return {
             "present": True,
@@ -222,11 +210,8 @@ class WiFi7BeaconAnalyzer:
         if not eht_cap or len(eht_cap) < 15:
             return {"present": False, "error": "EHT Capabilities IE not found"}
 
-        # MCS/NSS map starts at offset 12 (after ext_id + MAC + PHY)
-        # BW <= 80 MHz: 3 bytes
         mcs_map_80 = int.from_bytes(eht_cap[12:15], "little")
 
-        # Extract NSS values (nibbles; each 4-bit field is the max NSS directly)
         rx_nss_0_9 = (mcs_map_80 & 0xF) if (mcs_map_80 & 0xF) != 0xF else 0
         tx_nss_0_9 = (
             ((mcs_map_80 >> 4) & 0xF) if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
@@ -273,15 +258,12 @@ class WiFi7BeaconAnalyzer:
         Issue #5: EHT Operation IE should advertise NSS=4 for all basic MCS ranges
         Expected: All 4 bytes should be 0x44 (each nibble = max NSS = 4)
         """
-        # Extension ID 0x6A = EHT Operation (0x6D is TID-to-Link Mapping)
         eht_oper = WiFi7BeaconAnalyzer.get_extension_ie(beacon, 0x6A)
         if not eht_oper or len(eht_oper) < 6:
             return {"present": False, "error": "EHT Operation IE not found"}
 
-        # Info layout: ext_id(1) + EHT Operation Parameters(1) + Basic EHT-MCS/NSS Set(4)
         basic_mcs_nss = eht_oper[2:6]
 
-        # Decode NSS values (each nibble is the max NSS directly; 0xF = unsupported)
         def decode_nss(byte_val):
             rx = (byte_val & 0xF) if (byte_val & 0xF) != 0xF else 0
             tx = ((byte_val >> 4) & 0xF) if ((byte_val >> 4) & 0xF) != 0xF else 0
@@ -325,30 +307,17 @@ class WiFi7BeaconAnalyzer:
         Issue #6: MLD IE should advertise max simultaneous links = 2
         This is in the MLD Capabilities and Operations field (bits 0-3)
         """
-        # Multi-Link element is extension IE 0x6B
         mld_ie = WiFi7BeaconAnalyzer.get_extension_ie(beacon, 0x6B)
         if not mld_ie or len(mld_ie) < 10:
             return {"present": False, "error": "Multi-Link IE not found"}
 
-        # Control field (2 bytes) at offset 1-2
-        # Common Info Length at offset 3
-        # MLD Capabilities at Common Info offset depends on presence bits
-
-        # For basic ML element:
-        # Control (2) + Common Info Length (1) + MLD Address (6) + Link ID (1) +
-        # BSS Param Change Count (1) + EML Capabilities (2) + MLD Capabilities (2)
-
-        # MLD Capabilities is the last 2 bytes of common info
         common_info_len = mld_ie[3]
         if len(mld_ie) < 4 + common_info_len:
             return {"present": True, "error": "Multi-Link IE too short"}
 
-        # Common Info Length counts itself, so Common Info starts at offset 3
-        # MLD Capabilities is 2 bytes before end of common info
         mld_cap_offset = 3 + common_info_len - 2
         mld_cap = int.from_bytes(mld_ie[mld_cap_offset : mld_cap_offset + 2], "little")
 
-        # Bits 0-3 (mask 0x000F) are Maximum Number of Simultaneous Links
         max_simul_links = mld_cap & 0x000F
 
         return {
@@ -371,20 +340,17 @@ class WiFi7BeaconAnalyzer:
         if not vht_cap or len(vht_cap) < 12:
             return {"present": False, "error": "VHT Capabilities IE not found"}
 
-        # VHT Capabilities Info (4 bytes)
         vht_cap_info = int.from_bytes(vht_cap[0:4], "little")
 
-        # Beamformee STS Capability (bits 13-15)
         beamformee_sts = (vht_cap_info >> 13) & 0x7
 
-        # Sounding Dimensions (bits 16-18)
         sounding_dim = (vht_cap_info >> 16) & 0x7
 
         return {
             "present": True,
             "vht_cap_info": f"0x{vht_cap_info:08x}",
             "beamformee_sts": beamformee_sts,
-            "beamformee_sts_count": beamformee_sts + 1,  # Value is NSS-1
+            "beamformee_sts_count": beamformee_sts + 1,
             "sounding_dimensions": sounding_dim,
             "sounding_dimensions_count": sounding_dim + 1,
             "beamformee_sts_max": beamformee_sts == 7,
@@ -407,21 +373,18 @@ class RemoteProfilerController:
         security_mode: str = "ft-wpa3-mixed",
     ) -> None:
         """Start profiler on remote"""
-        # Kill any existing instances
         subprocess.run(
             ["ssh", self.remote_host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
             capture_output=True,
         )
         time.sleep(2)
 
-        # Build profiler command
         cmd = (
             f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
             f"--security-mode {security_mode} --passphrase {shlex.quote(passphrase)} "
             f"--debug --expert > /tmp/profiler_test_wifi7.log 2>&1 &"
         )
 
-        # Start profiler
         result = subprocess.run(
             ["ssh", self.remote_host, cmd],
             capture_output=True,
@@ -431,10 +394,8 @@ class RemoteProfilerController:
         if result.returncode != 0:
             pytest.fail(f"Failed to start profiler: {result.stderr}")
 
-        # Wait for startup
         time.sleep(6)
 
-        # Verify it's running
         check = subprocess.run(
             ["ssh", self.remote_host, "pgrep -f 'profiler --ap-mode'"],
             capture_output=True,
@@ -470,7 +431,6 @@ def ota_interface():
     iface = os.getenv("PROFILER_OTA_INTERFACE", "wlu1u3")
     channel = int(os.getenv("PROFILER_REMOTE_CHANNEL", "36"))
 
-    # Verify interface exists
     try:
         subprocess.run(
             ["iw", "dev", iface, "info"],
@@ -480,7 +440,6 @@ def ota_interface():
     except subprocess.CalledProcessError:
         pytest.skip(f"Interface {iface} not found")
 
-    # Configure monitor mode
     try:
         subprocess.run(
             ["sudo", "ip", "link", "set", iface, "down"],
@@ -752,7 +711,6 @@ class TestWiFi7Capabilities:
 
             assert beacon is not None, f"No beacons captured for SSID {ssid}"
 
-            # Verify all capabilities
             he_160 = WiFi7BeaconAnalyzer.verify_he_160_8080_support(beacon)
             eht_mcs15 = WiFi7BeaconAnalyzer.verify_eht_mcs15_support(beacon)
             eht_mu_bf = WiFi7BeaconAnalyzer.verify_eht_mu_beamformer(beacon)
@@ -761,7 +719,6 @@ class TestWiFi7Capabilities:
             mld_links = WiFi7BeaconAnalyzer.verify_mld_max_simul_links(beacon)
             vht_bf = WiFi7BeaconAnalyzer.verify_vht_beamformee_sts_sounding(beacon)
 
-            # Collect failures
             failures = []
 
             if not he_160.get("correct"):

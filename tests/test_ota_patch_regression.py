@@ -33,7 +33,6 @@ import time
 import pytest
 from scapy.all import Dot11Beacon, Dot11Elt, sniff
 
-# Skip all tests unless OTA testing is explicitly enabled
 pytestmark = pytest.mark.skipif(
     os.getenv("PROFILER_OTA_TESTS") != "1",
     reason="OTA tests disabled (set PROFILER_OTA_TESTS=1 to enable)",
@@ -66,16 +65,13 @@ def parse_ht_nss_and_caps(ht_cap: bytes) -> dict:
     if not ht_cap or len(ht_cap) < 26:
         return {"present": False}
 
-    # MCS Set at bytes 3-18
     mcs_set = ht_cap[3:19]
 
-    # Count spatial streams based on MCS set
     nss = 0
-    for i in range(4):  # Check SS 1-4
+    for i in range(4):
         if mcs_set[i] == 0xFF:
             nss = i + 1
 
-    # TxBF Capabilities at bytes 21-24
     txbf_cap = int.from_bytes(ht_cap[21:25], "little")
 
     return {
@@ -92,26 +88,22 @@ def parse_vht_nss_and_width(vht_cap: bytes) -> dict:
     if not vht_cap or len(vht_cap) < 12:
         return {"present": False}
 
-    # VHT Capabilities Info (4 bytes)
     vht_cap_info = int.from_bytes(vht_cap[0:4], "little")
     chan_width_set = (vht_cap_info >> 2) & 0x3
 
-    # Channel width interpretation
     width_map = {
         0: "No 160MHz/80+80MHz",
         1: "160MHz",
         2: "160MHz and 80+80MHz",
     }
 
-    # Rx/Tx MCS Maps
     rx_mcs_map = int.from_bytes(vht_cap[4:6], "little")
     tx_mcs_map = int.from_bytes(vht_cap[6:8], "little")
 
-    # Count NSS based on Rx MCS map
     nss = 0
     for i in range(8):
         ss_bits = (rx_mcs_map >> (i * 2)) & 0x3
-        if ss_bits != 0x3:  # Not "not supported"
+        if ss_bits != 0x3:
             nss = i + 1
 
     return {
@@ -130,15 +122,12 @@ def parse_he_nss_and_width(he_cap: bytes) -> dict:
     if not he_cap or len(he_cap) < 22:
         return {"present": False}
 
-    # PHY Capabilities byte 0 at offset 7
     phy_cap_0 = he_cap[7]
     supports_160mhz = (phy_cap_0 & 0x08) != 0
 
-    # MCS maps at offset 18
     rx_mcs_80 = int.from_bytes(he_cap[18:20], "little")
     tx_mcs_80 = int.from_bytes(he_cap[20:22], "little")
 
-    # Count NSS for 80 MHz
     nss_80 = 0
     for i in range(8):
         ss_bits = (rx_mcs_80 >> (i * 2)) & 0x3
@@ -154,7 +143,6 @@ def parse_he_nss_and_width(he_cap: bytes) -> dict:
         "tx_mcs_80": f"0x{tx_mcs_80:04x}",
     }
 
-    # Check 160 MHz maps if present
     if len(he_cap) >= 26:
         rx_mcs_160 = int.from_bytes(he_cap[22:24], "little")
         tx_mcs_160 = int.from_bytes(he_cap[24:26], "little")
@@ -181,16 +169,12 @@ def parse_eht_nss(eht_cap: bytes) -> dict:
     if not eht_cap or len(eht_cap) < 15:
         return {"present": False}
 
-    # MAC Capabilities at bytes 1-2
     eht_mac_cap = int.from_bytes(eht_cap[1:3], "little")
 
-    # PHY Capabilities at bytes 3-11 (9 bytes)
     eht_phy_cap_val = int.from_bytes(eht_cap[3:12], "little")
 
-    # MCS Map BW <= 80 MHz at offset 12 (3 bytes)
     mcs_map_80 = int.from_bytes(eht_cap[12:15], "little")
 
-    # Extract NSS values (each 4-bit field is the max NSS directly; 0xF = unsupported)
     rx_nss_0_9 = (mcs_map_80 & 0xF) if (mcs_map_80 & 0xF) != 0xF else 0
     tx_nss_0_9 = ((mcs_map_80 >> 4) & 0xF) if ((mcs_map_80 >> 4) & 0xF) != 0xF else 0
     rx_nss_10_11 = ((mcs_map_80 >> 8) & 0xF) if ((mcs_map_80 >> 8) & 0xF) != 0xF else 0
@@ -271,14 +255,12 @@ def start_profiler_and_capture(
     iface: str, host: str, ssid: str, channel: int = 36
 ) -> tuple[Dot11Beacon | None, str]:
     """Start profiler and capture beacon (helper function)"""
-    # Stop any existing instances
     subprocess.run(
         ["ssh", host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
         capture_output=True,
     )
     time.sleep(2)
 
-    # Start profiler
     cmd = (
         f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
         f"--security-mode ft-wpa3-mixed --passphrase {shlex.quote('WLAN PiProfiler')} "
@@ -296,7 +278,6 @@ def start_profiler_and_capture(
 
     time.sleep(6)
 
-    # Verify running
     check = subprocess.run(
         ["ssh", host, "pgrep -f 'profiler --ap-mode'"],
         capture_output=True,
@@ -311,7 +292,6 @@ def start_profiler_and_capture(
         )
         pytest.fail(f"Profiler failed to start. Log:\n{log_result.stdout}")
 
-    # Capture beacon
     beacons = []
     filter_str = "type mgt subtype beacon"
 
@@ -341,7 +321,6 @@ def start_profiler_and_capture(
     except Exception as e:
         pytest.fail(f"Failed to capture beacon: {e}")
 
-    # Get log
     log_result = subprocess.run(
         ["ssh", host, f"cat /tmp/profiler_regression_{channel}.log 2>&1"],
         capture_output=True,
@@ -358,14 +337,12 @@ def profiler_log_5ghz(remote_host):
     ssid = "REGRESSION-LOG-5GHZ"
     channel = 36
 
-    # Cleanup any existing profiler instances
     subprocess.run(
         ["ssh", remote_host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
         capture_output=True,
     )
     time.sleep(1)
 
-    # Start profiler
     cmd = (
         f"sudo profiler --ap-mode -c {channel} -s {shlex.quote(ssid)} "
         f"--security-mode ft-wpa3-mixed --passphrase {shlex.quote('WLAN PiProfiler')} "
@@ -381,9 +358,8 @@ def profiler_log_5ghz(remote_host):
     if result.returncode != 0:
         pytest.fail(f"Failed to start profiler: {result.stderr}")
 
-    time.sleep(6)  # Wait for profiler to start
+    time.sleep(6)
 
-    # Get the log
     log_result = subprocess.run(
         ["ssh", remote_host, f"cat /tmp/profiler_regression_{channel}.log 2>&1"],
         capture_output=True,
@@ -392,7 +368,6 @@ def profiler_log_5ghz(remote_host):
 
     yield {"log": log_result.stdout, "host": remote_host}
 
-    # Cleanup
     subprocess.run(
         ["ssh", remote_host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
         capture_output=True,
@@ -412,7 +387,6 @@ def beacon_5ghz(ota_interface, remote_host):
 
     yield {"beacon": beacon, "log": log, "host": remote_host}
 
-    # Cleanup
     subprocess.run(
         ["ssh", remote_host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
         capture_output=True,
@@ -422,8 +396,6 @@ def beacon_5ghz(ota_interface, remote_host):
 @pytest.fixture(scope="module")
 def beacon_2ghz(ota_interface, remote_host):
     """Capture 2.4 GHz beacon on channel 6 (module-scoped)"""
-    # Reconfigure monitor interface for 2.4 GHz channel 6
-    # Note: Channel 6 is used instead of channel 1 because it works better with HT40
     try:
         subprocess.run(
             ["sudo", "iw", "dev", ota_interface, "set", "channel", "6"],
@@ -443,7 +415,6 @@ def beacon_2ghz(ota_interface, remote_host):
 
     yield {"beacon": beacon, "log": log, "host": remote_host}
 
-    # Cleanup
     subprocess.run(
         ["ssh", remote_host, "sudo pkill -9 profiler; sudo pkill -9 hostapd"],
         capture_output=True,
@@ -465,7 +436,6 @@ class Test5GHzPatches:
         """
         beacon = beacon_5ghz["beacon"]
 
-        # Parse all capabilities
         ht = parse_ht_nss_and_caps(get_ie(beacon, 0x2D))
         vht = parse_vht_nss_and_width(get_ie(beacon, 0xBF))
         he = parse_he_nss_and_width(get_extension_ie(beacon, 0x23))
@@ -473,7 +443,6 @@ class Test5GHzPatches:
 
         failures = []
 
-        # HT NSS
         if not ht.get("present"):
             failures.append("HT Capabilities missing")
         elif ht["nss"] != 4:
@@ -481,7 +450,6 @@ class Test5GHzPatches:
                 f"HT NSS: {ht['nss']} (expected 4). MCS bytes: {ht['mcs_bytes']}"
             )
 
-        # VHT NSS
         if not vht.get("present"):
             failures.append("VHT Capabilities missing")
         elif vht["nss"] != 4:
@@ -489,7 +457,6 @@ class Test5GHzPatches:
                 f"VHT NSS: {vht['nss']} (expected 4). Rx MCS Map: {vht['rx_mcs_map']}"
             )
 
-        # HE NSS
         if not he.get("present"):
             failures.append("HE Capabilities missing")
         else:
@@ -502,7 +469,6 @@ class Test5GHzPatches:
                     f"HE 160MHz NSS: {he['nss_160mhz']} (expected 4). Rx MCS: {he.get('rx_mcs_160')}"
                 )
 
-        # EHT NSS
         if not eht.get("present"):
             failures.append("EHT Capabilities missing")
         else:
@@ -545,7 +511,6 @@ class Test5GHzPatches:
 
         failures = []
 
-        # VHT 160 MHz
         if not vht.get("present"):
             failures.append("VHT Capabilities missing")
         elif not vht["supports_160mhz"]:
@@ -554,7 +519,6 @@ class Test5GHzPatches:
                 f"Chan Width Set: {vht['chan_width_set']} ({vht['chan_width_desc']})"
             )
 
-        # HE 160 MHz
         if not he.get("present"):
             failures.append("HE Capabilities missing")
         else:
@@ -694,7 +658,6 @@ class Test24GHzPatches:
 
         failures = []
 
-        # HT NSS (should be 4)
         if not ht.get("present"):
             failures.append("HT Capabilities missing")
         elif ht["nss"] != 4:
@@ -702,11 +665,9 @@ class Test24GHzPatches:
                 f"HT NSS: {ht['nss']} (expected 4). MCS bytes: {ht['mcs_bytes']}"
             )
 
-        # VHT should NOT be present in 2.4 GHz
         if vht.get("present"):
             failures.append("VHT Capabilities present in 2.4 GHz (should not be)")
 
-        # HE should be present with 4 SS but no 160 MHz
         if not he.get("present"):
             failures.append("HE Capabilities missing in 2.4 GHz")
         else:
@@ -716,7 +677,6 @@ class Test24GHzPatches:
             if he_nss != 4:
                 failures.append(f"HE NSS: {he_nss} (expected 4)")
 
-        # EHT should be present with 4 SS
         if not eht.get("present"):
             failures.append("EHT Capabilities missing in 2.4 GHz")
         elif eht["rx_nss_mcs_0_9"] != 4:
@@ -746,15 +706,12 @@ class Test24GHzPatches:
 
         failures = []
 
-        # HT should be present (20 MHz operation)
         if not ht.get("present"):
             failures.append("HT Capabilities missing")
 
-        # VHT should NOT be present in 2.4 GHz
         if vht.get("present"):
             failures.append("VHT present in 2.4 GHz (should not be)")
 
-        # HE should be present but no 160 MHz
         if he.get("present") and he.get("supports_160mhz"):
             failures.append(
                 f"HE advertises 160 MHz in 2.4 GHz. "
@@ -787,7 +744,6 @@ class Test24GHzPatches:
         elif ht["txbf_cap"] != 0x1FFFFFFF:
             failures.append(f"HT TxBF: 0x{ht['txbf_cap']:08x} (expected 0x1fffffff)")
 
-        # Verify log message
         if "PROFILER: Enabled HT TxBF capabilities: 0x1fffffff" not in log:
             failures.append("HT TxBF log message missing")
 
@@ -817,7 +773,6 @@ class Test24GHzPatches:
         elif eht.get("mac_cap") != 0x00B7:
             failures.append(f"EHT MAC: 0x{eht.get('mac_cap'):04x} (expected 0x00b7)")
 
-        # Verify log message
         if "PROFILER: Override EHT MAC caps to 0x00b7" not in log:
             failures.append("EHT MAC caps log message missing")
 
@@ -845,7 +800,6 @@ class Test24GHzPatches:
         if not eht_ie:
             failures.append("EHT Capabilities IE missing")
         else:
-            # Verify log message indicating enhanced PHY caps
             if "PROFILER: Enhanced EHT PHY caps" not in log:
                 failures.append("EHT PHY caps log message missing")
 

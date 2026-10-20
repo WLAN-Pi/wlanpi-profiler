@@ -58,23 +58,20 @@ class ProfilerState(Enum):
 class StatusReason(Enum):
     """Reason codes for state transitions"""
 
-    # Running reasons
     STARTUP_COMPLETE = "startup_complete"
 
-    # Stopped reasons (not written to file, just for logging)
     USER_REQUESTED = "user_requested"
 
-    # Failed reasons
     COUNTRY_CODE_DETECTION = "country_code_detection"
     INSUFFICIENT_PERMISSIONS = "insufficient_permissions"
     INTERFACE_VALIDATION = "interface_validation"
     CONFIG_VALIDATION = "config_validation"
     MISSING_TOOLS = "missing_tools"
     ALREADY_RUNNING = "already_running"
-    FILE_NOT_FOUND = "file_not_found"  # PCAP file, config file, or other file not found
+    FILE_NOT_FOUND = "file_not_found"
     HOSTAPD_CRASHED = "hostapd_crashed"
     HOSTAPD_START_FAILED = "hostapd_start_failed"
-    FAKEAP_CRASHED = "fakeap_crashed"  # TxBeacons or Sniffer process failure
+    FAKEAP_CRASHED = "fakeap_crashed"
     UNKNOWN_ERROR = "unknown_error"
 
 
@@ -118,7 +115,6 @@ def detect_country_code(phy: str = "") -> str:
     log = logging.getLogger(__name__)
 
     try:
-        # Run iw reg get to get regulatory domain
         result = subprocess.run(
             ["iw", "reg", "get"],
             capture_output=True,
@@ -183,9 +179,6 @@ def detect_startup_method() -> str:
     if _STARTUP_METHOD_CACHE is not None:
         return _STARTUP_METHOD_CACHE
 
-    # systemd sets these environment variables when running services
-    # JOURNAL_STREAM: systemd journal socket for logging
-    # INVOCATION_ID: unique ID for this service invocation
     if os.environ.get("JOURNAL_STREAM") or os.environ.get("INVOCATION_ID"):
         _STARTUP_METHOD_CACHE = "systemd"
     else:
@@ -214,7 +207,6 @@ def write_status(
     """
     status_file = get_status_file_path()
 
-    # Ensure directory exists
     with contextlib.suppress(OSError):
         os.makedirs(os.path.dirname(status_file), mode=0o755, exist_ok=True)
 
@@ -222,7 +214,7 @@ def write_status(
         "schema_version": "1.0",
         "state": state.value,
         "timestamp": datetime.now(UTC).isoformat(),
-        "startup_method": detect_startup_method(),  # Auto-detect (cached after first call)
+        "startup_method": detect_startup_method(),
     }
 
     if reason is not None:
@@ -278,11 +270,9 @@ def write_info(
     """
     info_file = get_info_file_path()
 
-    # Ensure directory exists
     with contextlib.suppress(OSError):
         os.makedirs(os.path.dirname(info_file), mode=0o755, exist_ok=True)
 
-    # Calculate frequency from channel
     frequency = _get_frequency_from_channel(channel)
 
     if frequency is None:
@@ -299,25 +289,25 @@ def write_info(
         "profiler_version": profiler_version,
         "phy": phy,
         "interfaces": {
-            "ap": ap_interface,  # null for listen_only mode
+            "ap": ap_interface,
             "monitor": monitor_interface,
         },
         "channel": channel,
-        "frequency": frequency,  # May be null if unknown
+        "frequency": frequency,
         "country_code": country_code,
         "ssid": None if mode == "listen_only" else ssid,
         "bssid": None if mode == "listen_only" else bssid,
         "mode": mode,
-        "passphrase": passphrase,  # null for listen_only mode
+        "passphrase": passphrase,
         "started_at": started_at.isoformat(),
-        "uptime_seconds": 0,  # Will be updated by status updates
+        "uptime_seconds": 0,
         "profile_count": profile_count,
         "failed_profile_count": failed_profile_count,
         "total_clients_seen": total_clients_seen,
         "invalid_frame_count": invalid_frame_count,
         "bad_fcs_count": bad_fcs_count,
-        "last_profile": last_profile,  # null if no profiles yet
-        "last_profile_timestamp": last_profile_timestamp,  # null if no profiles yet
+        "last_profile": last_profile,
+        "last_profile_timestamp": last_profile_timestamp,
     }
 
     _write_json_atomic(info_file, info_data)
@@ -334,32 +324,25 @@ def update_last_profile_in_info(mac: str) -> None:
     info_file = get_info_file_path()
 
     try:
-        # Read existing info file
         info_data = _read_json(info_file)
         if info_data is None:
             log.debug("Info file doesn't exist yet, skipping last_profile update")
             return
 
-        # Update last_profile field
         info_data["last_profile"] = mac
 
-        # Update last_profile_timestamp
         now = datetime.now(UTC)
         info_data["last_profile_timestamp"] = now.isoformat()
 
-        # Increment profile_count
         current_count = info_data.get("profile_count", 0)
         info_data["profile_count"] = current_count + 1
 
-        # Update uptime_seconds
         if "started_at" in info_data:
-            # Handle both 'Z' suffix and '+00:00' for UTC timestamps
             started_at_str = info_data["started_at"].replace("Z", "+00:00")
             started_at = datetime.fromisoformat(started_at_str)
             uptime = (now - started_at).total_seconds()
             info_data["uptime_seconds"] = int(uptime)
 
-        # Write back atomically
         _write_json_atomic(info_file, info_data)
         log.debug(
             f"Updated info: last_profile={mac}, profile_count={info_data['profile_count']}, uptime={info_data.get('uptime_seconds', 0)}s"
@@ -388,13 +371,11 @@ def update_monitoring_metrics_in_info(
     info_file = get_info_file_path()
 
     try:
-        # Read existing info file
         info_data = _read_json(info_file)
         if info_data is None:
             log.debug("Info file doesn't exist yet, skipping monitoring metrics update")
             return
 
-        # Update metrics if provided
         if total_clients_seen is not None:
             info_data["total_clients_seen"] = total_clients_seen
 
@@ -407,16 +388,13 @@ def update_monitoring_metrics_in_info(
         if bad_fcs_count is not None:
             info_data["bad_fcs_count"] = bad_fcs_count
 
-        # Update uptime_seconds
         now = datetime.now(UTC)
         if "started_at" in info_data:
-            # Handle both 'Z' suffix and '+00:00' for UTC timestamps
             started_at_str = info_data["started_at"].replace("Z", "+00:00")
             started_at = datetime.fromisoformat(started_at_str)
             uptime = (now - started_at).total_seconds()
             info_data["uptime_seconds"] = int(uptime)
 
-        # Write back atomically
         _write_json_atomic(info_file, info_data)
         log.debug(
             f"Updated monitoring metrics: total_clients_seen={info_data.get('total_clients_seen', 0)}, "
@@ -489,7 +467,6 @@ def _get_frequency_from_channel(channel: int) -> int | None:
     Returns:
         Frequency in MHz, or None if not found
     """
-    # Reverse lookup in frequency map
     for freq, ch in _20MHZ_FREQUENCY_CHANNEL_MAP.items():
         if ch == channel:
             return freq
@@ -509,29 +486,24 @@ def _write_json_atomic(filepath: str, data: dict[str, Any]) -> None:
     temp_file = None
 
     try:
-        # Unique temp file per writer so concurrent processes (sniffer and
-        # profiler children) cannot clobber each other's temp file.
         directory = os.path.dirname(filepath) or "."
         fd, temp_file = tempfile.mkstemp(
             dir=directory, prefix=os.path.basename(filepath) + ".", suffix=".tmp"
         )
         with os.fdopen(fd, "w") as f:
             json.dump(data, f, indent=2)
-            f.write("\n")  # Trailing newline
+            f.write("\n")
             f.flush()
             os.fsync(f.fileno())
 
-        # Set permissions before rename so final file has correct perms
         set_file_permissions(temp_file)
 
-        # Atomic replace (overwrites existing target on POSIX and Windows)
         os.replace(temp_file, filepath)
         temp_file = None
 
     except Exception as e:
         log.warning(f"Failed to write {filepath}: {e}")
     finally:
-        # Clean up temp file on failure
         if temp_file is not None:
             with contextlib.suppress(Exception):
                 if os.path.exists(temp_file):
@@ -586,11 +558,9 @@ def write_last_session(
     log = logging.getLogger(__name__)
     session_file = get_last_session_file_path()
 
-    # Ensure directory exists
     with contextlib.suppress(OSError):
         os.makedirs(os.path.dirname(session_file), mode=0o755, exist_ok=True)
 
-    # Build session data
     info_data = get_info()
     if not info_data:
         info_data = {}

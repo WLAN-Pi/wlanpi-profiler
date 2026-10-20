@@ -13,31 +13,22 @@ define constant values for app
 import os
 import sys
 
-# Runtime files
 LAST_PROFILE_TMP_FILE = "/run/wlanpi-profiler.last_profile"
 SSID_TMP_FILE = "/run/wlanpi-profiler.ssid"
 STATUS_FILE = "/run/wlanpi-profiler.status.json"
 INFO_FILE = "/run/wlanpi-profiler.info.json"
 
-# Persistent session record
 LAST_SESSION_FILE = "/var/lib/wlanpi-profiler/last-session.json"
 
-# Configuration
 CONFIG_FILE = "/etc/wlanpi-profiler/config.ini"
 
-# Default passphrase for AP modes (8 characters minimum)
 DEFAULT_PASSPHRASE = "profiler"
 
-# Hostapd paths - Use paths relative to Python executable for dev/prod compatibility
-# This ensures we always use the hostapd binary from our virtual environment,
-# never a system-wide installation
 _BIN_DIR = os.path.dirname(sys.executable)
 HOSTAPD_BINARY = os.path.join(_BIN_DIR, "hostapd")
 HOSTAPD_CLI_BINARY = os.path.join(_BIN_DIR, "hostapd_cli")
 HOSTAPD_CONFIG_DIR = "/tmp"
 
-# Profiler's hostapd control interface (NOT system hostapd at /var/run/hostapd)
-# The profiler bundles its own hostapd and should never interact with system hostapd
 PROFILER_CTRL_INTERFACE = "/run/wlanpi-profiler/hostapd"
 
 DOT11_TYPE_MANAGEMENT = 0
@@ -50,45 +41,41 @@ DOT11_SUBTYPE_REASSOC_REQ = 0x02
 DOT11_SUBTYPE_AUTH_REQ = 0x0B
 
 SSID_PARAMETER_SET_IE_TAG = 0
-POWER_MIN_MAX_IE_TAG = 33  # power capability IE
-SUPPORTED_CHANNELS_IE_TAG = 36  # client supported channels
-HT_CAPABILITIES_IE_TAG = 45  # 802.11n
-RSN_CAPABILITIES_IE_TAG = 48  # 802.11w
-FT_CAPABILITIES_IE_TAG = 54  # 802.11r - mobility domain (MDE) IE
-SUPPORTED_OPERATING_CLASSES_IE_TAG = 59  # Alternate Operating Classes IE
-RM_CAPABILITIES_IE_TAG = 70  # 802.11k
-EXT_CAPABILITIES_IE_TAG = 127  # 802.11v - Extended Capabilities
-VHT_CAPABILITIES_IE_TAG = 191  # 802.11ac
-VENDOR_SPECIFIC_IE_TAG = 221  # Vendor Specific IE
-IE_EXT_TAG = 255  # Element ID Extension field
-HE_CAPABILITIES_IE_EXT_TAG = 35  # 802.11ax HE Capabilities IE
-HE_OPERATION_IE_EXT_TAG = 36  # 802.11ax HE Operation IE
-HE_SPATIAL_REUSE_IE_EXT_TAG = 39  # 802.11ax Spatial Reuse Paramater IE
-HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59  # 802.11ax 6 GHz capabilities IE
-MLE_EXT_TAG = 107  # 802.11be Multi-Link Element
-EHT_CAPABILITIES_IE_EXT_TAG = 108  # 802.11be EHT Capabilities IE
-EHT_OPERATION_IE_EXT_TAG = 109  # 802.11be EHT Operation IE
-RSNX_TAG = 244  # RSNX - RSN Extension IE
+POWER_MIN_MAX_IE_TAG = 33
+SUPPORTED_CHANNELS_IE_TAG = 36
+HT_CAPABILITIES_IE_TAG = 45
+RSN_CAPABILITIES_IE_TAG = 48
+FT_CAPABILITIES_IE_TAG = 54
+SUPPORTED_OPERATING_CLASSES_IE_TAG = 59
+RM_CAPABILITIES_IE_TAG = 70
+EXT_CAPABILITIES_IE_TAG = 127
+VHT_CAPABILITIES_IE_TAG = 191
+VENDOR_SPECIFIC_IE_TAG = 221
+IE_EXT_TAG = 255
+HE_CAPABILITIES_IE_EXT_TAG = 35
+HE_OPERATION_IE_EXT_TAG = 36
+HE_SPATIAL_REUSE_IE_EXT_TAG = 39
+HE_6_GHZ_BAND_CAP_IE_EXT_TAG = 59
+MLE_EXT_TAG = 107
+EHT_CAPABILITIES_IE_EXT_TAG = 108
+EHT_OPERATION_IE_EXT_TAG = 109
+RSNX_TAG = 244
 
-# RSN AKM Suite Types (IEEE 802.11-2024)
-# Used for client capability detection in association request frames
-RSN_AKM_WPA_PSK = 2  # WPA2-Personal
-RSN_AKM_FT_PSK = 4  # Fast Transition PSK
-RSN_AKM_SAE = 8  # WPA3-SAE
-RSN_AKM_FT_SAE = 9  # Fast Transition SAE
-RSN_AKM_SAE_GDH = 24  # SAE with Extended Key (Group Dependent Hashing)
-RSN_AKM_FT_SAE_GDH = 25  # FT-SAE with Extended Key (Group Dependent Hashing)
+RSN_AKM_WPA_PSK = 2
+RSN_AKM_FT_PSK = 4
+RSN_AKM_SAE = 8
+RSN_AKM_FT_SAE = 9
+RSN_AKM_SAE_GDH = 24
+RSN_AKM_FT_SAE_GDH = 25
 
 # Note: SAE-GDH (AKM 24/25) requires hostapd master (not in our currently bundled 2.11)
 # Profiler can detect these AKMs but cannot advertise them with current hostapd
 
-# Security mode mappings for hostapd wpa_key_mgmt configuration
-# Maps security_mode config value → hostapd wpa_key_mgmt string
 SECURITY_MODES = {
-    "wpa2": "WPA-PSK",  # WPA2-Personal only
-    "ft-wpa2": "WPA-PSK FT-PSK",  # WPA2 + Fast Transition
-    "wpa3-mixed": "WPA-PSK SAE",  # WPA2/WPA3 transition mode
-    "ft-wpa3-mixed": "WPA-PSK FT-PSK SAE FT-SAE",  # Full featured (default)
+    "wpa2": "WPA-PSK",
+    "ft-wpa2": "WPA-PSK FT-PSK",
+    "wpa3-mixed": "WPA-PSK SAE",
+    "ft-wpa3-mixed": "WPA-PSK FT-PSK SAE FT-SAE",
 }
 
 DEFAULT_SECURITY_MODE = "ft-wpa3-mixed"
@@ -249,8 +236,6 @@ _20MHZ_FREQUENCY_CHANNEL_MAP = {
     7115: 233,
 }
 
-# Security mode constraints
-# Used for validation, documentation, and auto-disable logic
 SECURITY_MODE_CONSTRAINTS = {
     "wpa2": {
         "ft_supported": False,

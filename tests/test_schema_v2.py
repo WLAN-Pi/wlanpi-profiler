@@ -9,7 +9,6 @@
 Test schema v2 JSON output validation
 """
 
-# Expected schema v2 required fields
 SCHEMA_V2_REQUIRED_FIELDS = [
     "mac",
     "is_laa",
@@ -26,7 +25,6 @@ SCHEMA_V2_REQUIRED_FIELDS = [
     "profiler_version",
 ]
 
-# Expected feature fields (subset - not exhaustive)
 EXPECTED_FEATURES = [
     "dot11k",
     "dot11n",
@@ -51,27 +49,22 @@ def validate_schema_v2(json_data: dict) -> tuple:
     """
     errors = []
 
-    # Check schema version
     if json_data.get("schema_version") != 2:
         errors.append(
             f"Expected schema_version 2, got {json_data.get('schema_version')}"
         )
 
-    # Check required fields exist
     for field in SCHEMA_V2_REQUIRED_FIELDS:
         if field not in json_data:
             errors.append(f"Missing required field: {field}")
 
-    # Validate MAC format
     mac = json_data.get("mac", "")
     if mac and not all(c in "0123456789abcdefABCDEF-" for c in mac):
         errors.append(f"Invalid MAC format: {mac}")
 
-    # Validate boolean fields
     if "is_laa" in json_data and not isinstance(json_data["is_laa"], bool):
         errors.append(f"is_laa must be boolean, got {type(json_data['is_laa'])}")
 
-    # Validate capture_band is string
     if "capture_band" in json_data:
         if not isinstance(json_data["capture_band"], str):
             errors.append(
@@ -82,7 +75,6 @@ def validate_schema_v2(json_data: dict) -> tuple:
                 f"capture_band must be '0', '2', '5', or '6', got '{json_data['capture_band']}'"
             )
 
-    # Validate capture_channel is integer
     if "capture_channel" in json_data and not isinstance(
         json_data["capture_channel"], int
     ):
@@ -90,12 +82,10 @@ def validate_schema_v2(json_data: dict) -> tuple:
             f"capture_channel must be integer, got {type(json_data['capture_channel'])}"
         )
 
-    # Validate features is dict
     if "features" in json_data:
         if not isinstance(json_data["features"], dict):
             errors.append(f"features must be dict, got {type(json_data['features'])}")
 
-    # Validate profiler_version exists and is string
     if "profiler_version" in json_data and not isinstance(
         json_data["profiler_version"], str
     ):
@@ -138,7 +128,6 @@ def test_validate_missing_field():
     bad_data = {
         "mac": "aa-bb-cc-dd-ee-ff",
         "is_laa": True,
-        # Missing capture_ssid
         "capture_bssid": "11:22:33:44:55:66",
         "capture_manuf": "Intel",
         "capture_band": "5",
@@ -169,7 +158,7 @@ def test_validate_wrong_schema_version():
         "capture_channel": 36,
         "features": {},
         "pcapng": "base64encodeddata",
-        "schema_version": 1,  # Wrong version
+        "schema_version": 1,
         "profiler_version": "1.0.22",
     }
 

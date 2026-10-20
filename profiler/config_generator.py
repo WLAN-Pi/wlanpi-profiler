@@ -30,7 +30,6 @@ class TemplateNotFoundError(ConfigGeneratorError):
 
 def get_template_dir() -> Path:
     """Get path to templates directory"""
-    # Templates are in profiler/templates/
     module_dir = Path(__file__).parent
     return module_dir / "templates"
 
@@ -51,32 +50,23 @@ def build_vendor_ie_hex() -> str:
     oui = bytes([0x31, 0x41, 0x59])
     subtype = bytes([0x00])
 
-    # TLV 0: Profiler version
     profiler_version = __version__
     profiler_version_data = profiler_version.encode("ascii")
     profiler_version_tlv = (
-        bytes([0x00])  # Type
-        + bytes([len(profiler_version_data)])  # Length
-        + profiler_version_data  # Value
+        bytes([0x00]) + bytes([len(profiler_version_data)]) + profiler_version_data
     )
 
-    # TLV 1: System version
     system_version = get_wlanpi_version()
     system_version_data = system_version.encode("ascii")
     system_version_tlv = (
-        bytes([0x01])  # Type
-        + bytes([len(system_version_data)])  # Length
-        + system_version_data  # Value
+        bytes([0x01]) + bytes([len(system_version_data)]) + system_version_data
     )
 
-    # Assemble vendor data
     vendor_data = oui + subtype + profiler_version_tlv + system_version_tlv
 
-    # Build full IE: Element ID (DD) + Length + Data
     ie_length = len(vendor_data)
     full_ie = bytes([0xDD, ie_length]) + vendor_data
 
-    # Convert to hex string (e.g., "dd0f31415900...")
     return full_ie.hex()
 
 
@@ -94,13 +84,11 @@ def calculate_center_frequency(channel: int, bandwidth: int) -> int:
     if bandwidth == 20:
         return channel
     elif bandwidth == 40:
-        # For 40 MHz, center is +2 or -2 from primary
-        if channel <= 7:  # 2.4 GHz (channels 1-13)
+        if channel <= 7:
             return channel + 2
-        else:  # 5 GHz
+        else:
             return channel + 2
     elif bandwidth == 80:
-        # For 80 MHz in 5 GHz
         if channel in [36, 40, 44, 48]:
             return 42
         elif channel in [52, 56, 60, 64]:
@@ -116,9 +104,8 @@ def calculate_center_frequency(channel: int, bandwidth: int) -> int:
         elif channel in [165, 169, 173]:
             return 171
         else:
-            return channel + 6  # Fallback
+            return channel + 6
     elif bandwidth == 160:
-        # For 160 MHz in 5 GHz
         if channel in [36, 40, 44, 48, 52, 56, 60, 64]:
             return 50
         elif channel in [100, 104, 108, 112, 116, 120, 124, 128]:
@@ -126,7 +113,7 @@ def calculate_center_frequency(channel: int, bandwidth: int) -> int:
         elif channel in [149, 153, 157, 161, 165, 169, 173]:
             return 163
         else:
-            return channel + 14  # Fallback
+            return channel + 14
     else:
         return channel
 
@@ -215,88 +202,69 @@ def generate_hostapd_config(
 
     hw_mode = "g" if band == "2ghz" else "a"
 
-    # Calculate center frequencies - operate at 20 MHz, advertise 160 MHz capability
     if band == "5ghz":
-        # Operate at 20 MHz for maximum driver compatibility
-        # Patches still advertise 160 MHz capability in beacons for client profiling
-        # This allows clients to reveal their full capabilities without requiring
-        # the AP hardware to actually support high bandwidth operation
-        vht_oper_chwidth = 0  # 20/40 MHz operation
-        vht_centr_freq = 0  # For 20 MHz, center freq must be 0 or omitted
-        he_oper_chwidth = 0  # 20/40 MHz operation
-        he_centr_freq = 0  # For 20 MHz, center freq must be 0 or omitted
-        eht_oper_chwidth = 0  # 20/40 MHz operation
-        eht_centr_freq = 0  # For 20 MHz, center freq must be 0 or omitted
-    else:  # 2.4 GHz
-        vht_oper_chwidth = 0  # No VHT in 2.4 GHz
+        vht_oper_chwidth = 0
+        vht_centr_freq = 0
+        he_oper_chwidth = 0
+        he_centr_freq = 0
+        eht_oper_chwidth = 0
+        eht_centr_freq = 0
+    else:
+        vht_oper_chwidth = 0
         vht_centr_freq = channel
-        he_oper_chwidth = 0  # 20/40 MHz max
+        he_oper_chwidth = 0
         he_centr_freq = channel
         eht_oper_chwidth = 0
         eht_centr_freq = channel
 
-    # Get interface MAC address if not provided
     if mac_address is None:
         try:
             with open(f"/sys/class/net/{interface}/address") as f:
                 mac_address = f.read().strip()
         except FileNotFoundError:
-            # Interface doesn't exist (e.g., in test environment)
-            # Use a dummy MAC address for testing
             mac_address = "00:11:22:33:44:55"
         except Exception as e:
             raise ConfigGeneratorError(
                 f"Failed to read MAC address for {interface}: {e}"
             ) from e
 
-    # Validate country code
     if not country_code or len(country_code) != 2 or not country_code.isalpha():
         raise ConfigGeneratorError(
             f"Invalid country code: {country_code}. Must be 2-letter country code (e.g., 'US')."
         )
 
-    # Validate security_mode
     if security_mode not in SECURITY_MODES:
         raise ConfigGeneratorError(
             f"Invalid security_mode: {security_mode}. "
             f"Must be one of: {', '.join(SECURITY_MODES.keys())}"
         )
 
-    # Map security_mode to wpa_key_mgmt and feature flags
     wpa_key_mgmt = SECURITY_MODES[security_mode]
     ft_enabled = "FT-" in wpa_key_mgmt
     wpa3_enabled = "SAE" in wpa_key_mgmt
 
     template_data = {
-        # Basic
         "interface": interface,
         "ssid": ssid,
         "channel": channel,
-        "country_code": country_code,  # Passed from manager.py (detected via iw reg get)
+        "country_code": country_code,
         "hw_mode": hw_mode,
-        "mac_address": mac_address,  # Interface MAC address for BSSID
-        # Security
+        "mac_address": mac_address,
         "wpa_key_mgmt": wpa_key_mgmt,
         "ft_enabled": ft_enabled,
         "wpa3_enabled": wpa3_enabled,
         "mobility_domain": "BE11",
         "passphrase": passphrase,
-        # 802.11 standards
-        "ieee80211n_enabled": True,  # Always enable 802.11n
-        "ieee80211ac_enabled": (
-            band == "5ghz"
-        ),  # VHT only in 5 GHz (independent of HE)
+        "ieee80211n_enabled": True,
+        "ieee80211ac_enabled": (band == "5ghz"),
         "ieee80211ax_enabled": not he_disabled,
         "ieee80211be_enabled": (not he_disabled) and (not be_disabled),
-        # VHT/HE/EHT parameters
         "vht_oper_chwidth": vht_oper_chwidth,
         "vht_oper_centr_freq_seg0_idx": vht_centr_freq,
         "he_oper_chwidth": he_oper_chwidth,
         "he_oper_centr_freq_seg0_idx": he_centr_freq,
         "eht_oper_chwidth": eht_oper_chwidth,
         "eht_oper_centr_freq_seg0_idx": eht_centr_freq,
-        # Vendor-specific IE (WLAN Pi Profiler version advertisement)
-        # Only include if not disabled via --noprofilertlv
         "vendor_elements": "" if profiler_tlv_disabled else build_vendor_ie_hex(),
     }
 

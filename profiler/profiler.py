@@ -34,12 +34,12 @@ try:
         category=CryptographyDeprecationWarning,
     )
 except ImportError:
-    pass  # cryptography not installed
+    pass
 
 try:
     from manuf2 import manuf
 except ModuleNotFoundError:
-    manuf = None  # OUI lookups will be disabled
+    manuf = None
 
 from scapy.all import Dot11, Dot11FCS, RadioTap, wrpcap
 
@@ -95,20 +95,17 @@ class Profiler:
 
         logging_level = logging.DEBUG if debug else logging.INFO
 
-        # Use same format as helpers.setup_logger for consistency
         logging.basicConfig(
             level=logging_level,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             stream=sys.stdout,
-            force=True,  # Override any existing configuration
+            force=True,
         )
 
     def __init__(
         self, config: dict[str, Any] | None = None, queue: Any | None = None
     ) -> None:
         try:
-            # Re-initialize logging for this subprocess since it doesn't inherit
-            # the parent's logging configuration
             self._setup_subprocess_logging(config)
 
             self.log = logging.getLogger(inspect.stack()[0][1].split("/")[-1])
@@ -129,7 +126,6 @@ class Profiler:
                     (config.get("GENERAL") or {}).get("listen_only")
                 )
                 _files_path = (config.get("GENERAL") or {}).get("files_path")
-                # Support both single path and list of paths
                 self.files_path: list[Any] = (
                     _files_path if isinstance(_files_path, list) else [_files_path]
                 )
@@ -149,7 +145,6 @@ class Profiler:
                     self.he_disabled,
                     self.be_disabled,
                 )
-                # Use first path for backwards compatibility with single-path vars
                 self.reports_dir = os.path.join(str(self.files_path[0]), "reports")
                 self.clients_dir = os.path.join(str(self.files_path[0]), "clients")
                 self.csv_file = os.path.join(
@@ -168,7 +163,6 @@ class Profiler:
             self.running = True
             self.run(queue)
         except Exception as e:
-            # Log to both logger and stderr since subprocess errors may not propagate
             error_msg = f"FATAL ERROR in profiler __init__: {type(e).__name__}: {e}"
             self.log.error(error_msg, exc_info=True)
 
@@ -183,7 +177,6 @@ class Profiler:
         try:
             self.log.debug("profiler run(): starting")
 
-            # Set up signal handlers for graceful shutdown
             def shutdown_handler(signum: int, _frame: Any) -> None:
                 self.log.info(f"Received signal {signum}, shutting down gracefully")
                 self.running = False
@@ -198,23 +191,18 @@ class Profiler:
                 buffer_squelch = 3
 
                 while self.running:
-                    # Always use timeout so we can check self.running flag periodically
                     try:
                         frame = queue.get(timeout=1)
                     except Empty:
                         if self.pcap_analysis:
-                            # Queue is empty and we're in pcap mode - analysis complete
                             self.log.info(
                                 "finished analyzing %s",
                                 self.pcap_analysis,
                             )
                             sys.exit(0)
-                        # Live mode - timeout expired, check running flag and continue
                         continue
 
-                    # Process the frame (only reached if we got one from queue)
                     if frame and isinstance(frame, (RadioTap, Dot11)):
-                        # Defense-in-depth: filter invalid MACs (should already be filtered upstream)
                         if not is_valid_mac(frame.addr2):
                             continue
 
@@ -236,7 +224,6 @@ class Profiler:
 
             self.log.info("Profiler subprocess shutting down cleanly")
         except Exception as error:
-            # log to both logger and stderr since subprocess errors may not propagate
             msg = f"FATAL ERROR in profiler run(): {type(error).__name__}: {error}"
             self.log.error(msg, exc_info=True)
 
@@ -247,11 +234,9 @@ class Profiler:
 
     def profile(self, frame: Any) -> None:
         """Handle profiling clients as they come into the queue"""
-        # we should determine the channel from frame itself, not from the profiler config
         freq = frame.ChannelFrequency
         self.log.debug("detected freq from assoc is %s", freq)
 
-        # update /var/run/wlanpi-profiler.last_profile
         update_last_profile_record(frame.addr2.replace(":", ""))
 
         channel = _20MHZ_FREQUENCY_CHANNEL_MAP.get(freq, 0)
@@ -290,7 +275,6 @@ class Profiler:
 
         ssid, oui_manuf, chipset, capabilities = self.analyze_assoc_req(frame, is_6ghz)
 
-        # Filter corrupted frames with invalid SSIDs
         if not is_valid_ssid(ssid):
             self.log.debug(
                 "Skipping frame from %s with invalid/corrupted SSID", frame.addr2
@@ -372,7 +356,6 @@ class Profiler:
         listen_only: bool,
     ) -> str:
         """Generate a report for output"""
-        # start report
         text_report = "-" * 45
         if listen_only:
             text_report += f"\n - SSID: {ssid}"
@@ -393,10 +376,8 @@ class Profiler:
         text_report += "-" * 45
         text_report += "\n"
 
-        # Output all capabilities in expanded format (40-char field width)
         for capability in capabilities:
             if capability.name and capability.value:
-                # Use consistent 40-character field width for all capabilities
                 out = f"{capability.name:<40} {capability.value}"
                 if out.strip():
                     text_report += out + "\n"
@@ -421,7 +402,6 @@ class Profiler:
         log = logging.getLogger(inspect.stack()[0][3])
         client_mac = frame.addr2.replace(":", "-", 5)
 
-        # Loop through all configured paths
         for _path_idx, files_path in enumerate(self.files_path):
             files_path_str = str(files_path)
             clients_dir = os.path.join(files_path_str, "clients")
@@ -434,11 +414,10 @@ class Profiler:
             if not os.path.isdir(dest):
                 try:
                     os.makedirs(dest, exist_ok=True)
-                    # Set permissions and group ownership for webui access
                     set_directory_permissions(dest)
                 except OSError:
                     log.exception("problem creating %s directory", dest)
-                    continue  # Skip this path and try the next
+                    continue
 
             data = {}
 
@@ -447,7 +426,6 @@ class Profiler:
             data["manuf"] = oui_manuf
             data["chipset"] = chipset
 
-            # Schema v2: Add capture SSID
             if hasattr(frame, "info") and frame.info:
                 try:
                     data["capture_ssid"] = frame.info.decode("utf-8", errors="ignore")
@@ -458,7 +436,7 @@ class Profiler:
                         else ""
                     )
             elif listen_only:
-                data["capture_ssid"] = ""  # Unknown in listen-only mode
+                data["capture_ssid"] = ""
             else:
                 data["capture_ssid"] = (
                     self.config.get("GENERAL", {}).get("ssid", "")
@@ -466,13 +444,11 @@ class Profiler:
                     else ""
                 )
 
-            # Schema v2: Add capture BSSID (AP MAC address)
             if hasattr(frame, "addr1"):
                 data["capture_bssid"] = frame.addr1
             else:
                 data["capture_bssid"] = ""
 
-            # Schema v2: Add capture manufacturer (lookup AP's OUI)
             if data.get("capture_bssid"):
                 try:
                     data["capture_manuf"] = (
@@ -485,7 +461,6 @@ class Profiler:
             else:
                 data["capture_manuf"] = "Unknown"
 
-            # Schema v2: Keep band as string
             data["capture_band"] = str(band[0]) if band != "unknown" else "0"
             data["capture_channel"] = channel
 
@@ -498,15 +473,11 @@ class Profiler:
             data["schema_version"] = 2
             data["profiler_version"] = __version__
 
-            # Capture source metadata - indicates if this was from controlled AP or external pcap
-            # "profiler" = live capture with controlled AP settings (channel, SSID, IEs)
-            # "external" = external pcap with unknown AP settings
             if self.pcap_analysis:
                 data["capture_source"] = "external"
             else:
                 data["capture_source"] = "profiler"
 
-            # if there is a malformed radiotap header
             band_suffix = ""
             if band == "unknown":
                 band_suffix = ""
@@ -521,20 +492,18 @@ class Profiler:
                 log.debug("writing json report to %s", json_filename)
                 with open(json_filename, "w") as write_json_file:
                     json.dump(data, write_json_file)
-                # Set permissions and group ownership for webui access
                 set_file_permissions(json_filename)
 
                 log.debug("writing text report to %s", text_filename)
                 with open(text_filename, "w") as file_writer:
                     file_writer.write(text_report)
-                # Set permissions and group ownership for webui access
                 set_file_permissions(text_filename)
 
             except OSError:
                 log.exception(
                     "error creating flat files to dump client info (%s)", text_filename
                 )
-                continue  # Skip this path and try the next
+                continue
 
             out_row = {"Client_Mac": client_mac, "OUI_Manuf": oui_manuf}
 
@@ -549,29 +518,23 @@ class Profiler:
                     out_fieldnames.append(capability.db_key)
                     out_row[capability.db_key] = capability.db_value
 
-            # dump out the frame to a file
             pcap_filename = os.path.splitext(text_filename)[0] + ".pcap"
             log.debug("writing to %s", pcap_filename)
             try:
                 wrpcap(pcap_filename, [frame])
-                # Set permissions and group ownership for webui access
                 set_file_permissions(pcap_filename)
             except OSError:
                 log.exception(
                     "error creating pcap file to dump client frame (%s)", pcap_filename
                 )
-                continue  # Skip this path and try the next
+                continue
 
-            # check if csv file exists (use path-specific csv_file)
             if not os.path.exists(csv_file):
-                # create file with csv headers
                 with open(csv_file, mode="w") as file_obj:
                     csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
                     csv_writer.writeheader()
-                # Set permissions and group ownership for webui access
                 set_file_permissions(csv_file)
 
-            # append data to csv file
             with open(csv_file, mode="a") as file_obj:
                 csv_writer = csv.DictWriter(file_obj, fieldnames=out_fieldnames)
                 csv_writer.writerow(out_row)
@@ -585,17 +548,14 @@ class Profiler:
 
         You must strip those before passing the payload in.
         """
-        # init element vars
         information_elements: dict[Any, Any] = {}
 
-        # Handle empty buffer (malformed frame with no IEs)
         if not buffer:
             return information_elements
 
         element_id = 0
         element_length = 0
         element_data = []
-        # loop tracking vars
         is_index_byte = True
         is_length_byte = True
         index = 0
@@ -613,35 +573,29 @@ class Profiler:
                 element_data.append(byte)
             else:
                 if element_id in [VENDOR_SPECIFIC_IE_TAG, IE_EXT_TAG]:
-                    # map a list of data items to the key
                     if element_id in information_elements:
                         information_elements[element_id].append(element_data)
                     else:
                         information_elements[element_id] = [element_data]
                 else:
-                    # map the data to the key
                     information_elements[element_id] = element_data
 
-                # reset vars to decode next information element
                 index = 0
                 is_index_byte = True
                 is_length_byte = True
                 element_data = []
                 element_id = 0
                 element_length = 0
-                # current byte should be next index byte
                 element_id = byte
                 is_index_byte = False
                 continue
             if last:
                 if element_id in [VENDOR_SPECIFIC_IE_TAG, IE_EXT_TAG]:
-                    # map a list of data items to the key
                     if element_id in information_elements:
                         information_elements[element_id].append(element_data)
                     else:
                         information_elements[element_id] = [element_data]
                 else:
-                    # map the data to the key
                     information_elements[element_id] = element_data
 
         return information_elements
@@ -650,10 +604,8 @@ class Profiler:
         """Resolve client's manuf using manuf database and other heuristics"""
         log = logging.getLogger(inspect.stack()[0][3])
 
-        # log.debug("starting oui lookup for %s", mac)
         oui_manuf = self.lookup.get_manuf(mac) if self.lookup else ""
 
-        # vendor OUI that we possibly want to check for a more clear OUI match
         low_quality = "muratama"
 
         sanitize = {
@@ -668,9 +620,6 @@ class Profiler:
             or oui_manuf.lower().startswith(low_quality)
             or oui_manuf.lower() in sanitize
         ) and VENDOR_SPECIFIC_IE_TAG in dot11_elt_dict:
-            # inspect vendor specific IEs and see if there's an IE with
-            # an OUI that we know can only be included if the manuf
-            # of the client is the vendor that maps to that OUI
             for element_data in dot11_elt_dict[VENDOR_SPECIFIC_IE_TAG]:
                 try:
                     vendor_mac = f"{element_data[0]:02X}:{element_data[1]:02X}:{element_data[2]:02X}:00:00:00"
@@ -678,9 +627,6 @@ class Profiler:
                         self.lookup.get_manuf(vendor_mac) if self.lookup else None
                     )
                     if oui_manuf_vendor is not None:
-                        # Matches are vendor specific IEs we know are client specific
-                        # e.g. Apple vendor specific IEs can only be found in Apple devices
-                        # Samsung may follow similar logic based on S10 5G testing and S21 5G Ultra but unsure of consistency
                         matches = ("apple", "samsung", "intel")
                         if oui_manuf_vendor.lower().startswith(matches):
                             if oui_manuf_vendor.lower() in sanitize:
@@ -699,11 +645,6 @@ class Profiler:
         self, dot11_elt_dict: dict[Any, Any]
     ) -> str:
         """Resolve client's chipset via heuristics of vendor specific tags"""
-        # Broadcom
-        # MediaTek
-        # Qualcomm
-        # Infineon AG
-        # Intel Wireless Network Group
         log = logging.getLogger(inspect.stack()[0][3])
         chipset = ""
         manufs = []
@@ -719,7 +660,7 @@ class Profiler:
         matches = ["broadcom", "qualcomm", "mediatek", "intel", "infineon"]
         _break = False
         for manufacturer in manufs:
-            if manufacturer is None:  # Skip None values
+            if manufacturer is None:
                 continue
             for match in matches:
                 if manufacturer.lower().startswith(match):
@@ -791,12 +732,9 @@ class Profiler:
 
         if HT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             ht_data = dot11_elt_dict[HT_CAPABILITIES_IE_TAG]
-            # HT Capabilities IE should be 26 bytes; we need at least 7 bytes
-            # to access MCS octets at indices 3-6
             if len(ht_data) >= 7:
                 spatial_streams = 0
 
-                # mcs octets 1 - 4 indicate # streams supported (up to 4 streams only)
                 for mcs_octet in range(3, 7):
                     mcs_octet_value = ht_data[mcs_octet]
 
@@ -808,7 +746,6 @@ class Profiler:
                 dot11n_nss.value = str(spatial_streams)
                 dot11n_nss.db_value = spatial_streams
             else:
-                # Malformed HT Capabilities IE - mark as supported but unknown NSS
                 dot11n.value = "Supported"
                 dot11n.db_value = 1
 
@@ -897,8 +834,7 @@ class Profiler:
 
         if VHT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             vht_caps = dot11_elt_dict[VHT_CAPABILITIES_IE_TAG]
-            if len(vht_caps) < 12:  # VHT Capabilities IE must be 12 bytes
-                # Malformed IE - return default values
+            if len(vht_caps) < 12:
                 return [
                     dot11ac,
                     dot11ac_nss,
@@ -909,7 +845,6 @@ class Profiler:
                     dot11ac_bf_sts,
                 ]
 
-            # determine number of spatial streams (NSS) supported
             nss, mcs = Profiler._parse_mcs_nss([vht_caps[4], vht_caps[5]], "0-8", "0-9")
             mcs_list = ", ".join(mcs) if len(mcs) > 1 else (mcs[0] if mcs else "")
             dot11ac.value = "Supported"
@@ -918,13 +853,11 @@ class Profiler:
             dot11ac_mcs.value = mcs_list
             dot11ac_mcs.db_value = mcs_list
 
-            # check for SU & MU beam formee support
             mu_octet = vht_caps[2]
             su_octet = vht_caps[1]
             bf_sts_octet = vht_caps[1]
             onesixty = vht_caps[0]
 
-            # 160 MHz
             if get_bit(onesixty, 2):
                 dot11ac_160_mhz.value = "Supported"
                 dot11ac_160_mhz.db_value = 1
@@ -932,10 +865,8 @@ class Profiler:
                 dot11ac_160_mhz.value = "Not supported"
                 dot11ac_160_mhz.db_value = 0
 
-            # bit 4 indicates support for both octets (1 = supported, 0 = not supported)
             beam_form_mask = 16
 
-            # SU BF
             if su_octet & beam_form_mask:
                 dot11ac_su_bf.value = "Supported"
                 dot11ac_su_bf.db_value = 1
@@ -943,7 +874,6 @@ class Profiler:
                 dot11ac_su_bf.value = "Not supported"
                 dot11ac_su_bf.db_value = 0
 
-            # MU BF
             if mu_octet & beam_form_mask:
                 dot11ac_mu_bf.value = "Supported"
                 dot11ac_mu_bf.db_value = 1
@@ -951,11 +881,10 @@ class Profiler:
                 dot11ac_mu_bf.value = "Not supported"
                 dot11ac_mu_bf.db_value = 0
 
-            # BF STS - bits 5,6,7 of VHT caps byte 1 (bit 7 is MSB)
             vht_bf_sts_binary_string = (
-                f"{int(get_bit(bf_sts_octet, 7))}"  # MSB
+                f"{int(get_bit(bf_sts_octet, 7))}"
                 f"{int(get_bit(bf_sts_octet, 6))}"
-                f"{int(get_bit(bf_sts_octet, 5))}"  # LSB
+                f"{int(get_bit(bf_sts_octet, 5))}"
             )
             vht_bf_sts_value = int(vht_bf_sts_binary_string, base=2)
             dot11ac_bf_sts.db_value = vht_bf_sts_value
@@ -1080,13 +1009,10 @@ class Profiler:
         if EXT_CAPABILITIES_IE_TAG in dot11_elt_dict:
             ext_cap_list = dot11_elt_dict[EXT_CAPABILITIES_IE_TAG]
 
-            # check octet 3 exists (802.11v BSS Transition)
             if len(ext_cap_list) >= 3:
-                # bit 4 of octet 3 in the extended capabilites field
                 octet3 = ext_cap_list[2]
                 bss_trans_support = int("00001000", 2)
 
-                # 'And' octet 3 to test for bss transition support
                 if octet3 & bss_trans_support:
                     dot11v.value = "Supported"
                     dot11v.db_value = 1
@@ -1094,11 +1020,9 @@ class Profiler:
                     dot11v.value = "Not supported"
                     dot11v.db_value = 0
 
-            # check octet 7 exists (802.11aa SCS - Stream Classification Service)
-            # Bit 54 overall = Octet 7, Bit 6
             if len(ext_cap_list) >= 7:
                 octet7 = ext_cap_list[6]
-                scs_bit = int("01000000", 2)  # bit 6
+                scs_bit = int("01000000", 2)
 
                 if octet7 & scs_bit:
                     scs_support.value = "Supported"
@@ -1107,11 +1031,9 @@ class Profiler:
                     scs_support.value = "Not supported"
                     scs_support.db_value = 0
 
-            # check octet 10 exists (QoS R1 MSCS - Mirrored SCS)
-            # Bit 85 overall = Byte 10 (0-indexed), Bit 5
-            if len(ext_cap_list) >= 11:  # Need at least 11 bytes to access index 10
-                octet10 = ext_cap_list[10]  # Bit 85 is in byte 10 (0-indexed)
-                mscs_bit = int("00100000", 2)  # bit 5
+            if len(ext_cap_list) >= 11:
+                octet10 = ext_cap_list[10]
+                mscs_bit = int("00100000", 2)
 
                 if octet10 & mscs_bit:
                     mscs_support.value = "Supported"
@@ -1174,12 +1096,8 @@ class Profiler:
         if RSN_CAPABILITIES_IE_TAG in dot11_elt_dict:
             rsn_cap_list = dot11_elt_dict[RSN_CAPABILITIES_IE_TAG]
 
-            # Parse cipher suites from RSN IE
-            # RSN IE structure: Version(2) + Group Cipher(4) + Pairwise Count(2) + Pairwise List(4*n) + AKM Count(2) + AKM List(4*n)
-            # Standard OUI: 00-0F-AC
-            if len(rsn_cap_list) >= 8:  # Minimum: version + group cipher + count
+            if len(rsn_cap_list) >= 8:
                 try:
-                    # Complete cipher suite type mapping (00-0F-AC suite)
                     cipher_types = {
                         0: "Use group",
                         1: "WEP-40",
@@ -1199,7 +1117,6 @@ class Profiler:
                         15: "Reserved",
                     }
 
-                    # Parse group cipher suite (bytes 2-5: OUI + Type)
                     if (
                         len(rsn_cap_list) >= 6
                         and rsn_cap_list[2] == 0x00
@@ -1211,7 +1128,6 @@ class Profiler:
                         group_cipher.value = f"{cipher_name} ({group_suite_type})"
                         group_cipher.db_value = group_suite_type
 
-                    # Parse pairwise cipher suites (all of them)
                     if len(rsn_cap_list) >= 10:
                         pairwise_count = rsn_cap_list[6] | (rsn_cap_list[7] << 8)
                         offset = 8
@@ -1220,7 +1136,6 @@ class Profiler:
 
                         for _i in range(pairwise_count):
                             if offset + 4 <= len(rsn_cap_list):
-                                # Check for 00-0F-AC OUI
                                 if (
                                     rsn_cap_list[offset] == 0x00
                                     and rsn_cap_list[offset + 1] == 0x0F
@@ -1239,20 +1154,16 @@ class Profiler:
                             else:
                                 break
 
-                        # Set pairwise cipher value (all ciphers with suite types, comma-separated)
                         if pairwise_ciphers:
                             pairwise_cipher.value = ", ".join(pairwise_ciphers)
-                            # db_value stores the first (preferred) cipher suite type as integer
                             pairwise_cipher.db_value = pairwise_suite_types[0]
 
-                        # Parse AKM suites (after pairwise ciphers) - get all of them
                         if offset + 2 <= len(rsn_cap_list):
                             akm_count = rsn_cap_list[offset] | (
                                 rsn_cap_list[offset + 1] << 8
                             )
                             offset += 2
 
-                            # Complete AKM suite type mapping (00-0F-AC suite)
                             akm_types = {
                                 0: "Reserved",
                                 1: ".1X-SHA-1",
@@ -1287,7 +1198,6 @@ class Profiler:
 
                             for _i in range(akm_count):
                                 if offset + 4 <= len(rsn_cap_list):
-                                    # Check for 00-0F-AC OUI
                                     if (
                                         rsn_cap_list[offset] == 0x00
                                         and rsn_cap_list[offset + 1] == 0x0F
@@ -1302,31 +1212,22 @@ class Profiler:
                                 else:
                                     break
 
-                            # Set AKM suite value (all AKMs with suite types, comma-separated)
                             if akm_suites:
                                 akm_suite.value = ", ".join(akm_suites)
-                                # db_value stores the first (preferred) AKM suite type as integer
                                 akm_suite.db_value = akm_suite_types[0]
 
-                        # Parse RSN Capabilities (for MFP/802.11w)
-                        # RSN Capabilities is a 2-byte field after AKM suites
-                        # offset is now pointing right after the last AKM suite
                         if offset + 2 <= len(rsn_cap_list):
                             rsn_capabilities = rsn_cap_list[offset] | (
                                 rsn_cap_list[offset + 1] << 8
                             )
 
-                            # Check bit 7 (0x80) - Management Frame Protection Capable
                             if rsn_capabilities & 0x0080:
                                 dot11w.value = "Supported"
                                 dot11w.db_value = 1
                             else:
                                 dot11w.value = "Not supported"
-                                # Keep db_value=0 (already set in definition)
 
                 except (IndexError, ValueError) as error:
-                    # Malformed RSN IE, skip cipher suite parsing
-                    # Expected for some malformed frames - log for debugging
                     log.debug(
                         "Malformed RSN IE in frame, skipping cipher suite parsing: %s",
                         error,
@@ -1341,19 +1242,17 @@ class Profiler:
             name="RSNX SAE H2E",
             value="Not reported",
             db_key="rsnx_sae_h2e",
-            db_value=-1,  # -1 = not reported, 0 = not supported, 1 = supported
+            db_value=-1,
         )
 
         if RSNX_TAG in dot11_elt_dict:
             rsnx_data = dot11_elt_dict[RSNX_TAG]
             if len(rsnx_data) > 0:
                 rsnx_byte = rsnx_data[0]
-                # Bit 5 is SAE H2E
                 if (rsnx_byte >> 5) & 1:
                     rsnx_sae_h2e.value = "Supported"
                     rsnx_sae_h2e.db_value = 1
                 else:
-                    # RSNX element present but SAE H2E bit not set
                     rsnx_sae_h2e.value = "Not supported"
                     rsnx_sae_h2e.db_value = 0
 
@@ -1371,21 +1270,16 @@ class Profiler:
             db_value=0,
         )
         min_power_cap = Capability(
-            # name="Min Power",
-            # value="Not reported",
             db_key="min_power",
             db_value=0,
         )
 
         if POWER_MIN_MAX_IE_TAG in dot11_elt_dict:
             power_data = dot11_elt_dict[POWER_MIN_MAX_IE_TAG]
-            # Power Capability IE should have at least 2 octets (min and max power)
             if len(power_data) >= 2:
-                # octet 3 of power capabilites
                 max_power = power_data[1]
                 min_power = power_data[0]
 
-                # check if signed (both min and max are signed 8-bit values)
                 if min_power > 127:
                     signed_min_power = (256 - min_power) * (-1)
                 else:
@@ -1454,7 +1348,6 @@ class Profiler:
                         channel_multiplier = 4
                 if channel - placeholder[-1] == channel_multiplier:
                     placeholder.append(channel)
-                    # are we at last index? add last list to ranges
                     if channel == channel_list[-1]:
                         ranges.append(placeholder)
                 else:
@@ -1464,7 +1357,7 @@ class Profiler:
 
             channel_ranges = []
             for _range in ranges:
-                if _range:  # Guard against empty ranges
+                if _range:
                     channel_ranges.append(f"{_range[0]}-{_range[-1]}")
 
             supported_channels.value = f"{', '.join(channel_ranges)}**"
@@ -1488,7 +1381,6 @@ class Profiler:
             supported_operating_classes = dot11_elt_dict[
                 SUPPORTED_OPERATING_CLASSES_IE_TAG
             ]
-            # pop current operating class from list (first octet is the current class)
             if supported_operating_classes:
                 supported_operating_classes.pop(0)
             for alternative_operating_class in supported_operating_classes:
@@ -1578,7 +1470,6 @@ class Profiler:
             dot11ax.value = "Reporting disabled (--no11ax option used)"
         else:
             if IE_EXT_TAG in dot11_elt_dict:
-                # Debug: Log all Extension IE IDs found
                 ext_ie_ids = [
                     int(str(element_data[0]))
                     for element_data in dot11_elt_dict[IE_EXT_TAG]
@@ -1594,9 +1485,6 @@ class Profiler:
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
-                        # HE Capabilities IE is a fixed 19-byte payload after the
-                        # extension id; a truncated/malformed IE must not crash the
-                        # whole capture session.
                         if len(element_data) < 20:
                             log.debug(
                                 "Skipping truncated HE Capabilities IE (%d bytes)",
@@ -1604,11 +1492,9 @@ class Profiler:
                             )
                             continue
 
-                        # dot11ax is supported
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
 
-                        # determine number of spatial streams (NSS) supported
                         nss, mcs_sorted = Profiler._parse_mcs_nss(
                             [element_data[18], element_data[19]], "0-9", "0-11"
                         )
@@ -1658,7 +1544,6 @@ class Profiler:
                             dot11ax_he_su_beamformee.value = "Not supported"
                             dot11ax_he_su_beamformee.db_value = 0
 
-                        # BF STS - bits 2,3,4 of PHY byte 4 (bit 4 is MSB)
                         he_bf_sts_octet = element_data[11]
                         he_bf_sts_value = (
                             (int(get_bit(he_bf_sts_octet, 4)) << 2)
@@ -1701,7 +1586,6 @@ class Profiler:
                         dot11ax_six_ghz.db_value = 1
 
                     if ext_ie_id == HE_CAPABILITIES_IE_EXT_TAG:
-                        # dot11ax is supported
                         dot11ax.value = "Supported"
                         dot11ax.db_value = 1
 
@@ -1730,7 +1614,6 @@ class Profiler:
             db_value=-1,
         )
 
-        # EHT MAC Capabilities
         dot11be_epcs = Capability(
             name="802.11be/EPCS Support",
             value="Not reported*",
@@ -1756,7 +1639,6 @@ class Profiler:
             db_value=-1,
         )
 
-        # EHT PHY Capabilities
         dot11be_su_beamformee = Capability(
             name="802.11be/SU Beamformee",
             value="Not reported*",
@@ -1776,7 +1658,6 @@ class Profiler:
             db_value=-1,
         )
 
-        # Multi-Link Element (MLE) Capabilities
         dot11be_mle = Capability(
             name="802.11be/MLE",
             value="Not reported*",
@@ -1850,16 +1731,12 @@ class Profiler:
                     ext_ie_id = int(str(element_data[0]))
 
                     if ext_ie_id == EHT_CAPABILITIES_IE_EXT_TAG:
-                        # EHT is supported
                         dot11be.value = "Supported"
                         dot11be.db_value = 1
 
-                        # Parse EHT MAC Capabilities (bytes 1-2, 16-bit field)
                         if len(element_data) >= 3:
-                            # Combine bytes 1-2 into 16-bit value (little-endian)
                             eht_mac_caps = element_data[1] | (element_data[2] << 8)
 
-                            # EPCS Priority Access Support (bit 0)
                             if eht_mac_caps & 0x0001:
                                 dot11be_epcs.value = "Supported"
                                 dot11be_epcs.db_value = 1
@@ -1867,7 +1744,6 @@ class Profiler:
                                 dot11be_epcs.value = "Not supported"
                                 dot11be_epcs.db_value = 0
 
-                            # EHT OM Control Support (bit 1)
                             if eht_mac_caps & 0x0002:
                                 dot11be_om_control.value = "Supported"
                                 dot11be_om_control.db_value = 1
@@ -1875,7 +1751,6 @@ class Profiler:
                                 dot11be_om_control.value = "Not supported"
                                 dot11be_om_control.db_value = 0
 
-                            # Restricted TWT Support (bit 4)
                             if eht_mac_caps & 0x0010:
                                 dot11be_rtwt.value = "Supported"
                                 dot11be_rtwt.db_value = 1
@@ -1883,7 +1758,6 @@ class Profiler:
                                 dot11be_rtwt.value = "Not supported"
                                 dot11be_rtwt.db_value = 0
 
-                            # SCS Traffic Description Support (bit 5)
                             if eht_mac_caps & 0x0020:
                                 dot11be_scs_traffic.value = "Supported"
                                 dot11be_scs_traffic.db_value = 1
@@ -1891,13 +1765,9 @@ class Profiler:
                                 dot11be_scs_traffic.value = "Not supported"
                                 dot11be_scs_traffic.db_value = 0
 
-                        # Parse EHT PHY Capabilities
-                        # PHY capabilities are 9 bytes starting at element_data[3]
                         if len(element_data) >= 5:
-                            # Parse PHY bits 0-15 (bytes 3-4)
                             eht_phy_bits_0_15 = element_data[3] | (element_data[4] << 8)
 
-                            # SU Beamformee (bit 6, mask 0x0040)
                             if eht_phy_bits_0_15 & 0x0040:
                                 dot11be_su_beamformee.value = "Supported"
                                 dot11be_su_beamformee.db_value = 1
@@ -1905,7 +1775,6 @@ class Profiler:
                                 dot11be_su_beamformee.value = "Not supported"
                                 dot11be_su_beamformee.db_value = 0
 
-                            # 320 MHz support in 6 GHz (bit 1, mask 0x0002)
                             if eht_phy_bits_0_15 & 0x0002:
                                 dot11be_320_mhz.value = "Supported"
                                 dot11be_320_mhz.db_value = 1
@@ -1913,28 +1782,21 @@ class Profiler:
                                 dot11be_320_mhz.value = "Not supported"
                                 dot11be_320_mhz.db_value = 0
 
-                        # MCS 15 and MCS 14 (EHT DUP) support - PHY bits 40-63
-                        # These are in bytes 8-10 of element_data (PHY bytes 5-7)
                         if len(element_data) >= 11:
-                            # Combine bytes 8-10 into 24-bit value (little-endian)
                             eht_phy_bits_40_63 = (
                                 element_data[8]
                                 | (element_data[9] << 8)
                                 | (element_data[10] << 16)
                             )
 
-                            # Support of MCS 15 (mask 0x007800, 4 bits)
                             mcs15_bits = (eht_phy_bits_40_63 & 0x007800) >> 11
                             if mcs15_bits > 0:
                                 dot11be_mcs15_support.value = "Supported"
-                                dot11be_mcs15_support.db_value = (
-                                    mcs15_bits  # Store the actual capability value
-                                )
+                                dot11be_mcs15_support.db_value = mcs15_bits
                             else:
                                 dot11be_mcs15_support.value = "Not supported"
                                 dot11be_mcs15_support.db_value = 0
 
-                            # Support of EHT DUP (MCS 14) in 6 GHz (mask 0x008000, bit 15)
                             if eht_phy_bits_40_63 & 0x008000:
                                 dot11be_eht_dup_6ghz.value = "Supported"
                                 dot11be_eht_dup_6ghz.db_value = 1
@@ -1942,30 +1804,20 @@ class Profiler:
                                 dot11be_eht_dup_6ghz.value = "Not supported"
                                 dot11be_eht_dup_6ghz.db_value = 0
 
-                        # Parse EHT MCS and NSS Set
-                        # Structure: EXT_TAG (1) + MAC (2) + PHY (9) + MCS/NSS Set (variable)
-                        # MCS/NSS starts at byte 12 (index 12)
-                        # Format: Each MCS map is 3 bytes (Rx/Tx pairs for MCS 0-9, 10-11, 12-13)
-                        if (
-                            len(element_data) >= 15
-                        ):  # Need at least 3 bytes for one MCS map
-                            mcs_nss_offset = 12  # After MAC (2) + PHY (9) + ext_tag (1)
+                        if len(element_data) >= 15:
+                            mcs_nss_offset = 12
 
-                            # Parse first MCS map (BW <= 80 MHz)
                             if len(element_data) >= mcs_nss_offset + 3:
                                 nss = 0
                                 mcs = []
 
-                                # Each byte has two 4-bit fields: RX (bits 0-3) and TX (bits 4-7)
-                                # Process all 3 bytes (MCS 0-9, 10-11, 12-13)
                                 for byte_idx in range(3):
                                     byte_val = element_data[mcs_nss_offset + byte_idx]
-                                    rx_nss = byte_val & 0x0F  # Lower 4 bits
+                                    rx_nss = byte_val & 0x0F
 
-                                    if rx_nss < 15:  # 15 means not supported
+                                    if rx_nss < 15:
                                         nss = max(nss, rx_nss)
 
-                                    # Determine MCS range based on byte index
                                     if byte_idx == 0 and rx_nss > 0:
                                         mcs.append("0-9")
                                     elif byte_idx == 1 and rx_nss > 0:
@@ -1989,57 +1841,42 @@ class Profiler:
                                         dot11be_mcs.value = mcs_str
                                         dot11be_mcs.db_value = mcs_str
 
-                    # Parse Multi-Link Element (MLE)
-                    if ext_ie_id == MLE_EXT_TAG:  # 107
-                        # MLE is present
+                    if ext_ie_id == MLE_EXT_TAG:
                         dot11be_mle.value = "Supported"
                         dot11be_mle.db_value = 1
 
-                        if (
-                            len(element_data) >= 3
-                        ):  # Need at least ext_id + 2 bytes for control
-                            # Parse Multi-Link Control (bytes 1-2)
+                        if len(element_data) >= 3:
                             mlc_control = element_data[1] | (element_data[2] << 8)
 
-                            # Extract MLC Type (bits 0-2)
                             mlc_type_val = mlc_control & 0x0007
                             dot11be_mle_mlc_type.value = str(mlc_type_val)
                             dot11be_mle_mlc_type.db_value = mlc_type_val
 
-                            # Extract presence bitmap
-                            eml_capa_present = (mlc_control & 0x0080) != 0  # bit 7
-                            mld_capa_present = (mlc_control & 0x0100) != 0  # bit 8
+                            eml_capa_present = (mlc_control & 0x0080) != 0
+                            mld_capa_present = (mlc_control & 0x0100) != 0
 
-                            # Calculate offset to Common Info fields
-                            # MLE structure: Ext ID (1) + MLC Control (2 bytes) + Common Info
-                            # Common Info starts at byte 3 (0-indexed)
-                            # First read Common Info Length field
                             if len(element_data) < 4:
-                                continue  # Not enough data
+                                continue
 
                             element_data[3]
-                            offset = 4  # Start after Ext ID (1) + MLC Control (2) + Length (1)
+                            offset = 4
 
-                            # Skip MLD MAC Address (6 bytes) - always present for Type 0
                             if mlc_type_val == 0:
                                 offset += 6
 
-                            # Skip optional fields based on presence bitmap
-                            if mlc_control & 0x0010:  # Link ID present (bit 4)
+                            if mlc_control & 0x0010:
                                 offset += 1
-                            if mlc_control & 0x0020:  # BSS Params present (bit 5)
+                            if mlc_control & 0x0020:
                                 offset += 1
-                            if mlc_control & 0x0040:  # Medium Sync present (bit 6)
+                            if mlc_control & 0x0040:
                                 offset += 2
 
-                            # Parse EML Capabilities
                             if eml_capa_present and offset + 2 <= len(element_data):
                                 eml_caps = element_data[offset] | (
                                     element_data[offset + 1] << 8
                                 )
                                 offset += 2
 
-                                # EMLSR Support (bit 0)
                                 if eml_caps & 0x0001:
                                     dot11be_mle_emlsr_support.value = "Supported"
                                     dot11be_mle_emlsr_support.db_value = 1
@@ -2047,12 +1884,10 @@ class Profiler:
                                     dot11be_mle_emlsr_support.value = "Not supported"
                                     dot11be_mle_emlsr_support.db_value = 0
 
-                                # EMLSR Padding Delay (bits 1-3)
                                 padding_val = (eml_caps >> 1) & 0x0007
                                 dot11be_mle_emlsr_padding_delay.value = str(padding_val)
                                 dot11be_mle_emlsr_padding_delay.db_value = padding_val
 
-                                # EMLSR Transition Delay (bits 4-6)
                                 transition_val = (eml_caps >> 4) & 0x0007
                                 dot11be_mle_emlsr_transition_delay.value = str(
                                     transition_val
@@ -2061,7 +1896,6 @@ class Profiler:
                                     transition_val
                                 )
 
-                                # EMLMR Support (bit 7)
                                 if eml_caps & 0x0080:
                                     dot11be_mle_emlmr_support.value = "Supported"
                                     dot11be_mle_emlmr_support.db_value = 1
@@ -2069,13 +1903,11 @@ class Profiler:
                                     dot11be_mle_emlmr_support.value = "Not supported"
                                     dot11be_mle_emlmr_support.db_value = 0
 
-                            # Parse MLD Capabilities
                             if mld_capa_present and offset + 2 <= len(element_data):
                                 mld_caps = element_data[offset] | (
                                     element_data[offset + 1] << 8
                                 )
 
-                                # Max Simultaneous Links (bits 0-3)
                                 max_links_val = mld_caps & 0x000F
                                 dot11be_mle_max_simultaneous_links.value = str(
                                     max_links_val
@@ -2084,14 +1916,12 @@ class Profiler:
                                     max_links_val
                                 )
 
-                                # T2LM Negotiation Support (bits 5-6)
                                 t2lm_val = (mld_caps >> 5) & 0x0003
                                 dot11be_mle_t2lm_negotiation_support.value = str(
                                     t2lm_val
                                 )
                                 dot11be_mle_t2lm_negotiation_support.db_value = t2lm_val
 
-                                # Link Reconfiguration Support (bit 13)
                                 if mld_caps & 0x2000:
                                     dot11be_mle_link_reconfig_support.value = (
                                         "Supported"
@@ -2165,23 +1995,15 @@ class Profiler:
         """
         log = logging.getLogger(inspect.stack()[0][3])
 
-        # log.debug("processing information elements for client MAC %s", frame.addr2)
-
-        # strip radiotap
         ie_buffer = bytes(frame.payload)
 
-        # strip dot11
         ie_buffer = ie_buffer[24:]
 
-        # strip params
         ie_buffer = ie_buffer[4:]
 
-        # strip fcs only when the frame actually carries one; otherwise the
-        # final 4 bytes of the last IE would be truncated
         if frame.haslayer(Dot11FCS):
             ie_buffer = ie_buffer[:-4]
 
-        # convert buffer to ie dict
         dot11_elt_dict = self.process_information_elements(ie_buffer)
 
         log.debug(
@@ -2191,52 +2013,38 @@ class Profiler:
             dot11_elt_dict.keys(),
         )
 
-        #  resolve manufacturer
         oui_manuf = self.resolve_oui_manuf(frame.addr2, dot11_elt_dict)
 
-        # parse chipset
         chipset = self.resolve_vendor_specific_tag_chipset(dot11_elt_dict)
 
         ssid = self.analyze_ssid_ie(dot11_elt_dict)
 
-        # dictionary to store capabilities as we decode them
         capabilities = []
 
-        # check if 11k supported
         capabilities += self.analyze_rm_capabilities_ie(dot11_elt_dict)
 
-        # check if 11r supported
         capabilities += self.analyze_ft_capabilities_ie(
             dot11_elt_dict, self.ft_disabled
         )
 
-        # check if 11v/aa/QoS supported (Extended Capabilities)
         capabilities += self.analyze_extended_capabilities_ie(dot11_elt_dict)
 
-        # check if 11w supported
         capabilities += self.analyze_rsn_capabilities_ie(dot11_elt_dict)
 
-        # check for RSNX (SAE H2E) support
         capabilities += self.analyze_rsnx_ie(dot11_elt_dict)
 
-        # check for 11n support
         capabilities += self.analyze_ht_capabilities_ie(dot11_elt_dict)
 
-        # check for 11ac support
         capabilities += self.analyze_vht_capabilities_ie(dot11_elt_dict)
 
-        # check for ext tags (e.g. 802.11ax support, 802.11be draft support)
         capabilities += self.analyze_extension_ies(
             dot11_elt_dict, self.he_disabled, self.be_disabled
         )
 
-        # check supported operating classes for 6 GHz
         capabilities += self.analyze_operating_classes(dot11_elt_dict)
 
-        # check supported power capabilities
         capabilities += self.analyze_power_capability_ie(dot11_elt_dict)
 
-        # check supported channels
         capabilities += self.analyze_supported_channels_ie(dot11_elt_dict, is_6ghz)
 
         return ssid, oui_manuf, chipset, capabilities
