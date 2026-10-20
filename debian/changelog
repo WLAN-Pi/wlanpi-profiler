@@ -1,3 +1,16 @@
+wlanpi-profiler (2.1.8-1) unstable; urgency=medium
+
+  * Refuse to stage a radio without monitor mode, and refuse an AP start
+    when the channel cannot be checked.
+  * Keep channel flags within their own band and suggest an alternative
+    channel when 1, 6 and 11 are restricted.
+  * Tune primary-as-monitor staging by frequency.
+  * Fix fakeAP on iwlwifi never profiling clients, and refuse No IR
+    channels in fakeAP mode.
+  * Update scapy to 2.8.0.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Tue, 20 Oct 2026 05:21:43 -0400
+
 wlanpi-profiler (2.1.7-1) unstable; urgency=medium
 
   * Drop captured frames whose 802.11 protocol version is not 0. Corrupt
