@@ -951,6 +951,28 @@ class TestStagingNeverChangesIftypeWhileUp:
         _assert_no_iftype_change_while_up(calls)
 
 
+@pytest.mark.parametrize(
+    "stage, driver",
+    [
+        ("stage_interface_fakeap", "iwlwifi"),
+        ("stage_interface_fakeap", "88XXau"),
+        ("stage_interface_fakeap", "mt76x2u"),
+        ("stage_interface_listen_only", "88XXau"),
+        ("stage_interface_listen_only", "mt76x2u"),
+    ],
+)
+def test_monitor_tuned_by_frequency_not_channel_number(monkeypatch, stage, driver):
+    iface = _iface(driver)
+    if stage == "stage_interface_listen_only" and driver == "88XXau":
+        iface.requires_vif = False
+    iface.channel, iface.frequency = 1, 5955
+    calls = _record_staging(monkeypatch, iface)
+    getattr(iface, stage)()
+    tunes = [c[2:] for c in calls if c[0] == "iw" and c[2:3] == ["set"]]
+    assert tunes
+    assert all(t[:3] == ["set", "freq", "5955"] for t in tunes), tunes
+
+
 def test_stage_hostapd_command_sequence(monkeypatch):
     """Golden sequence: LAR scan, then a monitor vif. Primary left UP+managed."""
     iface = _iface("ath12k_wifi7_pci")
