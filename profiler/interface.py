@@ -887,7 +887,7 @@ class Interface:
                     band_name = self._get_band_display_name(band)
                     flag = self._get_band_flag(band)
 
-                    # For 2.4 GHz, only show channels 1, 6, 11
+                    # For 2.4 GHz, prefer channels 1, 6, 11
                     if "1" in band:
                         sample = [ch for ch in channels if ch in [1, 6, 11]] or channels
                     else:
