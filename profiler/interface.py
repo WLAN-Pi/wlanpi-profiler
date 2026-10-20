@@ -889,7 +889,7 @@ class Interface:
 
                     # For 2.4 GHz, only show channels 1, 6, 11
                     if "1" in band:
-                        sample = [ch for ch in channels if ch in [1, 6, 11]]
+                        sample = [ch for ch in channels if ch in [1, 6, 11]] or channels
                     else:
                         sample = channels
 
