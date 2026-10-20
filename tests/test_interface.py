@@ -551,6 +551,34 @@ def test_ap_channel_validation_uses_own_band_flags(monkeypatch, freq, refused):
         iface.validate_channel_for_ap()
 
 
+@pytest.mark.parametrize(
+    "iw_output",
+    [
+        BAND_BOUNDARY_CHANNELS,
+        "",
+        "completed process return code is non-zero with no stdout or stderr",
+        "command failed: No such device (-19)",
+        "Band 1:\n",
+    ],
+)
+def test_ap_channel_validation_refuses_unlisted_frequency(monkeypatch, iw_output):
+    from profiler.interface import InterfaceError
+
+    monkeypatch.setattr(
+        "profiler.interface.run_command", lambda cmd, *a, **k: iw_output
+    )
+    iface = Interface()
+    iface.phy, iface.frequency = "phy0", 2437
+    with pytest.raises(InterfaceError, match="2437 MHz"):
+        iface.validate_channel_for_ap()
+
+
+def test_malformed_channel_line_is_skipped_with_its_flags():
+    iw = "Band 2:\n* 5180 MHz [36]\n* garbage\nNo IR\n* 5200 MHz [40]\n"
+    chs = Interface.get_channels_status(iw)["2:"]
+    assert [(c.ch, c.no_ir) for c in chs] == [("36", False), ("40", False)]
+
+
 class TestRunStagingCommand:
     """Staging commands must fail loudly (phase 0)."""
 
