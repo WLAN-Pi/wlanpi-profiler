@@ -604,6 +604,17 @@ def test_ap_channel_validation_refuses_when_iw_fails(monkeypatch, error):
         iface.validate_channel_for_ap()
 
 
+def test_alternative_suggestion_without_1_6_11(monkeypatch):
+    from profiler.interface import InterfaceError
+
+    iw = "Band 1:\n* 2417 MHz [2]\n* 2437 MHz [6]\nNo IR\nBand 2:\n* 5180 MHz [36]\nNo IR\n"
+    monkeypatch.setattr("profiler.interface.run_command", lambda cmd, *a, **k: iw)
+    iface = Interface()
+    iface.phy, iface.channel, iface.frequency = "phy0", 36, 5180
+    with pytest.raises(InterfaceError, match="--channel 2"):
+        iface.validate_channel_for_ap()
+
+
 class TestRunStagingCommand:
     """Staging commands must fail loudly (phase 0)."""
 
