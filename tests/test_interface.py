@@ -551,6 +551,19 @@ def test_ap_channel_validation_uses_own_band_flags(monkeypatch, freq, refused):
         iface.validate_channel_for_ap()
 
 
+def test_ap_channel_validation_refuses_no_ir_for_primary_as_monitor(monkeypatch):
+    from profiler.interface import InterfaceError
+
+    monkeypatch.setattr(
+        "profiler.interface.run_command", lambda cmd, *a, **k: BAND_BOUNDARY_CHANNELS
+    )
+    iface = Interface()
+    iface.phy, iface.frequency = "phy0", 5200
+    iface.primary_staged_as_monitor = True
+    with pytest.raises(InterfaceError, match="No IR"):
+        iface.validate_channel_for_ap()
+
+
 @pytest.mark.parametrize(
     "iw_output",
     [
