@@ -210,6 +210,26 @@ class TestSnifferProtocolVersion:
         assert len(sniffer.seen_macs) == queued
 
 
+def test_sniffer_refreshes_interface_cache_before_sniff(monkeypatch):
+    import logging
+
+    calls = []
+    sniffer = object.__new__(fakeap.Sniffer)
+    sniffer.log = logging.getLogger("test.sniffer")
+    sniffer.interface, sniffer.bpf_filter = "wlan0", "type mgt"
+    sniffer.invalid_frame_count = sniffer.bad_fcs_count = 0
+    sniffer.received_frame_cb = None
+    sniffer._open_socket = lambda: None
+    sniffer.log_session_stats = lambda: None
+    sniffer._update_monitoring_metrics = lambda **k: None
+    monkeypatch.setattr(
+        fakeap.scapyconf.ifaces, "reload", lambda: calls.append("reload")
+    )
+    monkeypatch.setattr(fakeap, "sniff", lambda **k: calls.append("sniff"))
+    sniffer.run()
+    assert calls == ["reload", "sniff"]
+
+
 def test_sniffer_bpf_filter_compiles_for_radiotap():
     from scapy.arch.common import compile_filter
     from scapy.data import DLT_IEEE802_11_RADIO
