@@ -24,17 +24,14 @@ class TestConfigGenerator:
     @pytest.mark.parametrize(
         "channel,bandwidth,expected",
         [
-            # 80 MHz calculations
             (36, 80, 42),
             (40, 80, 42),
             (52, 80, 58),
             (149, 80, 155),
-            # 160 MHz calculations
             (36, 160, 50),
             (52, 160, 50),
             (100, 160, 114),
             (149, 160, 163),
-            # 20/40 MHz
             (6, 20, 6),
             (36, 40, 38),
         ],
@@ -57,25 +54,19 @@ class TestConfigGenerator:
         assert os.path.exists(config_path)
         config = Path(config_path).read_text()
 
-        # Verify basic parameters
         assert "interface=wlan0" in config
         assert "ssid=Test5G" in config
         assert "channel=36" in config
         assert "hw_mode=a" in config
 
-        # Verify capabilities enabled
         assert "ieee80211n=1" in config
         assert "ieee80211ac=1" in config
         assert "ieee80211ax=1" in config
         assert "ieee80211be=1" in config
 
-        # Verify 20 MHz operation (hostapd patches advertise 160 MHz capability)
-        assert "vht_oper_chwidth=0" in config  # 0 = 20/40 MHz operation
-        assert (
-            "vht_oper_centr_freq_seg0_idx=0" in config
-        )  # For 20 MHz, center freq must be 0
+        assert "vht_oper_chwidth=0" in config
+        assert "vht_oper_centr_freq_seg0_idx=0" in config
 
-        # Cleanup
         os.remove(config_path)
 
     def test_generate_2ghz_basic(self):
@@ -91,21 +82,17 @@ class TestConfigGenerator:
         assert os.path.exists(config_path)
         config = Path(config_path).read_text()
 
-        # Verify basic parameters
         assert "interface=wlan0" in config
         assert "ssid=Test24G" in config
         assert "channel=6" in config
         assert "hw_mode=g" in config
 
-        # Verify HT enabled but VHT disabled (2.4 GHz has no VHT)
         assert "ieee80211n=1" in config
         assert "ieee80211ac=0" in config
 
-        # Verify Wi-Fi 6/7 enabled
         assert "ieee80211ax=1" in config
         assert "ieee80211be=1" in config
 
-        # Cleanup
         os.remove(config_path)
 
     @pytest.mark.parametrize(
@@ -144,11 +131,9 @@ class TestConfigGenerator:
 
         config = Path(config_path).read_text()
 
-        # HE disabled should also disable BE
         assert "ieee80211ax=0" in config
         assert "ieee80211be=0" in config
 
-        # VHT should still be enabled
         assert "ieee80211ac=1" in config
 
         os.remove(config_path)
@@ -166,7 +151,6 @@ class TestConfigGenerator:
 
         config = Path(config_path).read_text()
 
-        # BE disabled but HE should still be enabled
         assert "ieee80211ax=1" in config
         assert "ieee80211be=0" in config
 
@@ -180,17 +164,15 @@ class TestConfigGenerator:
             ssid="Test",
             band="5ghz",
             country_code="US",
-            security_mode="wpa3-mixed",  # WPA3 mixed without FT
+            security_mode="wpa3-mixed",
         )
 
         config = Path(config_path).read_text()
 
-        # FT parameters should not be present
         assert "mobility_domain" not in config
         assert "ft_over_ds" not in config
         assert "FT-PSK" not in config
         assert "FT-SAE" not in config
-        # But should have WPA3
         assert "SAE" in config
         assert "WPA-PSK" in config
 
@@ -204,15 +186,13 @@ class TestConfigGenerator:
             ssid="Test",
             band="5ghz",
             country_code="US",
-            security_mode="ft-wpa3-mixed",  # Default: WPA3 mixed with FT
+            security_mode="ft-wpa3-mixed",
         )
 
         config = Path(config_path).read_text()
 
-        # Should have SAE key management
         assert "SAE" in config
         assert "sae_password" in config
-        # And should have FT
         assert "FT-SAE" in config
         assert "FT-PSK" in config
 
@@ -226,15 +206,13 @@ class TestConfigGenerator:
             ssid="Test",
             band="5ghz",
             country_code="US",
-            security_mode="ft-wpa2",  # WPA2-only with FT
+            security_mode="ft-wpa2",
         )
 
         config = Path(config_path).read_text()
 
-        # Should only have PSK
         assert "WPA-PSK" in config
         assert "SAE" not in config
-        # But should have FT
         assert "FT-PSK" in config
 
         os.remove(config_path)
@@ -269,7 +247,7 @@ class TestConfigGenerator:
             generate_hostapd_config(
                 interface="wlan0",
                 channel=36,
-                ssid="A" * 32,  # 32 chars should fail (max is 31)
+                ssid="A" * 32,
                 band="5ghz",
                 country_code="US",
             )
@@ -279,7 +257,7 @@ class TestConfigGenerator:
         with pytest.raises(ConfigGeneratorError, match=r"Invalid 2\.4 GHz channel"):
             generate_hostapd_config(
                 interface="wlan0",
-                channel=15,  # Invalid
+                channel=15,
                 ssid="Test",
                 band="2ghz",
                 country_code="US",
@@ -290,7 +268,7 @@ class TestConfigGenerator:
         with pytest.raises(ConfigGeneratorError, match="Invalid 5 GHz channel"):
             generate_hostapd_config(
                 interface="wlan0",
-                channel=37,  # Not a valid 5 GHz channel
+                channel=37,
                 ssid="Test",
                 band="5ghz",
                 country_code="US",
@@ -327,7 +305,6 @@ class TestConfigGenerator:
             country_code="US",
         )
 
-        # Check permissions are 0600 (owner read/write only)
         stat_info = os.stat(config_path)
         permissions = stat_info.st_mode & 0o777
         assert permissions == 0o600
@@ -418,9 +395,8 @@ class TestHostapdManager:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process
         mock_process = mock.Mock()
-        mock_process.poll.return_value = None  # Process is running
+        mock_process.poll.return_value = None
         mock_process.pid = 12345
         mock_popen.return_value = mock_process
 
@@ -428,7 +404,6 @@ class TestHostapdManager:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Mock _get_bssid to avoid subprocess call
         mgr._get_bssid = mock.Mock()
 
         proc = mgr.start()
@@ -445,9 +420,8 @@ class TestHostapdManager:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that dies immediately
         mock_process = mock.Mock()
-        mock_process.poll.return_value = 1  # Exit code 1
+        mock_process.poll.return_value = 1
         mock_process.returncode = 1
         mock_process.communicate.return_value = ("", "Channel not allowed")
         mock_popen.return_value = mock_process
@@ -465,7 +439,6 @@ class TestHostapdManager:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Should not raise error
         mgr.stop()
 
     def test_stop_graceful(self):
@@ -474,9 +447,8 @@ class TestHostapdManager:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Mock process
         mock_process = mock.Mock()
-        mock_process.poll.return_value = None  # Running
+        mock_process.poll.return_value = None
         mgr.process = mock_process
 
         mgr.stop()
@@ -490,9 +462,8 @@ class TestHostapdManager:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Mock process that doesn't stop gracefully
         mock_process = mock.Mock()
-        mock_process.poll.return_value = None  # Running
+        mock_process.poll.return_value = None
         mock_process.wait.side_effect = [
             __import__("subprocess").TimeoutExpired("cmd", 5),
             None,
@@ -526,7 +497,6 @@ class TestHostapdManager:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Create temp config file
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
             mgr.config_path = f.name
             f.write("test")
@@ -560,7 +530,6 @@ class TestCountryCodeIntegration:
             config_content = f.read()
 
         assert "country_code=US" in config_content
-        # Clean up
         os.remove(config_path)
 
     def test_generate_hostapd_config_includes_country_code_gb(self):
@@ -584,7 +553,7 @@ class TestCountryCodeIntegration:
         config_path = generate_hostapd_config(
             interface="wlan0",
             ssid="TestSSID",
-            channel=100,  # DFS channel
+            channel=100,
             band="5ghz",
             country_code="DE",
         )
@@ -600,10 +569,8 @@ class TestCountryCodeIntegration:
         config = {"interface": "wlan0", "channel": 36, "ssid": "Test"}
         log = logging.getLogger("test")
 
-        # Constructor should accept country_code parameter
         mgr = HostapdManager(config, "US", log)
 
-        # Verify it was set (check config generation would use it)
         assert mgr is not None
 
     def test_hostapd_manager_different_country_codes(self):
@@ -619,8 +586,7 @@ class TestCountryCodeIntegration:
 
     def test_country_code_affects_dfs_channels(self):
         """Test that country code is present when using DFS channels"""
-        # DFS channels require proper country code for regulatory compliance
-        dfs_channel = 100  # DFS channel in 5 GHz
+        dfs_channel = 100
 
         config_path = generate_hostapd_config(
             interface="wlan0",
@@ -633,7 +599,6 @@ class TestCountryCodeIntegration:
         with open(config_path) as f:
             config_content = f.read()
 
-        # Country code MUST be present for DFS channels
         assert "country_code=US" in config_content
         assert f"channel={dfs_channel}" in config_content
         os.remove(config_path)
@@ -643,7 +608,7 @@ class TestCountryCodeIntegration:
         config_path = generate_hostapd_config(
             interface="wlan0",
             ssid="TestSSID",
-            channel=6,  # 2.4 GHz channel
+            channel=6,
             band="2ghz",
             country_code="US",
         )
@@ -661,7 +626,7 @@ class TestCountryCodeIntegration:
         config_path = generate_hostapd_config(
             interface="wlan0",
             ssid="TestSSID",
-            channel=36,  # UNII-1 channel
+            channel=36,
             band="5ghz",
             country_code="US",
         )
@@ -679,7 +644,7 @@ class TestCountryCodeIntegration:
         config_path = generate_hostapd_config(
             interface="wlan0",
             ssid="TestSSID",
-            channel=149,  # UNII-3 channel
+            channel=149,
             band="5ghz",
             country_code="US",
         )
@@ -703,9 +668,8 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process
         mock_process = mock.Mock()
-        mock_process.poll.return_value = None  # Process is running
+        mock_process.poll.return_value = None
         mock_process.pid = 12345
         mock_popen.return_value = mock_process
 
@@ -713,17 +677,14 @@ class TestHostapdWatchdog:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Mock _get_bssid to avoid subprocess call
         mgr._get_bssid = mock.Mock()
 
         mgr.start()
 
-        # Verify watchdog thread was started
         assert mgr._watchdog_thread is not None
         assert mgr._watchdog_thread.is_alive()
         assert mgr._watchdog_running
 
-        # Clean up
         mgr.cleanup()
 
     @mock.patch("subprocess.Popen")
@@ -747,10 +708,8 @@ class TestHostapdWatchdog:
         mgr.start()
         assert mgr._watchdog_running
 
-        # Cleanup should stop watchdog
         mgr.cleanup()
 
-        # Wait a moment for thread to finish
         import time
 
         time.sleep(0.5)
@@ -770,12 +729,10 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that stays alive but logs fatal error
         mock_process = mock.Mock()
-        mock_process.poll.return_value = None  # Process still running during check
+        mock_process.poll.return_value = None
         mock_process.pid = 12345
 
-        # Simulate fatal error in stdout
         mock_stdout = StringIO(
             "wlan0: interface state UNINITIALIZED->COUNTRY_UPDATE\n"
             "Could not set channel for kernel driver\n"
@@ -790,7 +747,6 @@ class TestHostapdWatchdog:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Start log streaming in background to process the error
         import threading
 
         stderr_done = threading.Event()
@@ -810,12 +766,10 @@ class TestHostapdWatchdog:
         stderr_thread.start()
         stdout_thread.start()
 
-        # Give threads time to process
         import time
 
         time.sleep(0.1)
 
-        # Should have detected the fatal error
         assert mgr._init_failed
         assert "Interface initialization failed" in mgr._init_error_msg
 
@@ -835,7 +789,6 @@ class TestHostapdWatchdog:
         mock_process.poll.return_value = None
         mock_process.pid = 12345
 
-        # AP-DISABLED in logs
         mock_stdout = StringIO(
             "wlan0: interface state COUNTRY_UPDATE->DISABLED\nwlan0: AP-DISABLED\n"
         )
@@ -848,7 +801,6 @@ class TestHostapdWatchdog:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Start log streaming
         import threading
         import time
 
@@ -861,7 +813,6 @@ class TestHostapdWatchdog:
 
         time.sleep(0.1)
 
-        # Should have detected AP-DISABLED
         assert mgr._init_failed
         assert "AP-DISABLED" in mgr._init_error_msg
 
@@ -874,7 +825,6 @@ class TestHostapdWatchdog:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Set startup time to 11 seconds ago (outside startup window)
         mgr._startup_time = time.time() - 11
 
         mock_stdout = StringIO("Interface initialization failed\n")
@@ -889,7 +839,6 @@ class TestHostapdWatchdog:
 
         time.sleep(0.1)
 
-        # Should NOT have set init_failed (outside startup window)
         assert not mgr._init_failed
 
     @mock.patch("subprocess.Popen")
@@ -900,10 +849,8 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that exits cleanly
         mock_process = mock.Mock()
-        # Initially running, then exits with 0
-        mock_process.poll.side_effect = [None, None, 0]  # Running, running, then exit 0
+        mock_process.poll.side_effect = [None, None, 0]
         mock_process.pid = 12345
         mock_popen.return_value = mock_process
 
@@ -914,22 +861,17 @@ class TestHostapdWatchdog:
 
         mgr.start()
 
-        # Watchdog should be running
         assert mgr._watchdog_thread is not None
         assert mgr._watchdog_running
 
-        # Ensure _init_failed is False (no errors detected)
         assert not mgr._init_failed
 
-        # Wait for watchdog to detect exit code 0
         import time
 
         time.sleep(1.5)
 
-        # Watchdog should have stopped cleanly (no error logged, no SIGUSR1 sent)
         assert not mgr._watchdog_running
 
-        # Clean up
         mgr._watchdog_stop.set()
         if mgr._watchdog_thread.is_alive():
             mgr._watchdog_thread.join(timeout=1)
@@ -945,10 +887,8 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that crashes
         mock_process = mock.Mock()
-        # Initially running, then exits with error
-        mock_process.poll.side_effect = [None, None, 1]  # Running, running, then exit 1
+        mock_process.poll.side_effect = [None, None, 1]
         mock_process.pid = 12345
         mock_popen.return_value = mock_process
 
@@ -959,19 +899,15 @@ class TestHostapdWatchdog:
 
         mgr.start()
 
-        # Wait for watchdog to detect crash
         import signal
         import time
 
         time.sleep(1.5)
 
-        # Watchdog should have sent SIGUSR1
         mock_kill.assert_called()
-        # Verify it sent SIGUSR1
         call_args = mock_kill.call_args
         assert call_args[0][1] == signal.SIGUSR1
 
-        # Clean up
         mgr._watchdog_stop.set()
         if mgr._watchdog_thread and mgr._watchdog_thread.is_alive():
             mgr._watchdog_thread.join(timeout=1)
@@ -999,17 +935,14 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that stays alive during initial check,
-        # then exits with 0 after startup
         mock_process = mock.Mock()
         mock_process.poll.side_effect = [
-            None,  # During start() 2s sleep check
-            None,  # Watchdog first poll
-            0,  # Watchdog second poll - exits with 0
+            None,
+            None,
+            0,
         ]
         mock_process.pid = 12345
 
-        # Simulate fatal error in stdout
         mock_stdout = StringIO("Interface initialization failed\n")
         mock_process.stdout = mock_stdout
         mock_process.stderr = StringIO("")
@@ -1021,25 +954,19 @@ class TestHostapdWatchdog:
         mgr = HostapdManager(config, "US", log)
         mgr._get_bssid = mock.Mock()
 
-        # Manually set _init_failed to simulate log monitoring detection
-        # (In real scenario, _stream_logs would set this after start() returns)
         mgr._init_failed = True
         mgr._init_error_msg = "Interface initialization failed"
 
-        # Start the manager (which will start watchdog)
         mgr.start()
 
-        # Wait for watchdog to detect exit and _init_failed flag
         import time
 
         time.sleep(1.5)
 
-        # Verify watchdog sent SIGUSR1 (not clean exit despite exit code 0)
         mock_kill.assert_called()
         call_args = mock_kill.call_args
         assert call_args[0][1] == signal.SIGUSR1
 
-        # Cleanup
         mgr._watchdog_stop.set()
         if mgr._watchdog_thread and mgr._watchdog_thread.is_alive():
             mgr._watchdog_thread.join(timeout=1)
@@ -1058,9 +985,8 @@ class TestHostapdWatchdog:
         mock_gen.return_value = "/tmp/test.conf"
         mock_exists.return_value = True
 
-        # Mock process that dies immediately
         mock_process = mock.Mock()
-        mock_process.poll.return_value = 1  # Already dead
+        mock_process.poll.return_value = 1
         mock_process.returncode = 1
         mock_popen.return_value = mock_process
 
@@ -1068,9 +994,7 @@ class TestHostapdWatchdog:
         log = logging.getLogger("test")
         mgr = HostapdManager(config, "US", log)
 
-        # Should raise HostapdStartupError
         with pytest.raises(HostapdStartupError, match="died immediately"):
             mgr.start()
 
-        # Watchdog should never have been started
         assert mgr._watchdog_thread is None

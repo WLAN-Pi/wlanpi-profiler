@@ -30,8 +30,6 @@ except ImportError:
     pass
 
 
-# Suppress BrokenPipeError when output is piped and pipe closes (e.g., | grep)
-# This is expected Unix behavior, not an error
 def handle_broken_pipe() -> None:
     """Install handler to suppress BrokenPipeError traceback"""
     import signal
@@ -44,7 +42,6 @@ def handle_broken_pipe() -> None:
 
 def main() -> None:
     """Set up args and start the profiler manager"""
-    # Handle BrokenPipeError gracefully when output is piped
     handle_broken_pipe()
 
     from . import helpers, manager
@@ -71,7 +68,6 @@ def main() -> None:
         print(f"Running hardware tests from: {tests_path}")
         print("=" * 70)
 
-        # Determine Python executable (should be in virtualenv)
         python_exe = sys.executable
 
         print("\n=== Device installation & interface tests ===\n")
@@ -98,9 +94,7 @@ def main() -> None:
             print("Hardware installation & interface tests - FAILED")
             sys.exit(1)
 
-    # Check platform requirements based on mode
     if "linux" not in sys.platform:
-        # Pcap analysis mode _should work_ cross-platform
         if not hasattr(args, "pcap_analysis") or not args.pcap_analysis:
             sys.exit(
                 f"{os.path.basename(__file__)}: Live capture requires Linux and a capable NIC. "
@@ -110,15 +104,12 @@ def main() -> None:
     try:
         manager.start(args)
     except BrokenPipeError:
-        # occurs when output is piped (e.g., | grep) and pipe closes
-        # suppress the error
         sys.exit(0)
 
 
 def init() -> None:
     """Handle main init"""
 
-    # hard set no support for python < v3.13
     if sys.version_info < (3, 13):  # noqa: UP036
         sys.exit(
             f"{os.path.basename(__file__)} requires Python version 3.13...\nyou are trying to run with Python version {platform.python_version()}...\nexiting..."

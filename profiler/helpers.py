@@ -47,37 +47,29 @@ except ImportError:
 try:
     import manuf2
 except ModuleNotFoundError:
-    manuf2 = None  # OUI lookups disabled but core works
+    manuf2 = None
 
 
-# Tools the profiler must have for live interface staging / capture.
 LIVE_REQUIRED_TOOLS = [
     "iw",
-    "ip",  # iproute2
+    "ip",
     "ethtool",
-    "lspci",  # usbutils
-    "lsusb",  # pciutils
+    "lspci",
+    "lsusb",
 ]
 
-# Tools expected to be present by default but never invoked directly by the
-# profiler; a missing entry is a warning, not a hard failure.
 LIVE_OPTIONAL_TOOLS = [
     "tcpdump",
-    "modprobe",  # kmod
-    "modinfo",  # kmod
-    "wpa_cli",  # wpa_supplicant
+    "modprobe",
+    "modinfo",
+    "wpa_cli",
 ]
 
-# Offline pcap analysis runs entirely in-process (scapy); no external tools.
 PCAP_REQUIRED_TOOLS: list[str] = []
 
 is_wpa_cli_present = True
 
 
-# Config options that carry boolean values. Kept in one place so that config
-# parsing (convert_configparser_to_dict) and validation agree on exactly which
-# keys may be coerced from strings like "true"/"false". Coercing every option
-# corrupts string values that happen to look truthy (e.g. ssid "1" or "on").
 BOOLEAN_CONFIG_KEYS = {
     "he_disabled",
     "be_disabled",
@@ -107,9 +99,6 @@ def check_required_tools(
     global is_wpa_cli_present
     logging.getLogger("check_required_tools")
 
-    # iw/ethtool live in /usr/sbin, which non-root, non-login shells often omit
-    # from PATH. Make them resolvable for both shutil.which and subprocess.
-    # Empty entries are dropped: a bare "" would mean the current directory.
     os.environ["PATH"] = os.pathsep.join(
         dict.fromkeys(
             p
@@ -134,7 +123,6 @@ def check_required_tools(
             print("Please install using your distro's package manager.")
 
             if record_status:
-                # Write failure status before exiting
                 from profiler.status import ProfilerState, StatusReason, write_status
 
                 write_status(
@@ -147,8 +135,6 @@ def check_required_tools(
     for tool in optional:
         if shutil.which(tool) is None:
             if tool == "wpa_cli":
-                # Only warn if wpa_supplicant is installed but wpa_cli is missing
-                # If wpa_supplicant isn't installed, we don't need wpa_cli
                 is_wpa_cli_present = False
                 if shutil.which("wpa_supplicant") is not None:
                     print(
@@ -178,7 +164,6 @@ from .constants import (
 
 FILES_PATH = "/var/www/html/profiler"
 
-# Group name for file permissions (webui runs as this user)
 WLANPI_GROUP = "wlanpi"
 
 
@@ -204,13 +189,10 @@ def set_file_permissions(path: str, mode: int = 0o640, set_group: bool = True) -
         if set_group and grp is not None:
             try:
                 gid = grp.getgrnam(WLANPI_GROUP).gr_gid
-                # -1 means don't change owner, only change group
                 os.chown(path, -1, gid)
             except KeyError:
-                # wlanpi group doesn't exist (e.g., development environment)
                 log.debug(f"Group '{WLANPI_GROUP}' not found, skipping chown")
             except PermissionError:
-                # Not running as root, can't change group
                 log.debug(f"Cannot change group to '{WLANPI_GROUP}' (not root)")
 
         return True
@@ -248,14 +230,12 @@ def setup_logger(
     """
     logging_level = logging.INFO
 
-    # Check for debug flag from multiple sources (in priority order)
     if args.debug:
         logging_level = logging.DEBUG
     elif os.environ.get("PROFILER_DEBUG", "").lower() in ("1", "true", "yes"):
         logging_level = logging.DEBUG
         print("Debug logging enabled via PROFILER_DEBUG environment variable")
     elif config and config.get("GENERAL", {}).get("debug"):
-        # Config value can be bool (from convert_configparser_to_dict) or string
         debug_value = config["GENERAL"]["debug"]
         if isinstance(debug_value, bool):
             is_debug = debug_value
@@ -266,7 +246,6 @@ def setup_logger(
             logging_level = logging.DEBUG
             print("Debug logging enabled via config.ini")
 
-    # Clear existing handlers to prevent duplicates when reconfiguring
     root_logger = logging.getLogger()
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
@@ -329,11 +308,9 @@ def is_valid_mac(mac: str) -> bool:
 
     mac_lower = mac.lower()
 
-    # All zeros
     if mac_lower == "00:00:00:00:00:00":
         return False
 
-    # Broadcast
     if mac_lower == "ff:ff:ff:ff:ff:ff":
         return False
 
@@ -341,11 +318,9 @@ def is_valid_mac(mac: str) -> bool:
     if len(octets) != 6:
         return False
 
-    # Zero OUI (first 3 octets all zeros)
     if octets[0] == "00" and octets[1] == "00" and octets[2] == "00":
         return False
 
-    # 5+ zero octets (corruption pattern)
     zero_count = sum(1 for o in octets if o == "00")
     return zero_count < 5
 
@@ -365,12 +340,10 @@ def is_valid_ssid(ssid_str: str) -> bool:
     Returns:
         True if SSID appears valid, False if likely corrupted
     """
-    # Empty SSID is valid (wildcard probe)
     if not ssid_str:
         return True
 
     # SSID max length is 32 bytes per 802.11 spec
-    # Check byte length, not character count (UTF-8 can have multi-byte chars)
     try:
         ssid_bytes = ssid_str.encode("utf-8")
     except (UnicodeEncodeError, UnicodeDecodeError):
@@ -379,12 +352,8 @@ def is_valid_ssid(ssid_str: str) -> bool:
     if len(ssid_bytes) > 32:
         return False
 
-    # Count printable ASCII characters (0x20-0x7E)
-    # Valid SSIDs should be mostly printable
     printable_count = sum(1 for c in ssid_str if 0x20 <= ord(c) <= 0x7E)
 
-    # If less than 50% of characters are printable ASCII, likely corrupted
-    # Exception: short SSIDs (1-2 chars) need all chars printable
     if len(ssid_str) <= 2:
         return printable_count == len(ssid_str)
 
@@ -404,18 +373,16 @@ def has_bad_fcs(frame: Any) -> bool:
         True if the frame has FCS and it doesn't match the computed CRC32,
         False if no FCS present or if FCS is valid.
     """
-    # Import here to avoid circular imports and allow module to work without scapy
     try:
         from scapy.layers.dot11 import Dot11FCS
     except ImportError:
         return False
 
     if not frame.haslayer(Dot11FCS):
-        return False  # No FCS layer present, can't validate
+        return False
 
     frame_fcs = frame.fcs
 
-    # Calculate expected CRC32 of payload (excluding the 4-byte FCS)
     crc_bytes = struct.pack("I", zlib.crc32(bytes(frame.payload)[:-4]) & 0xFFFF_FFFF)
     expected_fcs = int.from_bytes(crc_bytes, byteorder="little")
 
@@ -425,7 +392,6 @@ def has_bad_fcs(frame: Any) -> bool:
 def frequency(freq: Any) -> int:
     """Check if the provided frequency is valid"""
     try:
-        # make sure freq is an int
         freq = int(freq)
     except ValueError as err:
         raise ValueError(f"{freq} is not a number") from err
@@ -460,17 +426,13 @@ def setup_parser() -> argparse.ArgumentParser:
         description="wlanpi-profiler is an 802.11 client capabilities profiler. If installed via package manager, read the manual with: man wlanpi-profiler",
     )
 
-    # Add subcommands
     subparsers = parser.add_subparsers(dest="command", help="available commands")
 
-    # 'test' subcommand for running hardware tests
     test_parser = subparsers.add_parser("test", help="run on-device hardware tests")
     test_parser.add_argument(
         "-v", "--verbose", action="store_true", help="verbose test output"
     )
 
-    # For backward compatibility, if no subcommand is given, assume 'run' mode
-    # This allows existing usage like "profiler -c 36 -i wlan0" to continue working
     parser.add_argument(
         "--pytest",
         dest="pytest",
@@ -541,7 +503,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--no-interface-prep",
-        "--noprep",  # Keep old name for backward compatibility
+        "--noprep",
         dest="no_interface_prep",
         action="store_true",
         default=False,
@@ -555,21 +517,19 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         help="listen-only mode (passive Rx, no AP)",
     )
-    # Note: --11r and --no11r are both hidden (deprecated in favor of --security-mode)
-    # Don't use mutually_exclusive_group when both are SUPPRESS - causes argparse formatting issues
     parser.add_argument(
         "--11r",
         dest="ft_enabled",
         action="store_true",
         default=False,
-        help=argparse.SUPPRESS,  # Hidden: use --security-mode instead
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--no11r",
         dest="ft_disabled",
         action="store_true",
         default=False,
-        help=argparse.SUPPRESS,  # DEPRECATED: Hidden from help, use --security-mode instead
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--security-mode",
@@ -584,7 +544,7 @@ def setup_parser() -> argparse.ArgumentParser:
         dest="he_enabled",
         action="store_true",
         default=False,
-        help=argparse.SUPPRESS,  # "turn on 802.11ax High Efficiency (HE) reporting (override --config <file>)",
+        help=argparse.SUPPRESS,
     )
     dot11ax_group.add_argument(
         "--no11ax",
@@ -655,14 +615,13 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--list-interfaces",
-        "--list_interfaces",  # Keep old name for backward compatibility
+        "--list_interfaces",
         dest="list_interfaces",
         action="store_true",
         default=False,
         help="print out a list of interfaces with an 80211 stack",
     )
 
-    # Hostapd AP mode options
     ap_mode_group = parser.add_mutually_exclusive_group()
     ap_mode_group.add_argument(
         "--ap-mode",
@@ -683,7 +642,6 @@ def setup_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         dest="hostapd_config",
         help=argparse.SUPPRESS,
-        # help="path to custom hostapd.conf (expert mode, requires --ap-mode)",
     ).completer = FilesCompleter()  # type: ignore[attr-defined]
 
     parser.add_argument("--version", "-V", action="version", version=f"{__version__}")
@@ -727,14 +685,12 @@ class NetworkInterface:
 
 def get_data_from_iproute2(intf: str) -> NetworkInterface:
     """Get and parse output from iproute2 for a given interface"""
-    # Get json output from `ip` command
     result = run_command(["ip", "-json", "address"])
     data = json.loads(result)
     interface_data = {}
     for item in data:
         name = item["ifname"]
         interface_data[name] = item
-    # Build dataclass for storage and easier test assertion
     iface = NetworkInterface()
     if intf in interface_data:
         iface.operstate = interface_data[intf]["operstate"]
@@ -766,12 +722,10 @@ def setup_config(
     """
     log = logging.getLogger(inspect.stack()[0][3])
 
-    # load in config (a: from default location "/etc/wlanpi-profiler/config.ini" or b: from provided)
     if os.path.isfile(args.config):
         try:
             parser = load_config(args.config)
 
-            # we want to work with a dict whether we have config.ini or not
             config = convert_configparser_to_dict(parser)
         except configparser.MissingSectionHeaderError:
             log.error("config file appears to be corrupt")
@@ -793,18 +747,13 @@ def setup_config(
     if "interface" not in config["GENERAL"]:
         config["GENERAL"]["interface"] = "wlan0"
 
-    # handle special config.ini settings
     if config["GENERAL"].get("hostname_ssid"):
         config["GENERAL"]["ssid"] = socket.gethostname()
 
-    # handle args
-    #  - args passed in take precedent over config.ini values
-    #  - did user pass in options that over-ride defaults?
     if args.channel:
         config["GENERAL"]["channel"] = args.channel
     if args.frequency:
         config["GENERAL"]["frequency"] = args.frequency
-        # user gave us freq, do not set value from config.ini
         config["GENERAL"]["channel"] = 0
     else:
         config["GENERAL"]["frequency"] = 0
@@ -820,7 +769,6 @@ def setup_config(
         config["GENERAL"]["ft_disabled"] = args.ft_disabled
 
     if not config["GENERAL"].get("security_mode"):
-        # Check for deprecated ft_disabled first
         if config["GENERAL"].get("ft_disabled"):
             config["GENERAL"]["security_mode"] = "wpa3-mixed"
             log.warning(
@@ -830,11 +778,9 @@ def setup_config(
         else:
             config["GENERAL"]["security_mode"] = DEFAULT_SECURITY_MODE
 
-    # CLI override
     if args.security_mode:
         config["GENERAL"]["security_mode"] = args.security_mode
 
-    # Backward compat: --no11r CLI flag strips FT from security mode
     if args.ft_disabled:
         log.warning(
             "DEPRECATED: --no11r flag is deprecated. "
@@ -849,7 +795,6 @@ def setup_config(
             config["GENERAL"]["security_mode"] = "wpa2"
             log.info("--no11r: Changed security_mode from ft-wpa2 → wpa2")
 
-    # Validate final security_mode
     if config["GENERAL"]["security_mode"] not in SECURITY_MODES:
         error_msg = (
             f"Invalid security_mode: {config['GENERAL']['security_mode']}. "
@@ -860,27 +805,19 @@ def setup_config(
 
     # Auto-disable 802.11be for WPA2-only modes or when 11ax is disabled
     # (Wi-Fi 7 requires WPA3 and Wi-Fi 6 per IEEE spec)
-    # Precedence: CLI args > config.ini > auto-defaults
     security_mode = config["GENERAL"]["security_mode"]
     wpa2_only_modes = ["wpa2", "ft-wpa2"]
 
-    # Check if the user explicitly disabled 11be. Only an explicit `true` counts:
-    # the shipped default (`be_disabled: false`) must not suppress the auto-disable
-    # below. Force-enable for testing with the --11be flag.
     config_has_be_setting = config["GENERAL"].get("be_disabled") is True
     cli_has_be_setting = args.be_enabled or args.be_disabled
 
-    # Apply CLI 11ax overrides before deciding whether 11ax is disabled so that
-    # --11ax can prevent the 11be auto-disable.
     if args.he_enabled:
         config["GENERAL"]["he_disabled"] = False
     if args.he_disabled:
         config["GENERAL"]["he_disabled"] = args.he_disabled
 
-    # Check if 11ax will be disabled
     he_will_be_disabled = config["GENERAL"].get("he_disabled", False)
 
-    # Auto-disable 11be if: (WPA2-only mode OR 11ax disabled) AND user hasn't overridden
     should_auto_disable_be = False
     auto_disable_reason = None
 
@@ -901,10 +838,8 @@ def setup_config(
             f"Override with --11be for testing (non-standard)."
         )
 
-    # User explicit overrides (CLI takes highest precedence)
     if args.be_enabled:
         config["GENERAL"]["be_disabled"] = False
-        # Warn if enabling 11be with WPA2-only or when 11ax is disabled
         he_is_disabled = config["GENERAL"].get("he_disabled", False)
         if security_mode in wpa2_only_modes:
             log.warning(
@@ -921,11 +856,8 @@ def setup_config(
     if args.be_disabled:
         config["GENERAL"]["be_disabled"] = args.be_disabled
 
-    # Ensure be_disabled has a default value if not set by auto-disable or user
     if "be_disabled" not in config["GENERAL"]:
-        config["GENERAL"]["be_disabled"] = (
-            False  # Default: 11be enabled for non-WPA2 modes
-        )
+        config["GENERAL"]["be_disabled"] = False
 
     if args.profiler_tlv_disabled:
         config["GENERAL"]["profiler_tlv_disabled"] = args.profiler_tlv_disabled
@@ -940,30 +872,23 @@ def setup_config(
     if args.files_path:
         config["GENERAL"]["files_path"] = args.files_path
     elif "files_path" not in config["GENERAL"]:
-        # Only use default if not specified in config.ini
         config["GENERAL"]["files_path"] = FILES_PATH
 
-    # Handle passphrase (priority: CLI > config.ini > default)
     if args.passphrase:
         config["GENERAL"]["passphrase"] = args.passphrase
     elif "passphrase" not in config["GENERAL"]:
-        # Only use default if not specified in config.ini
         config["GENERAL"]["passphrase"] = DEFAULT_PASSPHRASE
 
-    # Handle hostapd mode options
-    # Default to ap_mode unless explicitly requesting fakeap
     if args.fakeap:
         config["GENERAL"]["fakeap"] = True
         config["GENERAL"]["ap_mode"] = False
     else:
-        # Default: use ap_mode
         config["GENERAL"]["ap_mode"] = True
         config["GENERAL"]["fakeap"] = False
 
     if args.hostapd_config:
         config["GENERAL"]["hostapd_config"] = args.hostapd_config
 
-    # Validate hostapd mode options (this should never trigger now due to mutually_exclusive_group)
     if args.ap_mode and args.fakeap:
         error_msg = "Cannot specify both --ap-mode and --fakeap"
         log.error(error_msg)
@@ -974,7 +899,6 @@ def setup_config(
         log.error(error_msg)
         return None, error_msg
 
-    # ensure channel is an integer and not a bool
     ch = (config.get("GENERAL") or {}).get("channel")
     if ch is None or ch == "":
         error_msg = "Invalid channel: no channel configured. Must be an integer."
@@ -1021,11 +945,11 @@ def convert_configparser_to_dict(
     _dict: dict[str, Any] = {}
     for section in config.sections():
         _dict[section] = {}
-        for key, _value in config.items(section):
+        for key, value in config.items(section):
+            _dict[section][key] = value
             if key in BOOLEAN_CONFIG_KEYS:
                 with contextlib.suppress(ValueError):
-                    _value = bool(strtobool(_value))  # type: ignore
-            _dict[section][key] = _value
+                    _dict[section][key] = bool(strtobool(value))
     return _dict
 
 
@@ -1055,7 +979,6 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
         if _ssid:
             ssid(_ssid)
 
-        # Validate passphrase - warn in listen_only mode, fail in AP modes
         _passphrase = (config.get("GENERAL") or {}).get("passphrase")
         if _passphrase:
             try:
@@ -1076,9 +999,6 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
         if freq:
             frequency(freq)
 
-        # Validate boolean config options
-        # These should be bool after convert_configparser_to_dict, but if strtobool
-        # failed (suppressed), they'll still be strings
         general = config.get("GENERAL", {})
         for opt in BOOLEAN_CONFIG_KEYS:
             val = general.get(opt)
@@ -1087,11 +1007,9 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
                     f"'{opt}' must be a boolean (true/false/yes/no), got '{val}'"
                 )
 
-        # Validate hostapd mode
         if (config.get("GENERAL") or {}).get("ap_mode"):
             from profiler.constants import HOSTAPD_BINARY
 
-            # Check hostapd binary exists
             if not os.path.exists(HOSTAPD_BINARY):
                 error_msg = f"Hostapd binary not found at {HOSTAPD_BINARY}"
                 log.error(error_msg)
@@ -1103,11 +1021,10 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
                 )
                 return False, error_msg
 
-            # Check for 6 GHz channel attempts
             ch = (config.get("GENERAL") or {}).get("channel")
             freq = (config.get("GENERAL") or {}).get("frequency")
 
-            if freq and freq >= 5955:  # 6 GHz band
+            if freq and freq >= 5955:
                 error_msg = (
                     f"Frequency {freq} MHz is in 6 GHz band (not currently supported)"
                 )
@@ -1121,7 +1038,6 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
                 return False, error_msg
 
             if ch and ch >= 1 and ch <= 233:
-                # Check if it's a 6 GHz channel (not in 2G or 5G lists)
                 from profiler.constants import CHANNELS
 
                 if ch not in CHANNELS["2G"] and ch not in CHANNELS["5G"]:
@@ -1139,7 +1055,6 @@ def validate(config: dict[str, Any]) -> tuple[bool, str | None]:
 
         verify_reporting_directories(config)
     except ValueError as e:
-        # Extract error message from ValueError args
         error_msg = str(e.args[0]) if e.args else str(e)
         log.error("%s", error_msg)
         return False, error_msg
@@ -1229,7 +1144,6 @@ def update_manuf2() -> bool:
     try:
         flat_file = os.path.join(manuf2.__path__[0], "manuf")
 
-        # Security: Only allow manuf2 from trusted system paths (prevent privilege escalation)
         ALLOWED_MANUF2_PATHS = [
             "/usr/bin/manuf2",
             "/usr/local/bin/manuf2",
@@ -1280,7 +1194,6 @@ def update_manuf2() -> bool:
 def create_user_xdg_data_dir(app_name: str) -> Path | None:
     """Create XDG data directory with proper user ownership when running as root (Linux only)"""
     if pwd is None:
-        # Not on Unix/Linux, skip this
         return None
 
     actual_user = os.environ.get("SUDO_USER", pwd.getpwuid(os.getuid()).pw_name)
@@ -1324,7 +1237,6 @@ def get_app_data_paths(
     candidate_paths = []
     log = logging.getLogger(inspect.stack()[0][3])
 
-    # Priority 1: Command-line argument (highest priority)
     has_explicit_path = False
     path_source = None
     if args and hasattr(args, "files_path") and args.files_path:
@@ -1336,14 +1248,12 @@ def get_app_data_paths(
             candidate_paths.append(Path(args.files_path))
         has_explicit_path = True
         path_source = "command line"
-    # Priority 2: Config file setting
     elif config and config.get("GENERAL", {}).get("files_path"):
         config_path = config["GENERAL"]["files_path"]
         candidate_paths.append(Path(config_path))
         has_explicit_path = True
         path_source = "config file"
 
-    # Add platform-specific paths as fallbacks (only if no explicit path given)
     if not has_explicit_path:
         if system == "Windows":
             userprofile = os.environ.get("USERPROFILE")
@@ -1374,7 +1284,6 @@ def get_app_data_paths(
         if not candidate_paths:
             candidate_paths.append(Path.home() / f".{app_name}")
 
-    # Test each path for write permission
     writable_paths = []
     for path in candidate_paths:
         try:
@@ -1396,7 +1305,6 @@ def get_app_data_paths(
             log.debug("Cannot use %s: %s", path, str(e))
             continue
 
-    # Fall back to temp directory if nothing else works
     if not writable_paths:
         temp_dir = Path(tempfile.gettempdir()) / app_name
         try:
@@ -1419,12 +1327,10 @@ def verify_reporting_directories(config: dict[str, Any]) -> None:
     if "GENERAL" in config:
         files_paths = config["GENERAL"].get("files_path")
 
-        # Support both single path and list of paths
         if not isinstance(files_paths, list):
             files_paths = [files_paths]
 
         for files_path in files_paths:
-            # Convert to string if it's a Path object
             files_path = str(files_path)
 
             try:
@@ -1433,7 +1339,6 @@ def verify_reporting_directories(config: dict[str, Any]) -> None:
                     set_directory_permissions(files_path)
                     log.debug("Created directory: %s", files_path)
                 else:
-                    # Ensure existing directory has correct permissions
                     set_directory_permissions(files_path)
                     log.debug("Verified directory structure: %s", files_path)
 
@@ -1454,7 +1359,6 @@ def verify_reporting_directories(config: dict[str, Any]) -> None:
                     set_directory_permissions(reports_dir)
             except (OSError, PermissionError) as e:
                 log.warning(f"Cannot create directory {files_path}: {e}")
-                # Continue to try other paths in the list
 
 
 def get_frequency_bytes(channel: int) -> bytes:
@@ -1466,7 +1370,6 @@ def get_frequency_bytes(channel: int) -> bytes:
     elif channel > 14:
         freq = 5000 + (channel * 5)
     else:
-        # Invalid channel (0 or negative)
         raise ValueError(f"Invalid channel number: {channel}")
 
     return freq.to_bytes(2, byteorder="little")
@@ -1475,9 +1378,6 @@ def get_frequency_bytes(channel: int) -> bytes:
 class Base64Encoder(json.JSONEncoder):
     """A Base64 encoder for JSON"""
 
-    # example usage: json.dumps(bytes(frame), cls=Base64Encoder)
-
-    # pylint: disable=method-hidden
     def default(self, obj: Any) -> Any:
         """Perform default Base64 encode"""
         if isinstance(obj, bytes):
@@ -1510,25 +1410,20 @@ def get_processor_name() -> str:
     """
     import platform
 
-    # Try platform.processor() first (works on some x86 systems)
     proc = platform.processor()
     if proc:
         return proc
 
-    # Fallback: parse /proc/cpuinfo for Linux systems
     try:
         with open("/proc/cpuinfo") as f:
             cpuinfo = f.read()
 
-        # x86/x64: look for "model name"
-        # ARM: look for "Hardware" field
         for line in cpuinfo.split("\n"):
             if "model name" in line.lower():
                 return line.split(":", 1)[1].strip()
             if line.startswith("Hardware"):
                 return line.split(":", 1)[1].strip()
 
-        # ARM fallback: decode CPU part number to known ARM processor names
         cpu_part = None
         for line in cpuinfo.split("\n"):
             if line.startswith("CPU part"):
@@ -1563,7 +1458,6 @@ def get_processor_name() -> str:
     except (FileNotFoundError, PermissionError, OSError):
         pass
 
-    # If all else fails, return empty string (matches platform.processor() behavior)
     return ""
 
 
@@ -1571,8 +1465,6 @@ def update_last_profile_record(mac: str) -> None:
     """Update Last Profile record on local filesystem"""
     log = logging.getLogger(inspect.stack()[0][3])
 
-    # Write to legacy file (backward compatibility)
-    # Skip if we don't have permission (e.g., running --pcap without root)
     try:
         with open(LAST_PROFILE_TMP_FILE, "w") as _file:
             _file.write(mac)
@@ -1581,7 +1473,6 @@ def update_last_profile_record(mac: str) -> None:
     except PermissionError:
         log.debug("skipping %s update (no permission)", LAST_PROFILE_TMP_FILE)
 
-    # Also update info file (skip if no permission)
     from profiler.status import update_last_profile_in_info
 
     try:
@@ -1606,11 +1497,11 @@ def flag_last_object(seq: Iterable[Any]) -> Iterator[tuple[Any, bool]]:
     Yields (item, is_last) tuples where is_last is True for the final item.
     Handles empty sequences gracefully by yielding nothing.
     """
-    seq = iter(seq)  # ensure seq is an iterator
+    seq = iter(seq)
     try:
         _a = next(seq)
     except StopIteration:
-        return  # Empty sequence - nothing to yield
+        return
     for _b in seq:
         yield _a, False
         _a = _b
@@ -1625,10 +1516,7 @@ def generate_run_message(config: dict[str, Any]) -> None:
     channel = config["GENERAL"]["channel"]
     frequency = config["GENERAL"]["frequency"]
 
-    # Check listen_only FIRST - it takes priority over ap_mode
-    # (ap_mode=True is the default, but --listen-only should override)
     if listen_only and not ap_mode:
-        # True listen-only mode (no AP, just passive sniffing)
         out = []
         out.append(
             f"Starting profiler in listen-only mode on {interface} (channel {channel} / {frequency} MHz)"
@@ -1688,7 +1576,6 @@ def generate_run_message(config: dict[str, Any]) -> None:
             print(line)
         print(f"{'~' * header_len}\n")
     else:
-        # Legacy fakeAP mode
         from profiler.constants import SECURITY_MODES
 
         out = []
@@ -1758,7 +1645,6 @@ def log_security_configuration(config: dict[str, Any], log: logging.Logger) -> N
     security_mode = config["GENERAL"].get("security_mode", "unknown")
     wpa_key_mgmt = SECURITY_MODES.get(security_mode, "unknown")
 
-    # Determine feature states
     ft_enabled = "FT-" in wpa_key_mgmt
     wpa3_enabled = "SAE" in wpa_key_mgmt
     he_disabled = config["GENERAL"].get("he_disabled", False)
@@ -1775,7 +1661,6 @@ def log_security_configuration(config: dict[str, Any], log: logging.Logger) -> N
     log.info("    802.11ax (Wi-Fi 6): %s", "disabled" if he_disabled else "enabled")
     log.info("    802.11be (Wi-Fi 7): %s", "disabled" if be_disabled else "enabled")
 
-    # Add notes for non-standard configs
     wpa2_only_modes = ["wpa2", "ft-wpa2"]
     if not be_disabled and security_mode in wpa2_only_modes:
         log.info("  ⚠ NOTE: Wi-Fi 7 enabled with WPA2-only (non-standard, for testing)")

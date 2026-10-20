@@ -62,8 +62,6 @@ class TestCountryCodeDetection:
             country = detect_country_code()
             assert country == "GB"
 
-    # Real `iw reg get` on a WLAN Pi with an unset global domain and a
-    # self-managed ath12k on phy1 (192.168.6.61 boot state).
     MIXED = (
         "global\ncountry 00: DFS-UNSET\n\nphy#1 (self-managed)\ncountry US: DFS-FCC\n\n"
     )
@@ -97,7 +95,7 @@ class TestCountryCodeDetection:
 
     def test_detect_country_code_rejects_numeric(self):
         """Test that numeric codes like '99' are rejected (only alpha codes)"""
-        mock_output = "global\ncountry 99: DFS-UNSET\n"  # Invalid numeric code
+        mock_output = "global\ncountry 99: DFS-UNSET\n"
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = mock_output
@@ -168,7 +166,7 @@ class TestStatusFileOperations:
         assert data["schema_version"] == "1.0"
         assert data["state"] == "starting"
         assert "timestamp" in data
-        assert "reason" not in data  # No reason provided
+        assert "reason" not in data
         assert "pid" not in data
         assert "error" not in data
 
@@ -219,12 +217,9 @@ class TestStatusFileOperations:
         with patch(
             "profiler.status.get_status_file_path", return_value=str(status_file)
         ):
-            # Check that temp file is created then removed
             write_status(ProfilerState.RUNNING, pid=999)
 
-        # Final file should exist
         assert status_file.exists()
-        # Temp file should NOT exist after write
         assert not (tmp_path / "test_status.json.tmp").exists()
 
     def test_get_status_file_exists(self, tmp_path):
@@ -277,7 +272,6 @@ class TestStatusFileOperations:
         """Test deleting status file that exists"""
         status_file = tmp_path / "test_status.json"
 
-        # Create the file
         with open(status_file, "w") as f:
             f.write("{}")
 
@@ -297,7 +291,6 @@ class TestStatusFileOperations:
         with patch(
             "profiler.status.get_status_file_path", return_value=str(status_file)
         ):
-            # Should not raise exception
             delete_status()
 
         assert not status_file.exists()
@@ -333,16 +326,16 @@ class TestInfoFileOperations:
         assert data["interfaces"]["ap"] == "wlan0"
         assert data["interfaces"]["monitor"] == "wlan0profiler"
         assert data["channel"] == 36
-        assert data["frequency"] == 5180  # Channel 36 = 5180 MHz
+        assert data["frequency"] == 5180
         assert data["country_code"] == "US"
         assert data["ssid"] == "TestSSID"
         assert data["bssid"] == "aa:bb:cc:dd:ee:ff"
         assert data["mode"] == "hostapd"
-        assert data["passphrase"] is None  # Default
+        assert data["passphrase"] is None
         assert "started_at" in data
         assert data["uptime_seconds"] == 0
         assert data["profile_count"] == 0
-        assert data["last_profile"] is None  # Null until first profile
+        assert data["last_profile"] is None
         assert data["last_profile_timestamp"] is None
 
     def test_write_info_with_last_profile(self, tmp_path):
@@ -353,7 +346,7 @@ class TestInfoFileOperations:
             write_info(
                 phy="phy0",
                 monitor_interface="wlan1mon",
-                ap_interface="wlan1mon",  # fake_ap uses same interface
+                ap_interface="wlan1mon",
                 channel=149,
                 country_code="GB",
                 ssid="MySSID",
@@ -375,7 +368,7 @@ class TestInfoFileOperations:
             write_info(
                 phy="phy0",
                 monitor_interface="wlan0mon",
-                ap_interface=None,  # listen_only has no AP
+                ap_interface=None,
                 channel=1,
                 country_code="US",
                 ssid="Test",
@@ -387,14 +380,13 @@ class TestInfoFileOperations:
             data = json.load(f)
 
         assert data["channel"] == 1
-        assert data["frequency"] == 2412  # Channel 1 = 2412 MHz
+        assert data["frequency"] == 2412
 
     def test_write_info_6ghz_channel(self, tmp_path):
         """Test writing info file with 6 GHz channel"""
         info_file = tmp_path / "test_info.json"
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Channel 1 in 6 GHz = 5955 MHz
             write_info(
                 phy="phy0",
                 monitor_interface="wlan0profiler",
@@ -409,10 +401,6 @@ class TestInfoFileOperations:
         with open(info_file) as f:
             data = json.load(f)
 
-        # Note: This will map to 2.4 GHz channel 1 (2412 MHz) since we can't
-        # distinguish band from channel number alone. The frequency calculation
-        # uses the first match in the map.
-        # In real usage, the band would be determined from config/interface state
         assert data["channel"] == 1
 
     def test_write_info_invalid_channel(self, tmp_path):
@@ -420,7 +408,6 @@ class TestInfoFileOperations:
         info_file = tmp_path / "test_info.json"
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Channel 999 doesn't exist
             write_info(
                 phy="phy0",
                 monitor_interface="wlan0profiler",
@@ -436,13 +423,12 @@ class TestInfoFileOperations:
             data = json.load(f)
 
         assert data["channel"] == 999
-        assert data["frequency"] is None  # Unknown channel
+        assert data["frequency"] is None
 
     def test_update_last_profile_in_info(self, tmp_path):
         """Test updating last_profile field in existing info file"""
         info_file = tmp_path / "test_info.json"
 
-        # Create initial info file
         initial_data = {
             "schema_version": "1.0",
             "interface": "wlan0",
@@ -462,14 +448,11 @@ class TestInfoFileOperations:
         with open(info_file) as f:
             data = json.load(f)
 
-        # All original fields should remain
         assert data["interface"] == "wlan0"
         assert data["channel"] == 36
-        # New fields added
         assert data["last_profile"] == "11:22:33:44:55:66"
         assert data["profile_count"] == 1
 
-        # Update again to test increment
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
             update_last_profile_in_info("AA:BB:CC:DD:EE:FF")
 
@@ -484,10 +467,8 @@ class TestInfoFileOperations:
         info_file = tmp_path / "nonexistent_info.json"
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Should not raise exception
             update_last_profile_in_info("AA:BB:CC:DD:EE:FF")
 
-        # File should still not exist
         assert not info_file.exists()
 
     def test_get_info_file_exists(self, tmp_path):
@@ -523,7 +504,6 @@ class TestInfoFileOperations:
         """Test deleting info file that exists"""
         info_file = tmp_path / "test_info.json"
 
-        # Create the file
         with open(info_file, "w") as f:
             f.write("{}")
 
@@ -539,7 +519,6 @@ class TestInfoFileOperations:
         info_file = tmp_path / "nonexistent_info.json"
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Should not raise exception
             delete_info()
 
         assert not info_file.exists()
@@ -575,7 +554,6 @@ class TestInfoFileOperations:
         """Test updating monitoring metrics in existing info file"""
         info_file = tmp_path / "test_info.json"
 
-        # Create initial info file
         initial_data = {
             "schema_version": "1.0",
             "profiler_version": "2.0.0",
@@ -607,10 +585,8 @@ class TestInfoFileOperations:
         with open(info_file) as f:
             data = json.load(f)
 
-        # Monitoring metrics should be updated
         assert data["total_clients_seen"] == 12
         assert data["failed_profile_count"] == 3
-        # Other fields should remain unchanged
         assert data["profile_count"] == 5
         assert data["interface"] == "wlan0"
         assert data["channel"] == 36
@@ -630,26 +606,23 @@ class TestInfoFileOperations:
             json.dump(initial_data, f)
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Update only total_clients_seen
             update_monitoring_metrics_in_info(total_clients_seen=15)
 
         with open(info_file) as f:
             data = json.load(f)
 
         assert data["total_clients_seen"] == 15
-        assert data["failed_profile_count"] == 2  # Unchanged
+        assert data["failed_profile_count"] == 2
 
     def test_update_monitoring_metrics_no_file(self, tmp_path):
         """Test update_monitoring_metrics when file doesn't exist"""
         info_file = tmp_path / "nonexistent_info.json"
 
         with patch("profiler.status.get_info_file_path", return_value=str(info_file)):
-            # Should not raise exception
             update_monitoring_metrics_in_info(
                 total_clients_seen=5, failed_profile_count=1
             )
 
-        # File should still not exist
         assert not info_file.exists()
 
 
@@ -698,20 +671,15 @@ class TestHelperFunctions:
 
     def test_is_process_alive_init_process(self):
         """Test checking if PID 1 (init/systemd) is alive"""
-        # PID 1 should exist on most Linux systems, but may not in containers
-        # Just verify the function doesn't crash with PID 1
         result = is_process_alive(1)
         assert isinstance(result, bool)
 
     def test_is_process_alive_nonexistent_pid(self):
         """Test checking if non-existent PID returns False"""
-        # PID 999999 very unlikely to exist
         assert is_process_alive(999999) is False
 
     def test_is_process_alive_negative_pid(self):
         """Test checking negative PID (os.kill with -1 has special meaning)"""
-        # os.kill(-1, 0) sends signal to all processes user has permission for
-        # This may succeed or fail depending on permissions, so just verify no crash
         result = is_process_alive(-1)
         assert isinstance(result, bool)
 
@@ -737,17 +705,15 @@ class TestHelperFunctions:
         _write_json_atomic(str(test_file), test_data)
 
         assert test_file.exists()
-        assert not temp_file.exists()  # Temp file should be gone after rename
+        assert not temp_file.exists()
 
     def test_write_json_atomic_overwrites_existing(self, tmp_path):
         """Test atomic write overwrites existing file"""
         test_file = tmp_path / "test.json"
 
-        # Write initial data
         with open(test_file, "w") as f:
             json.dump({"old": "data"}, f)
 
-        # Overwrite with new data
         new_data = {"new": "data"}
         _write_json_atomic(str(test_file), new_data)
 
@@ -1014,7 +980,7 @@ class TestAtomicJsonWrite:
             try:
                 for i in range(25):
                     _write_json_atomic(str(target), {"writer": n, "seq": i})
-            except Exception as exc:  # pragma: no cover - failure path
+            except Exception as exc:
                 errors.append(exc)
 
         threads = [threading.Thread(target=writer, args=(n,)) for n in range(4)]

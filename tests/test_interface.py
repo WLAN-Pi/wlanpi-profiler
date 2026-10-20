@@ -694,8 +694,6 @@ class TestMonIsPrimary:
         assert calls == []
 
     def test_stage_fakeap_uses_primary_as_monitor_for_iwlwifi(self, monkeypatch):
-        # iwlwifi cannot inject from a monitor vif (it crashes the firmware),
-        # so fakeAP stages the primary interface itself as the monitor.
         monkeypatch.setattr("profiler.interface._run_staging_command", lambda cmd: "")
         monkeypatch.setattr(
             "profiler.interface.run_command", lambda *a, **k: "wpa_cli v2.10\n"
@@ -953,7 +951,6 @@ class TestStagingNeverChangesIftypeWhileUp:
         calls = _record_staging(monkeypatch, iface)
         iface.stage_interface_hostapd()
         _assert_no_iftype_change_while_up(calls)
-        # hostapd owns the managed->AP switch; profiler must not pre-empt it
         assert not any("__ap" in c for c in calls)
 
     @pytest.mark.parametrize(
@@ -1073,7 +1070,7 @@ class TestStaleMonVif:
         before the cleanup ran, so it silently skipped)."""
         iface = _iface(driver)
         if "88XXau" in driver:
-            iface.mon, iface.requires_vif = "", False  # as setup() leaves it
+            iface.mon, iface.requires_vif = "", False
         calls = _record_staging(monkeypatch, iface, real_remove_vif=True)
         iface.stage_interface_fakeap()
         assert ["iw", "dev", "wlan0profiler", "del"] in calls
@@ -1147,7 +1144,6 @@ class TestLeaveRadioAsFound:
     def test_lar_scan_pauses_same_radio_monitors_on_iwlwifi(
         self, monkeypatch, driver, paused
     ):
-        # wlanpi9 is down, wlanpi1 is on another radio: both left alone.
         iface = _iface(driver)
         calls = _record_staging(monkeypatch, iface)
         monkeypatch.setattr(
@@ -1158,8 +1154,6 @@ class TestLeaveRadioAsFound:
             lambda i: i in ("wlan0", "wlanpi0", "wlanpi1"),
         )
         iface.stage_interface_hostapd()
-        # Down before the primary is even touched (a scan with the monitor
-        # down still crashes if it was up when the primary came up).
         assert calls[: len(paused) + 1] == [
             *(["ip", "link", "set", m, "down"] for m in paused),
             ["ip", "link", "set", "wlan0", "down"],
@@ -1228,7 +1222,6 @@ class TestLeaveRadioAsFound:
         monkeypatch.setattr("profiler.interface._run_staging_command", fail_down)
         with pytest.raises(InterfaceError):
             iface.stage_interface_hostapd()
-        # Never lowered, so never "restored"; the scan never ran.
         assert calls == [["ip", "link", "set", "wlanpi0", "down"]]
 
     def test_admin_up_reads_iff_up_and_raises_when_unreadable(

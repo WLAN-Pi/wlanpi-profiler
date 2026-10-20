@@ -29,8 +29,6 @@ class TestReportWriteFailures:
 
         profiler = Profiler(config=config)
 
-        # The profiler should handle write failures without crashing
-        # This is a smoke test to ensure error handling exists
         assert profiler is not None
 
     def test_text_report_write_failure(self, tmp_path, mock_permission_error):
@@ -51,7 +49,6 @@ class TestReportWriteFailures:
 
         profiler = Profiler(config=config)
 
-        # Verify profiler can be instantiated even if write paths have issues
         assert profiler is not None
 
     def test_pcap_write_failure(self, tmp_path):
@@ -72,11 +69,9 @@ class TestReportWriteFailures:
 
         profiler = Profiler(config=config)
 
-        # Mock wrpcap to fail
         with mock.patch(
             "profiler.profiler.wrpcap", side_effect=OSError("Write failed")
         ):
-            # Profiler should handle this gracefully
             assert profiler is not None
 
     def test_csv_write_failure(self, tmp_path):
@@ -97,7 +92,6 @@ class TestReportWriteFailures:
 
         profiler = Profiler(config=config)
 
-        # CSV writes should be robust to failures
         assert profiler is not None
 
 
@@ -108,12 +102,9 @@ class TestMultiPathFallback:
         """Test profiler falls back to second path when first write fails"""
         from profiler.profiler import Profiler
 
-        # Create two paths
         path1 = tmp_path / "path1"
         path2 = tmp_path / "path2"
         path2.mkdir()
-
-        # Don't create path1 to simulate failure
 
         config = {
             "GENERAL": {
@@ -129,7 +120,6 @@ class TestMultiPathFallback:
 
         profiler = Profiler(config=config)
 
-        # Verify profiler accepts multiple paths
         assert isinstance(profiler.files_path, list)
         assert len(profiler.files_path) == 2
 
@@ -137,7 +127,6 @@ class TestMultiPathFallback:
         """Test profiler behavior when all write paths fail"""
         from profiler.profiler import Profiler
 
-        # Create paths that don't exist
         path1 = tmp_path / "nonexistent1"
         path2 = tmp_path / "nonexistent2"
 
@@ -155,7 +144,6 @@ class TestMultiPathFallback:
 
         profiler = Profiler(config=config)
 
-        # Profiler should still instantiate but handle write errors later
         assert profiler is not None
 
 
@@ -166,7 +154,6 @@ class TestJSONCorruptionRecovery:
         """Test profiler can overwrite corrupted existing JSON files"""
         from profiler.profiler import Profiler
 
-        # Create a corrupted JSON file
         json_file = tmp_path / "corrupted.json"
         json_file.write_text("{ invalid json content ")
 
@@ -184,7 +171,6 @@ class TestJSONCorruptionRecovery:
 
         profiler = Profiler(config=config)
 
-        # Profiler should be able to create new reports even with corrupted files present
         assert profiler is not None
 
     def test_read_invalid_json_gracefully(self, tmp_path):
@@ -192,13 +178,11 @@ class TestJSONCorruptionRecovery:
         invalid_json_file = tmp_path / "invalid.json"
         invalid_json_file.write_text("not valid json at all")
 
-        # Try to read it
         try:
             with open(invalid_json_file) as f:
                 json.load(f)
             pytest.fail("Should have raised JSONDecodeError")
         except json.JSONDecodeError:
-            # Expected behavior
             pass
 
 
@@ -210,18 +194,15 @@ class TestConcurrentFileAccess:
         report_file = tmp_path / "report.json"
         report_data = {"client_mac": "00:11:22:33:44:55", "capabilities": []}
 
-        # Write a report
         with open(report_file, "w") as f:
             json.dump(report_data, f)
 
-        # Simulate multiple readers
         readers = []
         for _ in range(3):
             with open(report_file) as f:
                 data = json.load(f)
                 readers.append(data)
 
-        # All readers should get the same data
         assert all(r == report_data for r in readers)
 
     def test_write_race_condition_safety(self, tmp_path):
@@ -231,7 +212,6 @@ class TestConcurrentFileAccess:
 
         status_file = tmp_path / "status.json"
 
-        # Simulate atomic writes by writing to temp then moving
         for i in range(5):
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, dir=str(tmp_path), suffix=".tmp"
@@ -240,8 +220,7 @@ class TestConcurrentFileAccess:
                 tmp_name = tmp_file.name
             shutil.move(tmp_name, str(status_file))
 
-        # Verify final write succeeded
         with open(status_file) as f:
             data = json.load(f)
             assert "iteration" in data
-            assert data["iteration"] == 4  # Last write
+            assert data["iteration"] == 4

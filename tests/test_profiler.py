@@ -7,19 +7,14 @@ from profiler import profiler
 class TestProfiler:
     @staticmethod
     def get_dot11_elt_dict(frame, p):
-        # strip radiotap
         ie_buffer = bytes(frame.payload)
 
-        # strip dot11
         ie_buffer = ie_buffer[24:]
 
-        # strip params
         ie_buffer = ie_buffer[4:]
 
-        # strip fcs
         ie_buffer = ie_buffer[:-4]
 
-        # convert buffer to ie dict
         dot11_elt_dict = p.process_information_elements(ie_buffer)
         return dot11_elt_dict
 
@@ -76,7 +71,6 @@ class TestProfiler:
         p.he_disabled = False
         p.be_disabled = False
         cap = rdpcap(pcap)
-        # dot11_elt_dict = self.get_dot11_elt_dict(cap[0], p)
 
         ssid, oui_manuf, chipset, capabilities = p.analyze_assoc_req(
             cap[0], is_6ghz=True
@@ -103,16 +97,14 @@ class TestProfiler:
         p.he_disabled = False
         p.be_disabled = False
         cap = rdpcap(pcap)
-        # dot11_elt_dict = self.get_dot11_elt_dict(cap[0], p)
 
         ssid, oui_manuf, chipset, capabilities = p.analyze_assoc_req(
             cap[0], is_6ghz=True
         )
         assert ssid == "WLANPI_1"
         assert "Samsung" in oui_manuf
-        assert chipset == "Broadcom"  # S21 shipped with Broadcom
+        assert chipset == "Broadcom"
 
-        # Spatial streams are now reported in separate NSS capabilities
         found_11n = False
         found_11n_nss = False
         found_11ac = False
@@ -152,7 +144,6 @@ class TestGCMP256CipherRegression:
 
     def test_gcmp256_no_standalone_capability(self):
         """Ensure old standalone 'gcmp256' capability doesn't exist anymore"""
-        # Use OnePlus 11 Wi-Fi 7 pcap which supports GCMP-256
         pcap = "./tests/pcaps/wifi7/OnePlus11_Android15.pcapng"
         p = profiler.Profiler()
         p.ft_disabled = False
@@ -162,7 +153,6 @@ class TestGCMP256CipherRegression:
         cap = rdpcap(pcap)
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=False)
 
-        # Old 'gcmp256' db_key should NOT exist
         for capability in capabilities:
             assert capability.db_key != "gcmp256", (
                 "Found old 'gcmp256' capability - should be in cipher capabilities now"
@@ -170,7 +160,6 @@ class TestGCMP256CipherRegression:
 
     def test_gcmp256_in_cipher_capabilities(self):
         """Ensure GCMP-256 is detected in cipher capabilities"""
-        # Use OnePlus 11 Wi-Fi 7 pcap which supports GCMP-256
         pcap = "./tests/pcaps/wifi7/OnePlus11_Android15.pcapng"
         p = profiler.Profiler()
         p.ft_disabled = False
@@ -180,7 +169,6 @@ class TestGCMP256CipherRegression:
         cap = rdpcap(pcap)
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=False)
 
-        # Find cipher capabilities
         group_cipher = None
         pairwise_cipher = None
 
@@ -190,7 +178,6 @@ class TestGCMP256CipherRegression:
             elif capability.db_key == "pairwise_cipher":
                 pairwise_cipher = capability
 
-        # At least one cipher capability should exist and contain GCMP-256
         assert group_cipher is not None or pairwise_cipher is not None, (
             "No cipher capabilities found"
         )
@@ -205,7 +192,6 @@ class TestGCMP256CipherRegression:
 
     def test_gcmp256_cipher_value_format(self):
         """Ensure cipher capabilities use 'CIPHER-NAME (TYPE)' format"""
-        # Use OnePlus 11 Wi-Fi 7 pcap
         pcap = "./tests/pcaps/wifi7/OnePlus11_Android15.pcapng"
         p = profiler.Profiler()
         p.ft_disabled = False
@@ -215,20 +201,15 @@ class TestGCMP256CipherRegression:
         cap = rdpcap(pcap)
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=False)
 
-        # Check cipher capability format
         for capability in capabilities:
             if capability.db_key in ("group_cipher", "pairwise_cipher"):
-                # Value should contain cipher name and type number
-                # e.g., "GCMP-256 (9)" or "CCMP-128 (4)"
                 value = str(capability.value)
 
-                # Should have format "NAME (NUMBER)"
                 if "GCMP-256" in value:
                     assert "(9)" in value, (
                         f"GCMP-256 cipher should include type (9), got: {value}"
                     )
 
-                # db_value should be the cipher type number
                 if "GCMP-256" in value:
                     assert capability.db_value == 9, (
                         f"GCMP-256 db_value should be 9, got: {capability.db_value}"
@@ -236,7 +217,6 @@ class TestGCMP256CipherRegression:
 
     def test_gcmp256_pairwise_multiple_ciphers(self):
         """Test that multiple pairwise ciphers are comma-separated"""
-        # Use Pixel 8 Wi-Fi7 pcap which has multiple pairwise ciphers
         pcap = "./tests/pcaps/wifi7/Pixel8_Android16.pcapng"
         p = profiler.Profiler()
         p.ft_disabled = False
@@ -246,7 +226,6 @@ class TestGCMP256CipherRegression:
         cap = rdpcap(pcap)
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=False)
 
-        # Find pairwise_cipher capability
         pairwise_cipher = None
         for capability in capabilities:
             if capability.db_key == "pairwise_cipher":
@@ -254,10 +233,7 @@ class TestGCMP256CipherRegression:
                 break
 
         if pairwise_cipher and "," in str(pairwise_cipher.value):
-            # Multiple ciphers should be comma-separated
             value = str(pairwise_cipher.value)
-            # Should contain both cipher name and type for each
-            # e.g., "CCMP-128 (4), GCMP-256 (9)"
             assert "(" in value
             assert ")" in value, (
                 f"Cipher format should include types in parentheses: {value}"
@@ -265,7 +241,6 @@ class TestGCMP256CipherRegression:
 
     def test_cipher_capabilities_always_present(self):
         """Ensure group_cipher and pairwise_cipher capabilities always exist"""
-        # Use a basic 5GHz pcap
         pcap = "./tests/pcaps/SM-G977U_Android10_RandomizedMAC_26-a0-e2-00-00-00_5.8GHz-anonymized.pcap"
         p = profiler.Profiler()
         p.ft_disabled = False
@@ -275,7 +250,6 @@ class TestGCMP256CipherRegression:
         cap = rdpcap(pcap)
         _, _, _, capabilities = p.analyze_assoc_req(cap[0], is_6ghz=False)
 
-        # Find cipher capabilities
         has_group_cipher = False
         has_pairwise_cipher = False
 
@@ -285,15 +259,11 @@ class TestGCMP256CipherRegression:
             elif capability.db_key == "pairwise_cipher":
                 has_pairwise_cipher = True
 
-        # Both cipher capabilities should exist
         assert has_group_cipher, "group_cipher capability not found"
         assert has_pairwise_cipher, "pairwise_cipher capability not found"
 
     def test_cipher_not_reported_when_no_rsn(self):
         """Test cipher capabilities when RSN IE is not present"""
-        # This would require a pcap without RSN IE
-        # For now, just ensure the capability exists with appropriate value
-        # We test this in test_capability_migration.py::test_gcmp256_no_rsn_ie
         pass
 
 
@@ -301,8 +271,6 @@ class TestPhase0Parsing:
     """Parsing correctness fixes (phase 0)."""
 
     def test_operating_classes_pops_current_class(self):
-        # 131 is the *current* operating class; it must be dropped, and no
-        # 6 GHz alternative classes are actually present.
         caps = profiler.Profiler.analyze_operating_classes(
             {59: [131, 81, 115, 118, 121]}
         )

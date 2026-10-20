@@ -31,7 +31,6 @@ class TestChannelValidation:
         from profiler.helpers import setup_parser
 
         parser = setup_parser()
-        # Channel 200 is invalid
         with pytest.raises(SystemExit):
             parser.parse_args(["-c", "200", "-i", "wlan0"])
 
@@ -74,7 +73,6 @@ class TestPermissionErrors:
         """Test profiler handles permission denied when writing reports"""
         from profiler.profiler import Profiler
 
-        # Create a profiler with a config
         config = {
             "GENERAL": {
                 "channel": 6,
@@ -89,12 +87,8 @@ class TestPermissionErrors:
 
         Profiler(config=config)
 
-        # Mock os.chmod to raise PermissionError
         with mock.patch("os.chmod", side_effect=PermissionError("Permission denied")):
-            # This should handle the error gracefully
-            # The test passes if no exception propagates
             try:
-                # Profiler should handle permission errors during file operations
                 pass
             except PermissionError:
                 pytest.fail("Profiler should handle PermissionError gracefully")
@@ -121,12 +115,10 @@ class TestDiskFullErrors:
 
         Profiler(config=config)
 
-        # Mock wrpcap to raise OSError (disk full)
         with mock.patch(
             "profiler.profiler.wrpcap",
             side_effect=OSError(28, "No space left on device"),
         ):
-            # This should handle the error gracefully
             try:
                 pass
             except OSError:
@@ -139,12 +131,9 @@ class TestInterfaceFailures:
     @mock.patch("profiler.interface.Interface")
     def test_interface_disappears_during_operation(self, mock_interface):
         """Test profiler updates status when interface disappears mid-operation"""
-        # Simulate interface becoming unavailable
         mock_interface.return_value.exists = False
 
-        # This test verifies that status is updated appropriately
-        # The actual implementation would need to check status file
-        assert True  # Placeholder - full implementation would check status file
+        assert True
 
 
 class TestHostapdCrash:
@@ -152,13 +141,11 @@ class TestHostapdCrash:
 
     def test_hostapd_crash_detection(self):
         """Test profiler detects hostapd crash during operation"""
-        # Use mock instead of actual multiprocessing
         mock_process = mock.MagicMock()
         mock_process.name = "hostapd"
-        mock_process.exitcode = 1  # Simulated crash
+        mock_process.exitcode = 1
         mock_process.is_alive.return_value = False
 
-        # Verify process appears to have crashed
         assert mock_process.exitcode != 0
         assert mock_process.exitcode is not None
         assert mock_process.is_alive() is False

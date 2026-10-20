@@ -62,20 +62,16 @@ class TestInstallationIntegrity:
             "/var/www/html/profiler/reports",
         ]
         for directory in data_dirs:
-            # Check if directory exists OR if parent directory is writable
-            # (profiler creates subdirs at runtime)
             if not os.path.exists(directory):
                 parent = os.path.dirname(directory)
                 assert os.path.exists(parent), (
                     f"Parent directory {parent} does not exist"
                 )
-                # Directory will be created at runtime if parent exists
 
     def test_wpa_cli_is_available_optional(self) -> None:
         """Check if wpa_cli is available (optional)"""
         result = subprocess.run(["which", "wpa_cli"], capture_output=True, text=True)
         if result.returncode != 0:
-            # Only warn if wpa_supplicant is installed
             wpa_supp_result = subprocess.run(
                 ["which", "wpa_supplicant"], capture_output=True, text=True
             )

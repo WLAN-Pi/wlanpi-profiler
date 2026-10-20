@@ -26,12 +26,11 @@ class TestArgParsing:
             parser.parse_args(["--help"])
         out, err = capsys.readouterr()
         assert err == ""
-        # Verify help text is actually generated
         assert "usage:" in out
         assert "wlanpi-profiler" in out or "profiler" in out
         assert "--security-mode" in out
-        assert "--11be" in out  # Should be visible now
-        assert "--no11r" not in out  # Should be hidden
+        assert "--11be" in out
+        assert "--no11r" not in out
 
     def test_help_short_flag(self, parser, capsys):
         """Test that -h works (short form)"""
@@ -124,8 +123,6 @@ class TestArgParsing:
             parser.parse_args(["-h"])
         out, _ = capsys.readouterr()
         assert "--no-interface-prep" in out
-        # Old flag should still work but be hidden in main help display
-        # (argparse shows all aliases, so --noprep will appear)
 
     def test_list_interfaces_new_flag(self, parser):
         args = parser.parse_args(["--list-interfaces"])
@@ -147,7 +144,6 @@ class TestRootGate:
         from profiler import manager
 
         monkeypatch.setattr(manager, "are_we_root", lambda: False)
-        # Stop at the first step after the root gate
         monkeypatch.setattr(
             manager.helpers,
             "check_required_tools",
@@ -230,7 +226,6 @@ class TestReadOnlyMode:
             manager.os, "_exit", lambda code: (_ for _ in ()).throw(SystemExit(code))
         )
         monkeypatch.setattr(manager, "_read_only_mode", True)
-        # --pcap runs a profiler child; SIGTERM to the parent must still stop it.
         child = mock.Mock(name="profiler", pid=1)
         child.is_alive.return_value = False
         monkeypatch.setattr(manager, "__RUNNING_PROCESSES", [child])

@@ -25,6 +25,11 @@ from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, CONFIG_FILE
 from .helpers import run_command
 from .status import parse_reg_domains
 
+ARPHRD_ETHER = 1
+ARPHRD_IEEE80211 = 801
+ARPHRD_IEEE80211_PRISM = 802
+ARPHRD_IEEE80211_RADIOTAP = 803
+
 
 class InterfaceError(Exception):
     """Custom exception used when there are problems staging the interface for injection"""
@@ -91,10 +96,7 @@ class Interface:
         self.phys: list[Any] = []
         self.no_interface_prep = False
         self.removed = False
-        # Set when fakeAP staging switches the primary interface itself to
-        # monitor mode (iwlwifi/88XXau); reset_interface must restore it.
         self.primary_staged_as_monitor = False
-        # Admin state of the primary before staging; reset_interface restores
         # it. Leaving a managed interface up with no supplicant makes later
         # channel sets on the radio's other monitors fail with EBUSY.
         self.primary_was_up = True
@@ -130,32 +132,23 @@ class Interface:
         self.phy_id = self.get_phy_id()
         self.phy = f"phy{self.phy_id}"
         self.mon = ""
-        # if we're not managing interface prep, we need to get freq and channel from iw.
         if self.no_interface_prep:
             iw_dev_iface_info = run_command(["iw", "dev", f"{self.name}", "info"])
             self.frequency = self.get_frequency(iw_dev_iface_info, self.name) or 0
             self.channel = self.get_channel(iw_dev_iface_info, self.name) or 0
         else:
-            # the rtl88XXau is crap and doesn't support vifs, otherwise lets create a mon interface for iwlwifi, mt76x2u, etc
             if "88XXau" not in self.driver:
-                # if <iface>profiler is not already created. we will create it.
-                # Check if the provided interface name already ends with 'profiler'
                 if self.name.endswith("profiler"):
-                    # Interface already has profiler suffix, assume it's the monitor interface
-                    # This handles cases where the user provides wlanXprofiler directly
                     self.mon = self.name
                     self.log.debug(
                         "Provided interface '%s' already has 'profiler' suffix. "
                         "Treating it as pre-existing monitor interface.",
                         self.mon,
                     )
-                    # We still need a VIF, but won't create a new one
                     self.requires_vif = True
                 else:
-                    # Normal case: append 'profiler' to create monitor interface name
                     self.mon = f"{self.name}profiler"
 
-                    # Sanity check: ensure mon != name (shouldn't happen in normal flow)
                     if self.mon == self.name:
                         self.log.warning(
                             "proposed %s interface matches provided %s and already maps to phy%s",
@@ -203,7 +196,6 @@ class Interface:
             lsb_release = run_command(["lsb_release", "-a"])
             print(lsb_release)
         except FileNotFoundError:
-            # lsb_release not installed (e.g., minimal containers)
             print("OS: lsb_release not available")
         self.phys = self.build_iw_phy_list()
         self.log.debug("phys: %s", self.phys)
@@ -339,7 +331,6 @@ class Interface:
     def reset_interface(self) -> None:
         """Delete monitor interface and restore the primary interface to managed mode"""
         if self.mon_is_primary and not self.primary_staged_as_monitor:
-            # The provided interface is the monitor interface; leave it as-is
             return
         commands = []
         if self.requires_vif:
@@ -347,9 +338,6 @@ class Interface:
                 ["ip", "link", "set", f"{self.mon}", "down"],
                 ["iw", "dev", f"{self.mon}", "del"],
             ]
-        # Restore the primary interface to managed so the device is left usable
-        # after hostapd (__ap) or monitor-mode staging, in the admin state it
-        # was found in.
         commands += [
             ["ip", "link", "set", f"{self.name}", "down"],
             ["iw", "dev", f"{self.name}", "set", "type", "managed"],
@@ -365,10 +353,8 @@ class Interface:
     ) -> bool:
         """Check iw phy channels for disabled, No IR, or Radar detection and return True if found"""
         channels_status = self.get_channels_status(iw_phy_channels)
-        # on some cards, like iwlwifi, we may need to perform a scan to unlock channels because of LAR
         if channels_status:
             for _band, channels in channels_status.items():
-                # loop through channels and check if we need to do a scan before staging
                 for ch in channels:
                     if int(freq) == int(ch.freq) and (
                         ch.disabled or ch.no_ir or ch.radar_detect
@@ -444,10 +430,8 @@ class Interface:
         """Prepare the interface for fakeAP monitor mode and injection"""
         import shutil
 
-        # get and print debugs for versions of system utilities
         self.log.debug("start stage_interface")
 
-        # Only try wpa_cli if wpa_supplicant is present
         if shutil.which("wpa_supplicant") is not None:
             try:
                 wpa_cli_version = run_command(["wpa_cli", "-v"])
@@ -473,14 +457,10 @@ class Interface:
         if iw_version:
             self.log.debug("%s", iw_version.strip())
 
-        # Remove a stale monitor vif left behind by a previous crash. Must run
-        # before the driver branches below flip requires_vif to False, or a
-        # stale wlanXprofiler from an earlier hostapd/listen-only run survives.
         self._remove_mon_vif()
 
         cmds = []
         # Some drivers cannot inject from a monitor vif:
-        #  - rtl88XXau does not support vifs at all
         #  - iwlwifi crashes the firmware ("Device error - reprobe!") when
         #    injecting from a monitor vif while the primary vif is down, and
         #    cannot set the monitor vif channel while the primary is up.
@@ -503,7 +483,6 @@ class Interface:
                 ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         elif "88XXau" in self.driver:
-            # this prevents failures for rtl88XXau on some WLAN Pi OS v2 NEO{1,2} deployments
             self.mon = self.name
             self.requires_vif = False
             self.primary_staged_as_monitor = True
@@ -535,7 +514,6 @@ class Interface:
                 ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
 
-        # run the staging commands
         with self._radio_monitors_down():
             for cmd in cmds:
                 self.log.debug("run: %s", " ".join(cmd))
@@ -548,13 +526,10 @@ class Interface:
                 else:
                     _run_staging_command(cmd)
 
-        # check if the interface is in monitor mode and operstate up
-        # self.operstate = self.get_operstate(iface=self.mon)
         self.mode = self.get_mode(iface=self.mon)
         if "monitor" not in self.mode:
             raise InterfaceError("interface is not in monitor mode")
 
-        # check for No IR or disabled
         self.check_for_disabled_or_noir_channels(
             self.frequency,
             run_command(["iw", "phy", f"{self.phy}", "channels"]),
@@ -588,18 +563,14 @@ class Interface:
                 "provided as the monitor interface. Stage it yourself and use --noprep."
             )
 
-        # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
-        # We need to scan to unlock channels and remove NO IR flags
-        # The scan must NOT specify a frequency - we need a blanket scan
-        # across all frequencies to properly unlock the regulatory domain
         scan_cmds = [
             ["ip", "link", "set", f"{self.name}", "down"],
             ["iw", "dev", f"{self.name}", "set", "type", "managed"],
             ["ip", "link", "set", f"{self.name}", "up"],
-            ["iw", f"{self.name}", "scan"],  # Triggers LAR update (no freq param!)
+            # iwlwifi LAR only updates regulatory on a blanket scan; no freq.
+            ["iw", f"{self.name}", "scan"],
         ]
 
-        # Run LAR scan
         with self._radio_monitors_down():
             for cmd in scan_cmds:
                 self.log.debug("run: %s", " ".join(cmd))
@@ -616,10 +587,8 @@ class Interface:
         # (driver_nl80211.c: wpa_driver_nl80211_set_mode_impl), so the
         # primary is left UP in managed mode after the LAR scan.
 
-        # Remove a stale monitor vif before recreating it
         self._remove_mon_vif()
 
-        # Create monitor interface on same phy if needed
         cmds: list[list[str]] = []
         if self.requires_vif:
             cmds = [
@@ -641,14 +610,11 @@ class Interface:
                 # "Beacon set failed: -22 (Invalid argument)" errors.
             ]
 
-        # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
             _run_staging_command(cmd)
-            # Short sleep between commands to allow driver to process
             time.sleep(0.1)
 
-        # Verify monitor interface is up
         if self.requires_vif:
             self.mode = self.get_mode(iface=self.mon)
             if "monitor" not in self.mode:
@@ -656,8 +622,6 @@ class Interface:
                     f"monitor interface {self.mon} not in monitor mode"
                 )
 
-            # Log monitor interface state for debugging
-            # Note: Monitor interfaces typically report "unknown" operstate, which is normal
             operstate = self.get_operstate(iface=self.mon)
             self.log.debug(
                 "monitor interface %s created (operstate: %s)",
@@ -671,11 +635,7 @@ class Interface:
         """Prepare the interface for passive monitor mode (no TX/injection)"""
         self.log.debug("start stage_interface_listen_only")
 
-        # For Intel iwlwifi cards with LAR (Location-Aware Regulatory),
-        # We need to scan to unlock channels and remove NO IR flags
         if self.mon_is_primary:
-            # Provided interface is already the monitor interface; tune it and
-            # use it as-is (no scan/type changes, no vif creation).
             cmds = [
                 ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
@@ -684,10 +644,9 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "managed"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "scan"],  # Triggers LAR update
+                ["iw", f"{self.name}", "scan"],
             ]
 
-            # Run LAR scan
             with self._radio_monitors_down():
                 for cmd in scan_cmds:
                     self.log.debug("run: %s", " ".join(cmd))
@@ -696,10 +655,8 @@ class Interface:
                     else:
                         _run_staging_command(cmd)
 
-            # Remove a stale monitor vif before recreating it
             self._remove_mon_vif()
 
-            # Create monitor interface for passive sniffing
             if self.requires_vif:
                 cmds = [
                     ["ip", "link", "set", f"{self.name}", "down"],
@@ -717,7 +674,6 @@ class Interface:
                     ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
                 ]
             else:
-                # Driver doesn't support VIF (e.g., 88XXau) - put main interface in monitor mode
                 cmds = [
                     ["ip", "link", "set", f"{self.name}", "down"],
                     ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
@@ -725,19 +681,16 @@ class Interface:
                     ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
                 ]
 
-        # Run the staging commands
         for cmd in cmds:
             self.log.debug("run: %s", " ".join(cmd))
             _run_staging_command(cmd)
             time.sleep(0.1)
 
-        # Verify monitor interface is in monitor mode
         mon_iface = self.mon if self.requires_vif else self.name
         self.mode = self.get_mode(iface=mon_iface)
         if "monitor" not in self.mode:
             raise InterfaceError(f"interface {mon_iface} not in monitor mode")
 
-        # Check for No IR or disabled channels
         self.check_for_disabled_or_noir_channels(
             self.frequency,
             run_command(["iw", "phy", f"{self.phy}", "channels"]),
@@ -817,12 +770,10 @@ class Interface:
             ", ".join(restriction_type),
         )
 
-        # Find available channels (no disabled, no_ir, radar flags) in all bands
         available_by_band = {}
         for band, channels in channels_status.items():
             available = []
             for ch in channels:
-                # Only include standard 20MHz channels we support
                 if (
                     not ch.disabled
                     and not ch.no_ir
@@ -867,7 +818,6 @@ class Interface:
             error_lines.append(
                 f"Detected available unrestricted channels in the {band_name} band: {', '.join(map(str, alternatives))}"
             )
-            # For 2.4 GHz, only suggest non-overlapping channels 1, 6, 11
             if "1" in requested_band:
                 non_overlapping = [ch for ch in alternatives if ch in [1, 6, 11]]
                 if non_overlapping:
@@ -885,7 +835,6 @@ class Interface:
                     band_name = self._get_band_display_name(band)
                     flag = self._get_band_flag(band)
 
-                    # For 2.4 GHz, prefer channels 1, 6, 11
                     if "1" in band:
                         sample = [ch for ch in channels if ch in [1, 6, 11]] or channels
                     else:
@@ -899,7 +848,7 @@ class Interface:
                     else:
                         error_lines.append(f"Try with --channel {sample[0]}")
                     error_lines.append("")
-                    break  # Only suggest first alternative band
+                    break
         else:
             error_lines.append("No channels available in any band!")
             error_lines.append(
@@ -919,7 +868,6 @@ class Interface:
     @staticmethod
     def _get_band_display_name(band: str) -> str:
         """Convert band identifier from iw phy to more human-readable reference."""
-        # band comes from iw phy as "1:", "2:", "3:", etc.
         if "1" in band:
             return "2.4 GHz"
         elif "2" in band:
@@ -1164,7 +1112,6 @@ class Interface:
             device = run_command(
                 ["cat", f"/sys/class/net/{iface}/device/device"]
             ).strip()
-            # Remove 0x prefix if present (sysfs returns IDs as 0x8086, lspci expects 8086)
             vendor = vendor.replace("0x", "")
             device = device.replace("0x", "")
             chipset = run_command(["lspci", "-d", f"{vendor}:{device}", "-q"])
@@ -1267,22 +1214,18 @@ class Interface:
         phy = namedtuple("phy", ["phy_id", "interfaces"])
         phys: list[Any] = []
 
-        # Build mapping from phy_id to interfaces using /sys
         phy_to_interfaces: dict[str, list[Any]] = {}
 
-        # Iterate over all network interfaces in /sys/class/net
         try:
             for iface_name in os.listdir("/sys/class/net"):
                 iface_path = os.path.join("/sys/class/net", iface_name)
                 if not os.path.isdir(iface_path):
                     continue
 
-                # Check if this is a wireless interface (has phy80211)
                 phy80211_path = os.path.join(iface_path, "phy80211")
                 if not os.path.exists(phy80211_path):
                     continue
 
-                # Get phy index from /sys/class/net/<iface>/phy80211/index
                 phy_index_path = os.path.join(phy80211_path, "index")
                 try:
                     with open(phy_index_path) as f:
@@ -1290,7 +1233,6 @@ class Interface:
                 except OSError:
                     continue
 
-                # Get ifindex
                 ifindex_path = os.path.join(iface_path, "ifindex")
                 try:
                     with open(ifindex_path) as f:
@@ -1298,7 +1240,6 @@ class Interface:
                 except OSError:
                     ifindex = ""
 
-                # Get MAC address
                 addr_path = os.path.join(iface_path, "address")
                 try:
                     with open(addr_path) as f:
@@ -1306,7 +1247,6 @@ class Interface:
                 except OSError:
                     addr = ""
 
-                # Get interface type/mode from /sys/class/net/<iface>/type
                 type_path = os.path.join(iface_path, "type")
                 iface_type = "unknown"
                 try:
@@ -1320,7 +1260,6 @@ class Interface:
                 except (OSError, ValueError):
                     pass
 
-                # Create iface tuple and add to mapping
                 interface = iface(iface_name, ifindex, addr, iface_type)
                 if phy_id not in phy_to_interfaces:
                     phy_to_interfaces[phy_id] = []
@@ -1328,7 +1267,6 @@ class Interface:
         except OSError:
             pass
 
-        # Convert mapping to list of phy namedtuples
         for phy_id, interfaces in phy_to_interfaces.items():
             phys.append(phy(phy_id, interfaces))
 
@@ -1336,7 +1274,6 @@ class Interface:
 
     def get_phy_id(self) -> str:
         """Check and determines the phy# for the interface name of this object"""
-        # Read phy index directly from /sys
         phy_index_path = f"/sys/class/net/{self.name}/phy80211/index"
         try:
             with open(phy_index_path) as f:
@@ -1357,13 +1294,12 @@ class Interface:
             _type = int(_interface_type)
         except ValueError:
             return mode
-        if _type == 1:
+        if _type == ARPHRD_ETHER:
             mode = "managed"
-        elif _type == 801 or _type == 802:
+        elif _type in (
+            ARPHRD_IEEE80211,
+            ARPHRD_IEEE80211_PRISM,
+            ARPHRD_IEEE80211_RADIOTAP,
+        ):
             mode = "monitor"
-        elif (
-            _type == 803
-        ):  # https://github.com/torvalds/linux/blob/master/include/uapi/linux/if_arp.h#L91
-            mode = "monitor"
-        # self.log.debug("%s mode is %s (%s)", iface, mode, _type)
         return mode.lower()

@@ -63,17 +63,14 @@ class HostapdManager:
         self.log = logger
         self.process: subprocess.Popen[str] | None = None
         self.config_path: str | None = None
-        # Use ap_interface (wlan0) if available, otherwise fall back to interface
         self.interface = config.get("ap_interface", config.get("interface", "wlan0"))
         self.bssid: str | None = None
-        self._log_threads: list[threading.Thread] = []  # Track log streaming threads
+        self._log_threads: list[threading.Thread] = []
 
-        # Watchdog thread for monitoring process health
         self._watchdog_thread: threading.Thread | None = None
         self._watchdog_stop = threading.Event()
         self._watchdog_running = False
 
-        # Log monitoring for fatal errors
         self._init_failed = False
         self._init_error_msg: str | None = None
         self._startup_time: float | None = None
@@ -99,7 +96,7 @@ class HostapdManager:
             "CTRL-EVENT-TERMINATING",
         ]
 
-        STARTUP_WINDOW = 10  # Monitor for fatal errors in first 10 seconds
+        STARTUP_WINDOW = 10
 
         try:
             for line in stream:
@@ -107,15 +104,12 @@ class HostapdManager:
                 if not line:
                     continue
 
-                # Check if we're in startup window
                 in_startup = (
                     self._startup_time
                     and (time.time() - self._startup_time) < STARTUP_WINDOW
                 )
 
-                # Detect fatal errors during startup
                 if in_startup:
-                    # Check for fatal error messages
                     for error_pattern in FATAL_ERRORS:
                         if error_pattern in line:
                             self._init_failed = True
@@ -123,7 +117,6 @@ class HostapdManager:
                             self.log.error(f"[{prefix}] FATAL: {line}")
                             break
 
-                    # Check for fatal events
                     if not self._init_failed:
                         for event_pattern in FATAL_EVENTS:
                             if event_pattern in line:
@@ -132,16 +125,13 @@ class HostapdManager:
                                 self.log.error(f"[{prefix}] FATAL EVENT: {line}")
                                 break
 
-                # Regular logging
                 if "error" in line.lower() or "failed" in line.lower():
                     self.log.error(f"[{prefix}] {line}")
                 elif "warning" in line.lower():
                     self.log.warning(f"[{prefix}] {line}")
                 elif "DFS" in line:
-                    # Highlight our DFS bypass messages
                     self.log.info(f"[{prefix}] {line}")
                 else:
-                    # Most hostapd messages (including PROFILER:) are debug-level
                     self.log.debug(f"[{prefix}] {line}")
         except Exception as e:
             self.log.debug(f"Log streaming thread ({prefix}) stopped: {e}")
@@ -157,19 +147,14 @@ class HostapdManager:
         self.log.debug("Hostapd watchdog thread started")
         self._watchdog_running = True
 
-        poll_interval = 1.0  # Check every 1 second
+        poll_interval = 1.0
 
         while not self._watchdog_stop.is_set():
             if self.process is None:
                 break
 
-            # Check if process has exited
             exit_code = self.process.poll()
             if exit_code is not None:
-                # Process has exited - determine if this is an error or intentional shutdown
-
-                # Case 1: Fatal error detected in logs (during startup window)
-                # This covers scenarios where hostapd logs errors but exits with code 0
                 if self._init_failed:
                     self.log.error(
                         f"Hostapd failed during startup (exit code: {exit_code})"
@@ -200,26 +185,21 @@ class HostapdManager:
                     self.log.error(
                         "Triggering profiler shutdown due to hostapd startup failure"
                     )
-                    time.sleep(0.1)  # Ensure status file write completes
+                    time.sleep(0.1)
                     os.kill(os.getpid(), signal.SIGUSR1)
 
                     self._watchdog_running = False
                     break
 
-                # Case 2: Clean exit (exit code 0, no errors detected in logs)
-                # This is intentional shutdown (cleanup() called)
                 if exit_code == 0:
                     self.log.debug("Hostapd exited cleanly (exit code: 0)")
                     self._watchdog_running = False
                     break
 
-                # Case 3: Non-zero exit code (unexpected crash/failure)
-                # Runtime crash after startup window, or immediate failure
                 self.log.error(
                     f"Hostapd process died unexpectedly (exit code: {exit_code})"
                 )
 
-                # Build detailed error message
                 error_detail = f"Hostapd exited with code {exit_code}"
                 if exit_code == -11:
                     error_detail += " (SIGSEGV - segmentation fault/crash)"
@@ -242,13 +222,12 @@ class HostapdManager:
                 import signal
 
                 self.log.error("Triggering profiler shutdown due to hostapd failure")
-                time.sleep(0.1)  # Ensure status file write completes
+                time.sleep(0.1)
                 os.kill(os.getpid(), signal.SIGUSR1)
 
                 self._watchdog_running = False
                 break
 
-            # Sleep for interval (but wake on stop signal)
             self._watchdog_stop.wait(timeout=poll_interval)
 
         self.log.debug("Hostapd watchdog thread stopped")
@@ -267,7 +246,6 @@ class HostapdManager:
         from profiler.config_generator import generate_hostapd_config
 
         try:
-            # Determine band from channel/frequency
             channel = int(self.config.get("channel") or 0)
             frequency = self.config.get("frequency")
 
@@ -286,11 +264,9 @@ class HostapdManager:
                 else:
                     band = "6ghz"
             else:
-                # Default to 5 GHz
                 band = "5ghz"
                 channel = 36
 
-            # Generate config
             self.config_path = generate_hostapd_config(
                 interface=self.interface,
                 channel=channel,
@@ -323,18 +299,15 @@ class HostapdManager:
             HostapdNotFoundError: If hostapd binary not found
             HostapdStartupError: If hostapd fails to start
         """
-        # Check binary exists
         if not os.path.exists(HOSTAPD_BINARY):
             raise HostapdNotFoundError(
                 f"Hostapd binary not found at {HOSTAPD_BINARY}. "
                 "This installation may be corrupted. Reinstall wlanpi-profiler."
             )
 
-        # Generate config if not already done
         if not self.config_path:
             self.generate_config()
 
-        # Start hostapd
         if not self.config_path:
             raise HostapdError("Config path not set - call generate_config() first")
 
@@ -347,13 +320,11 @@ class HostapdManager:
             self.log.warning(f"Failed to create ctrl_interface directory: {e}")
 
         try:
-            # Build hostapd command - add -d flag for expert mode to show MSG_DEBUG messages
             hostapd_cmd = [HOSTAPD_BINARY]
             if self.config.get("expert", False):
-                hostapd_cmd.append("-d")  # Enable debug output for PROFILER messages
+                hostapd_cmd.append("-d")
             hostapd_cmd.append(self.config_path)
 
-            # Record startup time for log monitoring
             self._startup_time = time.time()
 
             self.log.info(f"Starting hostapd: {' '.join(hostapd_cmd)}")
@@ -362,11 +333,10 @@ class HostapdManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                bufsize=1,  # Line buffered for real-time streaming
+                bufsize=1,
             )
             self.process = process
 
-            # Start log streaming threads
             stdout_thread = threading.Thread(
                 target=self._stream_logs,
                 args=(process.stdout, "HOSTAPD"),
@@ -384,19 +354,16 @@ class HostapdManager:
             self._log_threads = [stdout_thread, stderr_thread]
             self.log.debug("Started hostapd log streaming threads")
 
-            # Wait a moment for startup
             time.sleep(2)
 
-            # Check if process died immediately
             if process.poll() is not None:
                 exit_code = process.returncode
 
-                # Provide helpful error messages based on exit code
                 error_msg = (
                     f"Hostapd died immediately after startup.\nExit code: {exit_code}\n"
                 )
 
-                if exit_code == -11:  # SIGSEGV
+                if exit_code == -11:
                     error_msg += (
                         "Exit code -11 (SIGSEGV) suggests hostapd crashed.\n"
                         "This often happens when:\n"
@@ -408,23 +375,20 @@ class HostapdManager:
                 elif exit_code == 1:
                     error_msg += "Configuration error or interface already in use.\n"
 
-                # Note: Stderr already logged by streaming thread, no need to include here
                 error_msg += "(See hostapd logs above for details)"
                 raise HostapdStartupError(error_msg)
 
             self.log.info(f"Hostapd started successfully (PID: {process.pid})")
 
-            # Start watchdog thread to monitor process health indefinitely
             self._watchdog_stop.clear()
             self._watchdog_thread = threading.Thread(
                 target=self._watchdog,
-                daemon=True,  # Thread dies with main process
+                daemon=True,
                 name="hostapd-watchdog",
             )
             self._watchdog_thread.start()
             self.log.debug("Started hostapd process watchdog thread")
 
-            # Get BSSID from interface
             self._get_bssid()
 
             return process
@@ -453,7 +417,6 @@ class HostapdManager:
                 self.log.info(f"Stopping hostapd (PID: {self.process.pid})...")
                 self.process.terminate()
 
-                # Wait for graceful shutdown
                 try:
                     self.process.wait(timeout=timeout)
                     self.log.info("Hostapd stopped gracefully")
@@ -505,14 +468,12 @@ class HostapdManager:
             )
 
             if result.returncode == 0:
-                # Parse output for "bssid[0]=aa:bb:cc:dd:ee:ff"
                 for line in result.stdout.split("\n"):
                     if line.startswith("bssid[0]="):
                         self.bssid = line.split("=")[1].strip().lower()
                         self.log.debug(f"AP BSSID from hostapd_cli: {self.bssid}")
                         return
 
-            # Fallback: Read interface MAC (may not be accurate with MLD)
             result = subprocess.run(
                 ["ip", "link", "show", self.interface],
                 capture_output=True,
@@ -538,7 +499,6 @@ class HostapdManager:
         if self._watchdog_thread and self._watchdog_running:
             self.log.debug("Stopping hostapd watchdog thread...")
             self._watchdog_stop.set()
-            # Give thread time to exit gracefully (reduced timeout for faster shutdown)
             self._watchdog_thread.join(timeout=1)
 
         self.stop()
