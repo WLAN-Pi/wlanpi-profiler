@@ -785,11 +785,9 @@ class Interface:
                     requested_channel_info = ch
                     if ch.disabled:
                         restriction_type.append("Disabled")
-                    # A monitor interface reports No IR for channels that are
-                    # still usable for injection (e.g. iwlwifi fakeAP, where
-                    # the primary is staged as the monitor), so only block on
-                    # No IR for real AP (non-monitor) staging.
-                    if ch.no_ir and not self.primary_staged_as_monitor:
+                    # iwlwifi firmware drops injected frames on No IR channels
+                    # too, so a primary staged as monitor gets no exemption.
+                    if ch.no_ir:
                         restriction_type.append("No IR (No initiation of radiation)")
                     if ch.radar_detect:
                         restriction_type.append("Radar detection")
