@@ -758,19 +758,21 @@ class Interface:
             country_code: Current regulatory country code (e.g., "US")
 
         Raises:
-            InterfaceError: If channel has regulatory restrictions, with
-                suggestions for alternative channels
+            InterfaceError: If the channel isn't in the phy's channel list or
+                has regulatory restrictions, with suggestions for alternative
+                channels
         """
         self.log.debug("start validate_channel_for_ap")
 
-        iw_phy_channels = run_command(["iw", "phy", f"{self.phy}", "channels"])
+        cmd = ["iw", "phy", f"{self.phy}", "channels"]
+        try:
+            iw_phy_channels = run_command(cmd, check=True)
+        except (subprocess.CalledProcessError, OSError) as e:
+            raise InterfaceError(
+                f"'{' '.join(cmd)}' failed ({e}); refusing to start an AP "
+                "without a regulatory check."
+            ) from e
         channels_status = self.get_channels_status(iw_phy_channels)
-
-        if not channels_status:
-            self.log.warning(
-                "Unable to validate channel - could not parse iw phy channels"
-            )
-            return
 
         requested_band = None
         requested_channel_info = None
@@ -794,6 +796,13 @@ class Interface:
                     break
             if requested_channel_info:
                 break
+
+        if requested_channel_info is None:
+            raise InterfaceError(
+                f"Channel {self.channel} ({self.frequency} MHz) is not in "
+                f"'iw phy {self.phy} channels'; refusing to start an AP "
+                "without a regulatory check."
+            )
 
         if not restriction_type:
             self.log.debug(
@@ -989,24 +998,22 @@ class Interface:
         )
         bands: dict[str, list[Any]] = {}
         channels: list[Any] = []
+        in_channel = False
         for line in iw_phy_channels.splitlines():
             line = line.strip().lower()
             if line.startswith("band "):
                 channels = bands.setdefault(line.split()[1], [])
+                in_channel = False
             elif line.startswith("*"):
-                fields = line.split()
-                channels.append(
-                    channel(
-                        fields[1],
-                        fields[3].strip("[]"),
-                        False,
-                        False,
-                        "disabled" in line,
+                m = re.match(r"\*\s+(\d+)\s+mhz\s+\[(\d+)\]", line)
+                in_channel = bool(m)
+                if m:
+                    channels.append(
+                        channel(m[1], m[2], False, False, "disabled" in line)
                     )
-                )
-            elif channels and line.startswith("no ir"):
+            elif in_channel and line.startswith("no ir"):
                 channels[-1] = channels[-1]._replace(no_ir=True)
-            elif channels and line.startswith("radar detection"):
+            elif in_channel and line.startswith("radar detection"):
                 channels[-1] = channels[-1]._replace(radar_detect=True)
         return bands
 
