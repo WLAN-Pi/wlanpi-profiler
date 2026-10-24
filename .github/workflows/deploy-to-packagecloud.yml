@@ -30,6 +30,12 @@ jobs:
       pkg: wlanpi-profiler
       version: ${{ needs.format.outputs.version }} 
     secrets: inherit
+  tag:
+    name: Tag the release
+    needs: sbuild_deploy
+    permissions:
+      contents: write
+    uses: WLAN-Pi/gh-workflows/.github/workflows/tag-release.yml@main
   slack-workflow-status:
     if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) }}
     name: Post workflow status to Slack
