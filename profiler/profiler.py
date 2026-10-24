@@ -848,6 +848,7 @@ class Profiler:
             nss, mcs = Profiler._parse_mcs_nss([vht_caps[4], vht_caps[5]], "0-8", "0-9")
             mcs_list = ", ".join(mcs) if len(mcs) > 1 else (mcs[0] if mcs else "")
             dot11ac.value = "Supported"
+            dot11ac.db_value = 1
             dot11ac_nss.value = str(nss)
             dot11ac_nss.db_value = nss
             dot11ac_mcs.value = mcs_list
