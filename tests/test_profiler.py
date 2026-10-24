@@ -120,6 +120,7 @@ class TestProfiler:
                 found_11n_nss = True
             if capability.name == "802.11ac":
                 assert capability.value == "Supported"
+                assert capability.db_value == 1
                 found_11ac = True
             if capability.name == "802.11ac/VHT NSS":
                 assert capability.value == "2"
