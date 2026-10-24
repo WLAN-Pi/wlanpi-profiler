@@ -54,7 +54,7 @@ jobs:
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
 
   slack-workflow-status:
-    if: ${{ always() && github.repository_owner == 'WLAN-Pi' && ! github.event.pull_request.head.repo.fork }}
+    if: ${{ always() && github.repository_owner == 'WLAN-Pi' && ! github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
     name: Post Workflow Status to Slack
     needs:
       - shellcheck

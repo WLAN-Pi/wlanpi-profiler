@@ -37,7 +37,7 @@ jobs:
       contents: write
     uses: WLAN-Pi/gh-workflows/.github/workflows/tag-release.yml@main
   slack-workflow-status:
-    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) }}
+    if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) && (github.actor != 'dependabot[bot]') }}
     name: Post workflow status to Slack
     needs:
       - sbuild_deploy
