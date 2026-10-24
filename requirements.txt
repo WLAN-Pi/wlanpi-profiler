@@ -18,7 +18,7 @@ iniconfig==2.3.0
     # via pytest
 jinja2==3.1.6
     # via -r requirements.in
-manuf2==2.0.2
+manuf2==2.0.3
     # via -r requirements.in
 markupsafe==3.0.3
     # via jinja2
