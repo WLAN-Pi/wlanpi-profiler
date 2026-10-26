@@ -3,7 +3,7 @@ Section: contrib/python
 Priority: optional
 Maintainer: Josh Schmelzle <josh@joshschmelzle.com>
 Uploaders: 
-Build-Depends: debhelper (>= 11),
+Build-Depends: debhelper-compat (= 13),
                dh-python,
                pybuild-plugin-pyproject,
                dh-virtualenv (>= 1.1),
