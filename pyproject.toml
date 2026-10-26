@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "profiler"
 description = "a Wi-Fi client capability analyzer"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13"
 license = "BSD-3-Clause"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
