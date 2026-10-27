@@ -21,7 +21,8 @@ jobs:
     uses: WLAN-Pi/gh-workflows/.github/workflows/sbuild-pkg.yml@main
     with:
       pkg: wlanpi-profiler
-      version: ${{ needs.format.outputs.version }} 
+      version: ${{ needs.format.outputs.version }}
+      distros: '["trixie"]'
   slack-workflow-status:
     if: ${{ always() && (github.repository_owner == 'WLAN-Pi') && (! github.event.pull_request.head.repo.fork) && (github.actor != 'dependabot[bot]') }}
     name: Post Workflow Status to Slack
