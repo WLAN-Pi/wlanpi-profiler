@@ -2,4 +2,4 @@ scapy>=2.8.0
 manuf2>=2.0.3
 jinja2
 argcomplete  # tab-completion for the profiler CLI
-pytest>=9.0.3  # Required for on-device hardware tests (profiler test)
+pytest>=9.2.0  # Required for on-device hardware tests (profiler test)

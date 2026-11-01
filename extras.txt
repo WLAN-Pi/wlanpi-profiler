@@ -51,7 +51,7 @@ pygments==2.21.0
     # via pytest
 pyproject-api==1.11.2
     # via tox
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   pytest-cov
     #   pytest-mock
