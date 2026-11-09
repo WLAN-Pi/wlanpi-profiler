@@ -4,7 +4,7 @@
 #
 #    pip-compile extras.in
 #
-ast-serialize==0.11.2
+ast-serialize==0.13.1
     # via mypy
 cachetools==7.2.0
     # via tox
@@ -27,7 +27,7 @@ iniconfig==2.3.0
     # via pytest
 librt==0.16.0
     # via mypy
-mypy==2.4.0
+mypy==2.4.1
     # via -r extras.in
 mypy-extensions==1.1.0
     # via mypy
