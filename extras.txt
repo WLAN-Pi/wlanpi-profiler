@@ -59,7 +59,7 @@ pytest-cov==7.1.0
     # via -r extras.in
 pytest-mock==3.17.0
     # via -r extras.in
-python-discovery==1.6.1
+python-discovery==1.9.5
     # via
     #   tox
     #   virtualenv
@@ -67,7 +67,7 @@ ruff==0.17.3
     # via -r extras.in
 tomli-w==1.2.0
     # via tox
-tox==4.67.4
+tox==4.67.9
     # via -r extras.in
 typing-extensions==4.16.0
     # via mypy
