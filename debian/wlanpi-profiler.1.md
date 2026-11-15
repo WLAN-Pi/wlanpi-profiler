@@ -30,6 +30,8 @@ _OPTIONS_ := { -h | -c | -f | -i | -s | --passphrase | --config | --files_path |
 
 : Set the operating channel to broadcast on. Channels are usually numbered starting at 1, and you may use **iw(8)** to get the total number of channels and list the available channels. Depending on regulatory settings, some channels may not be available. You may need to set a regulatory domain [see **iw(8)** or **crda(8)**] in order to use a 5 GHz channel.
 
+: Without **-c** or **-f**, the channel comes from the configuration file. If the radio does not allow an AP on that channel, the profiler moves to another channel in the same band and logs a warning. A channel given with **-c** or **-f** is never replaced: the profiler exits and suggests a channel.
+
 > Examples:
 
 >> **sudo profiler -c 11**

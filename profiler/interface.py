@@ -30,9 +30,19 @@ ARPHRD_IEEE80211 = 801
 ARPHRD_IEEE80211_PRISM = 802
 ARPHRD_IEEE80211_RADIOTAP = 803
 
+# 5 GHz lists the lower channel of each U-NII-1 and U-NII-3 40 MHz pair: the
+# hostapd template is fixed to HT40+ (#242).
+# ponytail: no 6 GHz entry; hostapd mode rejects 6 GHz (helpers.validate), so
+# only fakeAP could use one. Add the PSC channels (5, 21, 37, ...) for it.
+_FALLBACK_CHANNELS = {"1:": [1, 6, 11], "2:": [36, 44, 149, 157]}
+
 
 class InterfaceError(Exception):
     """Custom exception used when there are problems staging the interface for injection"""
+
+
+class NoUsableChannelError(InterfaceError):
+    """The configured channel is restricted and its band has no fallback channel"""
 
 
 def _run_staging_command(cmd: list[str]) -> str:
@@ -480,7 +490,6 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         elif "88XXau" in self.driver:
             self.mon = self.name
@@ -490,7 +499,6 @@ class Interface:
                 ["ip", "link", "set", f"{self.name}", "down"],
                 ["iw", "dev", f"{self.name}", "set", "type", "monitor"],
                 ["ip", "link", "set", f"{self.name}", "up"],
-                ["iw", f"{self.name}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
         else:
             cmds = [
@@ -511,7 +519,6 @@ class Interface:
                 ["ip", "link", "set", f"{self.mon}", "up"],
                 ["iw", f"{self.name}", "scan"],
                 ["ip", "link", "set", f"{self.name}", "down"],
-                ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"],
             ]
 
         with self._radio_monitors_down():
@@ -699,21 +706,27 @@ class Interface:
 
         self.log.debug("finish stage_interface_listen_only")
 
-    def validate_channel_for_ap(self, country_code: str = "") -> None:
+    def validate_channel_for_ap(
+        self, country_code: str = "", fallback: bool = False
+    ) -> None:
         """
         Validate that the selected channel is usable for AP operation.
 
         After interface staging and LAR scan, verify the channel doesn't have
-        No IR, Disabled, or Radar flags. If it does, try to find alternative channels
-        and exit with a helpful error message.
+        No IR, Disabled, or Radar flags. If it does, either move to a channel
+        from _FALLBACK_CHANNELS in the same band (fallback) or exit with a
+        helpful error message.
 
         Args:
             country_code: Current regulatory country code (e.g., "US")
+            fallback: Replace a restricted channel instead of refusing it
 
         Raises:
             InterfaceError: If the channel isn't in the phy's channel list or
                 has regulatory restrictions, with suggestions for alternative
                 channels
+            NoUsableChannelError: With fallback, if no fallback channel in the
+                band is free of restrictions
         """
         self.log.debug("start validate_channel_for_ap")
 
@@ -762,6 +775,33 @@ class Interface:
                 self.frequency,
             )
             return
+
+        if fallback:
+            usable = {
+                int(ch.ch): int(ch.freq)
+                for ch in channels_status[requested_band]
+                if not (ch.disabled or ch.no_ir or ch.radar_detect)
+            }
+            pick = next(
+                (
+                    ch
+                    for ch in _FALLBACK_CHANNELS.get(requested_band, [])
+                    if ch in usable
+                ),
+                None,
+            )
+            if pick is not None:
+                self.log.warning(
+                    "Channel %s (%s MHz) has regulatory restrictions: %s. "
+                    "Using channel %s (%s MHz) instead.",
+                    self.channel,
+                    self.frequency,
+                    ", ".join(restriction_type),
+                    pick,
+                    usable[pick],
+                )
+                self.channel, self.frequency = pick, usable[pick]
+                return
 
         self.log.error(
             "Channel %s (%s MHz) has regulatory restrictions: %s",
@@ -862,7 +902,15 @@ class Interface:
             f" 3. Check all available channels: sudo iw phy {self.phy} channels"
         )
 
-        raise InterfaceError("\n".join(error_lines))
+        raise (NoUsableChannelError if fallback else InterfaceError)(
+            "\n".join(error_lines)
+        )
+
+    def tune_monitor(self) -> None:
+        """Tune the fakeAP monitor to self.frequency"""
+        cmd = ["iw", f"{self.mon}", "set", "freq", f"{self.frequency}", "HT20"]
+        self.log.debug("run: %s", " ".join(cmd))
+        _run_staging_command(cmd)
 
     @staticmethod
     def _get_band_display_name(band: str) -> str:

@@ -787,6 +787,7 @@ class TestStatusReasonEnum:
         assert StatusReason.COUNTRY_CODE_DETECTION.value == "country_code_detection"
         assert StatusReason.INSUFFICIENT_PERMISSIONS.value == "insufficient_permissions"
         assert StatusReason.INTERFACE_VALIDATION.value == "interface_validation"
+        assert StatusReason.NO_USABLE_CHANNEL.value == "no_usable_channel"
         assert StatusReason.CONFIG_VALIDATION.value == "config_validation"
         assert StatusReason.MISSING_TOOLS.value == "missing_tools"
         assert StatusReason.ALREADY_RUNNING.value == "already_running"

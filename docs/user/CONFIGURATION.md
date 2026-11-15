@@ -42,6 +42,10 @@ fakeap: false
 - Default: 36
 - Description: Wi-Fi channel to broadcast on
 
+If the radio reports this channel as disabled, No IR, or DFS, the profiler moves to another channel in the same band and logs a warning. It tries 36, 44, 149, and 157 on 5 GHz, and 1, 6, and 11 on 2.4 GHz, in that order. If none of them is usable, the profiler exits with the status reason `no_usable_channel`.
+
+The profiler never replaces a channel given with `-c` or `-f`, or the channel of an interface staged with `--noprep`. It exits instead and suggests a channel.
+
 **frequency**
 
 - Type: Integer

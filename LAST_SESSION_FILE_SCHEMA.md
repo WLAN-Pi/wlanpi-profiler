@@ -262,6 +262,7 @@ These values come from the `StatusReason` enum in `profiler/status.py` and are u
 | `country_code_detection` | Regulatory domain detection failed |
 | `insufficient_permissions` | Insufficient permissions to run |
 | `interface_validation` | Interface validation failed |
+| `no_usable_channel` | The configured channel is restricted on the radio, and its band has no channel the profiler can move to |
 | `config_validation` | Invalid configuration |
 | `missing_tools` | Required tools not found |
 | `already_running` | Another profiler instance detected |

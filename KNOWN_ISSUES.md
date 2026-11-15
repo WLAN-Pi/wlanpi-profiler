@@ -8,6 +8,8 @@ iwlwifi uses something called Location Aware Regulatory (LAR) which ignores `iw 
 
 To enable channels and also remove `No IR` to enable injection, we have to do a scan before creating a mon vif. 
 
+The scan does not clear `No IR` everywhere. In GB, an Intel radio keeps channels 36 to 48 as `No IR` after the scan. When the channel comes from `config.ini`, the profiler moves to the first usable channel of 36, 44, 149, and 157. A channel given with `-c` or `-f` is refused instead.
+
 # rtl88xxau does not support vif
 
 See title.

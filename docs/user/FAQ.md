@@ -66,6 +66,18 @@ Results are saved to:
 sudo profiler -c 48
 ```
 
+To change the default, set `channel` in `/etc/wlanpi-profiler/config.ini`.
+
+### Why did the profiler start on a different channel?
+
+The radio does not allow an AP on the channel in `config.ini`. Regulatory rules differ by country and by radio: an Intel radio in GB, for example, reports channels 36 to 48 as No IR. The profiler then moves to another channel in the same band and logs a warning such as:
+
+```
+Channel 36 (5180 MHz) has regulatory restrictions: No IR (No initiation of radiation). Using channel 149 (5745 MHz) instead.
+```
+
+To pick the channel yourself, use `-c`. The profiler does not replace a channel given with `-c` or `-f`. See the [configuration guide](CONFIGURATION.md#channel-and-frequency) for the order it tries.
+
 ### How do I use a custom SSID?
 
 ```bash
