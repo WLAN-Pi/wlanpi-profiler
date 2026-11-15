@@ -32,38 +32,52 @@ the [argcomplete docs](https://kislyuk.github.io/argcomplete/) for zsh/fish/tcsh
 ## Global options
 
 ```
-usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--passphrase PASSPHRASE]
-                [--config FILE] [--files_path PATH] [--hostname_ssid] [--debug] [--no-interface-prep]
-                [--noAP] [--security-mode {wpa2,ft-wpa2,wpa3-mixed,ft-wpa3-mixed}] [--no11ax] [--11be | --no11be]
-                [--noprofilertlv] [--wpa3_personal_transition | --wpa3_personal] [--oui_update] [--pcap PCAP]
-                [--no_bpf_filters] [--list-interfaces] [--ap-mode | --fakeap] [--version]
+usage: profiler [-h] [-c CHANNEL | -f FREQUENCY] [-i INTERFACE] [-s SSID] [--passphrase PASSPHRASE] [--config FILE]
+                [--files_path PATH] [--hostname_ssid] [--debug] [--expert] [--no-interface-prep] [--listen-only]
+                [--security-mode {wpa2,ft-wpa2,wpa3-mixed,ft-wpa3-mixed}] [--no11ax] [--11be | --no11be]
+                [--noprofilertlv] [--oui_update] [--pcap PCAP] [--no_bpf_filters] [--list-interfaces] [--ap-mode |
+                --fakeap] [--version]
+                {test} ...
 
-wlanpi-profiler is an 802.11 client capabilities profiler. If installed via apt package manager, read the manual with: man wlanpi-profiler
+wlanpi-profiler is an 802.11 client capabilities profiler. If installed via package manager, read the manual with: man wlanpi-profiler
 
-optional arguments:
+positional arguments:
+  {test}                available commands
+    test                run on-device hardware tests
+
+options:
   -h, --help            show this help message and exit
   -c CHANNEL            set the channel to broadcast on
   -f FREQUENCY          set the frequency to broadcast on
   -i INTERFACE          set network interface for profiler
   -s SSID               set profiler SSID name
+  --passphrase PASSPHRASE
+                        set AP passphrase (8-63 chars, default: profiler)
   --config FILE         customize path for configuration file (default: /etc/wlanpi-profiler/config.ini)
-  --files_path PATH     customize default directory where analysis is saved on local system (default: /var/www/html/profiler)
+  --files_path PATH     customize directories where analysis is saved (can be specified multiple times, default:
+                        /var/www/html/profiler and /root/.local/share/wlanpi-profiler)
   --hostname_ssid       use the WLAN Pi's hostname as SSID name (default: False)
   --debug               enable debug logging output
+  --expert              enable expert mode (includes hostapd debug output)
   --no-interface-prep, --noprep
                         disable interface preparation (profiler will not configure interface to monitor mode)
-  --noAP                enable Rx only mode (default: False)
+  --listen-only, --noAP
+                        listen-only mode (passive Rx, no AP)
+  --security-mode {wpa2,ft-wpa2,wpa3-mixed,ft-wpa3-mixed}
+                        security mode for AP: wpa2, ft-wpa2, wpa3-mixed, ft-wpa3-mixed (default: ft-wpa3-mixed). Note:
+                        802.11be auto-disabled for wpa2/ft-wpa2 (Wi-Fi 7 requires WPA3)
   --no11ax              turn off 802.11ax High Efficiency (HE) reporting
+  --11be                enable 802.11be Extremely High Throughput (Wi-Fi 7) reporting (override auto-disable for WPA2
+                        modes)
   --no11be              turn off 802.11be Extremely High Throughput (EHT) reporting
   --noprofilertlv       disable generation of Profiler specific vendor IE
-  --wpa3_personal_transition
-                        enable WPA3 Personal Transition in the RSNE for 2.4 / 5 GHz
-  --wpa3_personal       enable WPA3 Personal only in the RSNE for 2.4 / 5 GHz
   --oui_update          initiates update of OUI database (requires Internet connection)
-  --read PCAP           read and analyze association request frames from pcap
+  --pcap PCAP           analyze association request frames from pcap
   --no_bpf_filters      removes BPF filters from sniffer() but may impact profiler performance
   --list-interfaces, --list_interfaces
-                        print out a list of interfaces with an 80211 stack (no root needed)
+                        print out a list of interfaces with an 80211 stack
+  --ap-mode             use hostapd AP mode for fast discovery (default behavior, requires monitor VIF support)
+  --fakeap              use legacy FakeAP mode (Scapy/monitor-only, slower discovery but works with more adapters)
   --version, -V         show program's version number and exit
 ```
 
@@ -201,7 +215,7 @@ sudo profiler --security-mode wpa2 --11be
 ### Legacy FakeAP mode
 
 ```bash
-sudo profiler --fakeap --interface wlan0 --channel 36
+sudo profiler --fakeap -i wlan0 -c 36
 # Use legacy scapy-based mode instead of hostapd
 ```
 

@@ -748,7 +748,7 @@ class Interface:
             if requested_channel_info:
                 break
 
-        if requested_channel_info is None:
+        if requested_band is None or requested_channel_info is None:
             raise InterfaceError(
                 f"Channel {self.channel} ({self.frequency} MHz) is not in "
                 f"'iw phy {self.phy} channels'; refusing to start an AP "
@@ -818,22 +818,19 @@ class Interface:
             error_lines.append(
                 f"Detected available unrestricted channels in the {band_name} band: {', '.join(map(str, alternatives))}"
             )
+            pick = alternatives[0]
             if "1" in requested_band:
-                non_overlapping = [ch for ch in alternatives if ch in [1, 6, 11]]
-                if non_overlapping:
-                    error_lines.append(f"Try with --channel {non_overlapping[0]}")
-                else:
-                    error_lines.append(f"Try with --channel {alternatives[0]}")
-            else:
-                error_lines.append(f"Try with --channel {alternatives[0]}")
+                pick = next((ch for ch in alternatives if ch in [1, 6, 11]), pick)
+            error_lines.append(f"Try with {self._channel_flag(requested_band, pick)}")
         elif available_by_band:
-            error_lines.append(f"No available channels in {requested_band} band.")
+            error_lines.append(
+                f"No available channels in the {self._get_band_display_name(requested_band)} band."
+            )
             error_lines.append("")
 
             for band, channels in available_by_band.items():
                 if band != requested_band:
                     band_name = self._get_band_display_name(band)
-                    flag = self._get_band_flag(band)
 
                     if "1" in band:
                         sample = [ch for ch in channels if ch in [1, 6, 11]] or channels
@@ -843,10 +840,9 @@ class Interface:
                     error_lines.append(
                         f"Available in {band_name} band: {', '.join(map(str, sample))}"
                     )
-                    if flag:
-                        error_lines.append(f"Try with --channel {sample[0]} {flag}")
-                    else:
-                        error_lines.append(f"Try with --channel {sample[0]}")
+                    error_lines.append(
+                        f"Try with {self._channel_flag(band, sample[0])}"
+                    )
                     error_lines.append("")
                     break
         else:
@@ -858,9 +854,12 @@ class Interface:
         error_lines.append("")
         error_lines.append("Additional troubleshooting:")
         error_lines.append(" 1. Check current regulatory status: sudo iw reg get")
-        error_lines.append(" 2. Set a valid country code: sudo iw reg set US")
         error_lines.append(
-            " 3. Check all available channels: sudo iw phy phy0 channels"
+            " 2. If the country code is wrong, set it: sudo wlanpi-reg-domain set XX"
+            " (Intel radios detect it themselves)"
+        )
+        error_lines.append(
+            f" 3. Check all available channels: sudo iw phy {self.phy} channels"
         )
 
         raise InterfaceError("\n".join(error_lines))
@@ -872,22 +871,17 @@ class Interface:
             return "2.4 GHz"
         elif "2" in band:
             return "5 GHz"
-        elif "3" in band:
+        elif "4" in band:
             return "6 GHz"
         else:
             return band.replace("band ", "").replace(":", "")
 
     @staticmethod
-    def _get_band_flag(band: str) -> str:
-        """Get the CLI flag for a given band identifier."""
-        if "1" in band:
-            return "--band 2.4"
-        elif "2" in band:
-            return "--band 5"
-        elif "3" in band:
-            return "--band 6"
-        else:
-            return ""
+    def _channel_flag(band: str, channel: int) -> str:
+        # 6 GHz channel numbers repeat 2.4 and 5 GHz ones, which -c would pick.
+        if "4" in band:
+            return f"-f {5950 + 5 * channel}"
+        return f"-c {channel}"
 
     @staticmethod
     def parse_ap_capabilities(iw_phy_info: str) -> dict[str, bool]:

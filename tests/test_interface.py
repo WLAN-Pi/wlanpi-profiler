@@ -1,3 +1,4 @@
+import re
 import subprocess
 
 import pytest
@@ -624,8 +625,32 @@ def test_alternative_suggestion_without_1_6_11(monkeypatch):
     monkeypatch.setattr("profiler.interface.run_command", lambda cmd, *a, **k: iw)
     iface = Interface()
     iface.phy, iface.channel, iface.frequency = "phy0", 36, 5180
-    with pytest.raises(InterfaceError, match="--channel 2"):
+    with pytest.raises(InterfaceError, match="-c 2"):
         iface.validate_channel_for_ap()
+
+
+@pytest.mark.parametrize(
+    "iw,suggested",
+    [
+        ("Band 2:\n* 5180 MHz [36]\nNo IR\n* 5745 MHz [149]\n", "-c 149"),
+        ("Band 1:\n* 2412 MHz [1]\nBand 2:\n* 5180 MHz [36]\nNo IR\n", "-c 1"),
+        ("Band 2:\n* 5180 MHz [36]\nNo IR\nBand 4:\n* 5975 MHz [5]\n", "-f 5975"),
+    ],
+)
+def test_alternative_suggestion_is_a_valid_argument(monkeypatch, iw, suggested):
+    from profiler import helpers
+    from profiler.interface import InterfaceError
+
+    monkeypatch.setattr("profiler.interface.run_command", lambda cmd, *a, **k: iw)
+    iface = Interface()
+    iface.phy, iface.channel, iface.frequency = "phy1", 36, 5180
+    with pytest.raises(InterfaceError) as e:
+        iface.validate_channel_for_ap()
+    error = str(e.value)
+    assert re.search(r"Try with (.+)", error)[1] == suggested
+    assert "iw phy phy1 channels" in error
+    args = helpers.setup_parser().parse_args(suggested.split())
+    assert args.channel or args.frequency
 
 
 class TestRunStagingCommand:
