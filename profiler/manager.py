@@ -31,9 +31,10 @@ from .constants import _20MHZ_FREQUENCY_CHANNEL_MAP, SSID_TMP_FILE
 
 Interface: Any = None
 InterfaceError: Any = Exception
+NoUsableChannelError: Any = Exception
 if sys.platform.startswith("linux"):
     with contextlib.suppress(ImportError):
-        from .interface import Interface, InterfaceError
+        from .interface import Interface, InterfaceError, NoUsableChannelError
 
 
 __PIDS: list[tuple[str, int | None]] = []
@@ -655,13 +656,26 @@ def _start_impl(args: argparse.Namespace, log: logging.Logger) -> None:
             sys.exit(-1)
 
         if not listen_only:
+            requested = __IFACE.frequency
             try:
-                __IFACE.validate_channel_for_ap(country_code)
+                __IFACE.validate_channel_for_ap(
+                    country_code,
+                    fallback=not (
+                        args.channel or args.frequency or args.no_interface_prep
+                    ),
+                )
+                if __IFACE.frequency != requested:
+                    config["GENERAL"]["channel"] = __IFACE.channel
+                    config["GENERAL"]["frequency"] = __IFACE.frequency
+                if not ap_mode and not args.no_interface_prep:
+                    __IFACE.tune_monitor()
             except InterfaceError as e:
                 log.error(str(e))
                 write_status(
                     state=ProfilerState.FAILED,
-                    reason=StatusReason.INTERFACE_VALIDATION,
+                    reason=StatusReason.NO_USABLE_CHANNEL
+                    if isinstance(e, NoUsableChannelError)
+                    else StatusReason.INTERFACE_VALIDATION,
                     error=str(e),
                 )
                 removeVif()

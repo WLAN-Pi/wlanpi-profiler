@@ -653,6 +653,81 @@ def test_alternative_suggestion_is_a_valid_argument(monkeypatch, iw, suggested):
     assert args.channel or args.frequency
 
 
+GB_INTEL_5GHZ = (
+    "Band 2:\n* 5180 MHz [36]\nNo IR\n* 5200 MHz [40]\nNo IR\n"
+    "* 5260 MHz [52]\nNo IR\nRadar detection\n"
+    "* 5745 MHz [149]\n* 5765 MHz [153]\n* 5825 MHz [165]\n"
+)
+
+
+@pytest.mark.parametrize(
+    "iw,requested,expected",
+    [
+        (GB_INTEL_5GHZ, (36, 5180), (149, 5745)),
+        (
+            "Band 2:\n* 5180 MHz [36]\n* 5260 MHz [52]\nRadar detection\n",
+            (52, 5260),
+            (36, 5180),
+        ),
+        (
+            "Band 1:\n* 2412 MHz [1]\nNo IR\n* 2437 MHz [6]\n* 2472 MHz [13]\nNo IR\n",
+            (13, 2472),
+            (6, 2437),
+        ),
+    ],
+)
+def test_restricted_channel_falls_back_in_band(monkeypatch, iw, requested, expected):
+    monkeypatch.setattr("profiler.interface.run_command", lambda cmd, *a, **k: iw)
+    iface = Interface()
+    iface.phy, (iface.channel, iface.frequency) = "phy0", requested
+    iface.validate_channel_for_ap(fallback=True)
+    assert (iface.channel, iface.frequency) == expected
+
+
+@pytest.mark.parametrize(
+    "iw,requested",
+    [
+        ("Band 2:\n* 5180 MHz [36]\nNo IR\n* 5825 MHz [165]\n", (36, 5180)),
+        ("Band 2:\n* 5180 MHz [36]\nNo IR\n* 5200 MHz [40]\n", (36, 5180)),
+        ("Band 1:\n* 2412 MHz [1]\nBand 2:\n* 5180 MHz [36]\nNo IR\n", (36, 5180)),
+        ("Band 4:\n* 5955 MHz [1]\nNo IR\n* 5975 MHz [5]\n", (1, 5955)),
+    ],
+    ids=["only 165 is free", "only 40 is free", "only another band is free", "6 GHz"],
+)
+def test_fallback_without_a_candidate_is_refused(monkeypatch, iw, requested):
+    from profiler.interface import NoUsableChannelError
+
+    monkeypatch.setattr("profiler.interface.run_command", lambda cmd, *a, **k: iw)
+    iface = Interface()
+    iface.phy, (iface.channel, iface.frequency) = "phy0", requested
+    with pytest.raises(NoUsableChannelError):
+        iface.validate_channel_for_ap(fallback=True)
+    assert (iface.channel, iface.frequency) == requested
+
+
+def test_restricted_channel_is_refused_without_fallback(monkeypatch):
+    from profiler.interface import InterfaceError, NoUsableChannelError
+
+    monkeypatch.setattr(
+        "profiler.interface.run_command", lambda cmd, *a, **k: GB_INTEL_5GHZ
+    )
+    iface = Interface()
+    iface.phy, iface.channel, iface.frequency = "phy0", 36, 5180
+    with pytest.raises(InterfaceError) as e:
+        iface.validate_channel_for_ap()
+    assert not isinstance(e.value, NoUsableChannelError)
+    assert (iface.channel, iface.frequency) == (36, 5180)
+
+
+def test_tune_monitor_sets_the_monitor_frequency(monkeypatch):
+    calls = []
+    monkeypatch.setattr("profiler.interface._run_staging_command", calls.append)
+    iface = Interface()
+    iface.mon, iface.frequency = "wlan0profiler", 5745
+    iface.tune_monitor()
+    assert calls == [["iw", "wlan0profiler", "set", "freq", "5745", "HT20"]]
+
+
 class TestRunStagingCommand:
     """Staging commands must fail loudly (phase 0)."""
 
@@ -1014,6 +1089,9 @@ def test_monitor_tuned_by_frequency_not_channel_number(monkeypatch, stage, drive
     iface.channel, iface.frequency = 1, 5955
     calls = _record_staging(monkeypatch, iface)
     getattr(iface, stage)()
+    if stage == "stage_interface_fakeap":
+        assert not any("freq" in c for c in calls), "fakeAP tunes after the check"
+        iface.tune_monitor()
     tunes = [c[2:] for c in calls if c[0] == "iw" and c[2:3] == ["set"]]
     assert tunes
     assert all(t[:3] == ["set", "freq", "5955"] for t in tunes), tunes

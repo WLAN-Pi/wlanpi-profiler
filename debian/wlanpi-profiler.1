@@ -36,6 +36,12 @@ available channels.
 Depending on regulatory settings, some channels may not be available.
 You may need to set a regulatory domain [see \f[B]iw(8)\f[R] or
 \f[B]crda(8)\f[R]] in order to use a 5 GHz channel.
+Without \f[B]\-c\f[R] or \f[B]\-f\f[R], the channel comes from the
+configuration file.
+If the radio does not allow an AP on that channel, the profiler moves to
+another channel in the same band and logs a warning.
+A channel given with \f[B]\-c\f[R] or \f[B]\-f\f[R] is never replaced:
+the profiler exits and suggests a channel.
 .RS
 .PP
 Examples:

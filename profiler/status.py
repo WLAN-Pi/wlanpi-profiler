@@ -65,6 +65,7 @@ class StatusReason(Enum):
     COUNTRY_CODE_DETECTION = "country_code_detection"
     INSUFFICIENT_PERMISSIONS = "insufficient_permissions"
     INTERFACE_VALIDATION = "interface_validation"
+    NO_USABLE_CHANNEL = "no_usable_channel"
     CONFIG_VALIDATION = "config_validation"
     MISSING_TOOLS = "missing_tools"
     ALREADY_RUNNING = "already_running"

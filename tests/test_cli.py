@@ -351,3 +351,132 @@ def test_interface_without_monitor_refused_before_staging(monkeypatch, tmp_path,
     )
     error = _start_until_refused(monkeypatch, tmp_path, argv, fakeap="--fakeap" in argv)
     assert error == reason
+
+
+def _start_until_channel_check(monkeypatch, tmp_path, argv, validate, expect):
+    import logging
+
+    from profiler import manager, status
+
+    statuses = []
+    monkeypatch.setattr(manager, "are_we_root", lambda: True)
+    monkeypatch.setattr(status, "write_status", lambda **k: statuses.append(k))
+    monkeypatch.setattr(status, "detect_country_code", lambda phy: "GB")
+    monkeypatch.setattr(manager.helpers, "check_required_tools", lambda *a, **k: None)
+    monkeypatch.setattr(manager.helpers, "setup_logger", lambda *a, **k: None)
+    monkeypatch.setattr(
+        manager.helpers, "get_app_data_paths", lambda *a, **k: [str(tmp_path)]
+    )
+    monkeypatch.setattr(manager.helpers, "validate", lambda c: (True, None))
+    fakeap = "--fakeap" in argv
+    general = {
+        "interface": "wlan0",
+        "channel": 36,
+        "files_path": [str(tmp_path)],
+        "ap_mode": not fakeap,
+        "fakeap": fakeap,
+        "listen_only": False,
+    }
+    monkeypatch.setattr(
+        manager.helpers, "setup_config", lambda a: ({"GENERAL": general}, None)
+    )
+    monkeypatch.setattr(Interface, "mac", "02:00:00:00:00:01", raising=False)
+    monkeypatch.setattr(Interface, "phy", "phy0", raising=False)
+    for touch in ("setup", "stage_interface_fakeap", "stage_interface_hostapd"):
+        monkeypatch.setattr(Interface, touch, lambda *a, **k: None)
+    for unsupported in ("monitor_unsupported", "fakeap_unsupported"):
+        monkeypatch.setattr(Interface, unsupported, lambda self: "")
+    monkeypatch.setattr(Interface, "validate_channel_for_ap", validate)
+    monkeypatch.setattr(manager, "removeVif", lambda: None)
+
+    args = helpers.setup_parser().parse_args(["-i", "wlan0", *argv])
+    with pytest.raises(expect):
+        manager._start_impl(args, logging.getLogger("test"))
+    return statuses, general
+
+
+@pytest.mark.parametrize(
+    "argv,fallback",
+    [([], True), (["-c", "36"], False), (["-f", "5180"], False), (["--noprep"], False)],
+)
+def test_channel_fallback_only_without_an_explicit_channel(
+    monkeypatch, tmp_path, argv, fallback
+):
+    from profiler.interface import NoUsableChannelError
+    from profiler.status import StatusReason
+
+    def refuse(self, country_code="", fallback=False):
+        raise (NoUsableChannelError if fallback else InterfaceError)("refused")
+
+    statuses, _ = _start_until_channel_check(
+        monkeypatch, tmp_path, argv, refuse, SystemExit
+    )
+    assert statuses[-1]["reason"] == (
+        StatusReason.NO_USABLE_CHANNEL
+        if fallback
+        else StatusReason.INTERFACE_VALIDATION
+    )
+
+
+def _fall_back_to_149(self, country_code="", fallback=False):
+    self.channel, self.frequency = 149, 5745
+
+
+def _keep_channel(self, country_code="", fallback=False):
+    pass
+
+
+@pytest.mark.parametrize(
+    "validate,channel,frequency",
+    [(_keep_channel, 36, 5180), (_fall_back_to_149, 149, 5745)],
+)
+def test_fakeap_tunes_the_monitor_after_the_channel_check(
+    monkeypatch, tmp_path, validate, channel, frequency
+):
+    tuned = []
+
+    def tune(self):
+        tuned.append(self.frequency)
+        raise InterfaceError("stop after the tune")
+
+    monkeypatch.setattr(Interface, "tune_monitor", tune)
+    _, general = _start_until_channel_check(
+        monkeypatch, tmp_path, ["--fakeap"], validate, SystemExit
+    )
+    assert tuned == [frequency]
+    assert (general["channel"], general["frequency"]) == (channel, frequency)
+
+
+class _Reached(Exception):
+    pass
+
+
+def _stop(*args):
+    raise _Reached
+
+
+def test_fakeap_with_noprep_leaves_the_tune_to_the_user(monkeypatch, tmp_path):
+    from profiler import manager
+
+    monkeypatch.setattr(
+        Interface, "tune_monitor", lambda self: pytest.fail("tune_monitor ran")
+    )
+    monkeypatch.setattr(manager.helpers, "generate_run_message", _stop)
+    _start_until_channel_check(
+        monkeypatch, tmp_path, ["--fakeap", "--noprep"], _keep_channel, _Reached
+    )
+
+
+def test_hostapd_mode_starts_on_the_fallback_channel_without_a_tune(
+    monkeypatch, tmp_path
+):
+    from profiler import manager
+
+    monkeypatch.setattr(
+        Interface, "tune_monitor", lambda self: pytest.fail("tune_monitor ran")
+    )
+    monkeypatch.setattr(manager.helpers, "update_ssid_record", _stop)
+    _, general = _start_until_channel_check(
+        monkeypatch, tmp_path, [], _fall_back_to_149, _Reached
+    )
+    assert (general["channel"], general["frequency"]) == (149, 5745)
