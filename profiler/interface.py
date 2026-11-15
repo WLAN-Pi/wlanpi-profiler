@@ -748,7 +748,7 @@ class Interface:
             if requested_channel_info:
                 break
 
-        if requested_channel_info is None:
+        if requested_band is None or requested_channel_info is None:
             raise InterfaceError(
                 f"Channel {self.channel} ({self.frequency} MHz) is not in "
                 f"'iw phy {self.phy} channels'; refusing to start an AP "
