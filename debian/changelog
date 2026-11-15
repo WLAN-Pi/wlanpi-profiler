@@ -1,3 +1,30 @@
+wlanpi-profiler (2.1.9) unstable; urgency=medium
+
+  * When the channel from config.ini is restricted on the radio
+    (disabled, No IR or DFS), start on the first unrestricted channel of
+    36, 44, 149 and 157, or of 1, 6 and 11 on 2.4 GHz, and log a
+    warning. An Intel radio in GB keeps channels 36-48 as No IR, so the
+    profiler did not start from the WebUI, FPMS or the service. A
+    channel given with -c or -f, or staged with --noprep, is still
+    refused. If the band has no such channel, the profiler exits with
+    the new status reason no_usable_channel. fakeAP tunes its monitor
+    after this check, so a disabled configured channel is replaced as
+    well (#364).
+  * The restricted-channel error suggests -c, or -f for 6 GHz. It
+    suggested --channel and --band, which the profiler does not accept.
+    It also names the radio's own phy and wlanpi-reg-domain (#360).
+  * Set dot11ac to 1 in the JSON and CSV output for a client that sends
+    a full VHT Capabilities element. The text report already said
+    Supported (#343).
+  * Update manuf2 to 2.0.3 (#344), certifi to 2026.10.19 (#342), pytest
+    to 9.2.0 (#352) and the setuptools build requirement to 84.2.1
+    (#348).
+  * Build with debhelper-compat 13, and require Python 3.13 or later
+    with no upper bound (#350). From this release on, the version has
+    no Debian revision.
+
+ -- Josh Schmelzle <josh@joshschmelzle.com>  Sun, 15 Nov 2026 14:52:59 -0500
+
 wlanpi-profiler (2.1.8-1) unstable; urgency=medium
 
   * Refuse to stage a radio without monitor mode, and refuse an AP start
