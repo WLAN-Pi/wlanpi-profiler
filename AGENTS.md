@@ -34,8 +34,8 @@ Find the ledger with: `rg -n "ponytail:" profiler tests`
 - rtl88XXau is explicitly out of scope for hardware verification: it is not
   tested, and missing rtl88XXau hardware results never block a change or a
   review. Keep its unit tests passing; do not request or wait for device runs.
-  Never mention rtl88XXau to the user: not in replies, caveats, driver
-  lists or verification summaries.
+  Don't bring rtl88XXau up in replies, caveats, driver lists or
+  verification summaries.
 
 ## Interface staging rules
 
