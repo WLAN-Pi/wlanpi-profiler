@@ -63,7 +63,7 @@ python-discovery==1.9.5
     # via
     #   tox
     #   virtualenv
-ruff==0.17.4
+ruff==0.17.5
     # via -r extras.in
 tomli-w==1.2.0
     # via tox
